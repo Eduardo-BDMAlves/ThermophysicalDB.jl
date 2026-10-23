@@ -1,11 +1,11 @@
 # Changes here will be overwritten by Copier
 AddPrecommitUpdateCI: false
-Authors: Eduardo-BDMAlves <eduardo.alves@polo.ufsc.br>
+Authors: Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>
 JuliaMinVersion: '1.10'
 License: MIT
-LicenseCopyrightHolders: Eduardo-BDMAlves
+LicenseCopyrightHolders: Eduardo Bader Dalfovo Mohr Alves
 PackageName: ThermophysicalDB
-PackageOwner: Eduardo Alves <eduardo.alves@polo.ufsc.br>
+PackageOwner: Eduardo-BDMAlves
 PackageUUID: ca26f490-bc68-4489-97cc-95a4c39097e5
 StrategyConfirmIncluded: false
 StrategyLevel: 3

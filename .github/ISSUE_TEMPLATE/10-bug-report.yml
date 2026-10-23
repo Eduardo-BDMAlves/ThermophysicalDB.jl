@@ -10,9 +10,9 @@ body:
 
         Please, before submitting, make sure that:
 
-        - There is not an [existing issue](https://github.com/Eduardo Alves <eduardo.alves@polo.ufsc.br>/ThermophysicalDB.jl/issues) with the same question
-        - You have read the [contributing guide](https://Eduardo Alves <eduardo.alves@polo.ufsc.br>.github.io/ThermophysicalDB.jl/dev/90-contributing/)
-        - You are following the [code of conduct](https://github.com/Eduardo Alves <eduardo.alves@polo.ufsc.br>/ThermophysicalDB.jl/blob/main/CODE_OF_CONDUCT.md)
+        - There is not an [existing issue](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/issues) with the same question
+        - You have read the [contributing guide](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev/90-contributing/)
+        - You are following the [code of conduct](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/blob/main/CODE_OF_CONDUCT.md)
         The form below should help you in filling out this issue.
   - type: textarea
     id: description

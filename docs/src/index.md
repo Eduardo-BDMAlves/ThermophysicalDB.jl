@@ -4,7 +4,7 @@ CurrentModule = ThermophysicalDB
 
 # ThermophysicalDB
 
-Documentation for [ThermophysicalDB](<https://github.com/Eduardo> Alves <eduardo.alves@polo.ufsc.br>/ThermophysicalDB.jl).
+Documentation for [ThermophysicalDB](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl).
 
 ## Contributors
 

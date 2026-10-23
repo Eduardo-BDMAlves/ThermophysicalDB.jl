@@ -6,5 +6,6 @@ message: >-
   metadata from this file.
 type: software
 authors:
-  - given-names: Eduardo-BDMAlves
+  - given-names: Eduardo Bader Dalfovo Mohr
+    family-names: Alves
     email: eduardo.alves@polo.ufsc.br

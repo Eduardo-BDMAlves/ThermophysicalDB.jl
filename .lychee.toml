@@ -3,7 +3,7 @@ exclude = [
   "@[Cc]ite.*",
   "^https://github.com/.*/releases/tag/v.*$",
   "^https://doi.org/FIXME$",
-  "^https://Eduardo Alves <eduardo.alves@polo.ufsc.br>.github.io/ThermophysicalDB.jl/stable/?$",
+  "^https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable/?$",
   "^https://blog.esciencecenter.nl", # due to a certificate error (cf. #556)
   "zenodo.org/badge/DOI/FIXME$"
 ]
