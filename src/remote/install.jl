@@ -13,26 +13,6 @@ function progress_printer(label::AbstractString)
     end
 end
 
-"""
-    download_file(url, dest; progress = true, timeout = Inf) -> String
-
-Download `url` into `dest` with Downloads.jl. With `progress = true`, a message is logged
-every 10 % for files larger than 1 MiB.
-"""
-function download_file(
-    url::AbstractString,
-    dest::AbstractString;
-    progress::Bool = true,
-    timeout::Real = Inf,
-)
-    if progress
-        Downloads.download(url, dest; timeout, progress = progress_printer(basename(dest)))
-    else
-        Downloads.download(url, dest; timeout)
-    end
-    return dest
-end
-
 # Digest of the archive to install: the one NIST publishes next to it. Built-in releases
 # carry a copy, used when the digest file cannot be fetched.
 function resolve_sha256(release::Release, download)::String
@@ -216,7 +196,9 @@ function update_database!(;
 )::Manifest
     status = check_update(; dir, fetch)
     if status.state === :not_installed || status.state === :update_available
-        return install_release(status.latest; dir, download)
+        manifest = install_release(status.latest; dir, download)
+        forget_database!()
+        return manifest
     end
     if status.state === :up_to_date
         @info "ThermoML archive is up to date" version = status.installed.version
