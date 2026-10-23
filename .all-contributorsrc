@@ -1,0 +1,5 @@
+{
+  "projectName": "ThermophysicalDB",
+  "projectOwner": "Eduardo Alves <eduardo.alves@polo.ufsc.br>",
+  "files": ["README.md", "docs/src/index.md"]
+}
