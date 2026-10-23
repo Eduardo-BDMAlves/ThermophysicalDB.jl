@@ -65,15 +65,13 @@ end
 
 makedocs(;
     modules = [ThermophysicalDB],
-    authors = "Eduardo-BDMAlves <eduardo.alves@polo.ufsc.br>",
-    repo = "https://github.com/Eduardo Alves <eduardo.alves@polo.ufsc.br>/ThermophysicalDB.jl/blob/{commit}{path}#{line}",
+    authors = "Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>",
+    repo = "https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/blob/{commit}{path}#{line}",
     sitename = "ThermophysicalDB.jl",
     format = Documenter.HTML(;
-        canonical = "https://Eduardo Alves <eduardo.alves@polo.ufsc.br>.github.io/ThermophysicalDB.jl",
+        canonical = "https://eduardo-bdmalves.github.io/ThermophysicalDB.jl",
     ),
     pages = list_pages(),
 )
 
-deploydocs(;
-    repo = "github.com/Eduardo Alves <eduardo.alves@polo.ufsc.br>/ThermophysicalDB.jl",
-)
+deploydocs(; repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl")
