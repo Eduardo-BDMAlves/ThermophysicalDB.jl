@@ -111,15 +111,15 @@ Temperatures are in K, pressures in MPa and densities in kg m⁻³. Their scatte
 ## Vapor pressure up to the critical temperature
 
 ```@example co2
-v = points(db; component = "carbon dioxide", exact = true, property = "Vapor or sublimation pressure")
+v = points(
+    db; component = "carbon dioxide", exact = true, property = "Vapor or sublimation pressure",
+    temperature = (240u"K", Tref * u"K"),
+)
 t = table(v; unitful = true)
 
 T = ustrip.(u"K", t.temperature)
 p = ustrip.(u"Pa", t.value)
-
-use = (240 .< T .< Tref)
-T, p = T[use], p[use]
-year = Float64.(t.year)[use]
+year = Float64.(t.year)
 
 psat(model, T) = Clapeyron.saturation_pressure(model, T)[1]
 

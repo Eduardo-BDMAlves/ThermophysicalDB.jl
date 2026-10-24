@@ -36,6 +36,20 @@ DataView
 table
 ```
 
+## References of a selection
+
+```@docs
+bibtex
+write_bibtex
+reference_summary
+latex_table
+markdown_table
+csv_table
+write_references
+ThermophysicalDB.ReferenceSummary
+ThermophysicalDB.BibtexReport
+```
+
 ## The dataset
 
 ```@docs

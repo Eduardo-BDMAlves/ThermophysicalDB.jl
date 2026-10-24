@@ -87,13 +87,13 @@ pure_median(name, property, unit) = median(ustrip.(unit, table(pure(name, proper
 
 fig = Figure(size = (900, 420))
 ax1 = Axis(fig[1, 1]; xlabel = "x ethanol", ylabel = "η [mPa s]", title = "Viscosity at 25 °C")
-sc = scatter!(ax1, x, η; color = year, markersize = 9)
+sc = scatter!(ax1, x, η; color = year, Main.DocsSetup.year_scale(year)..., markersize = 9)
 hlines!(ax1, [η_ethanol, η_water]; color = (:gray, 0.7), linestyle = :dash)
 
 ax2 = Axis(fig[1, 2]; xlabel = "x ethanol", ylabel = "Δη [mPa s]", title = "Viscosity deviation")
 hlines!(ax2, [0.0]; color = "#e8ecff", linewidth = 1.5)
-scatter!(ax2, x, Δη; color = year, markersize = 9)
-Colorbar(fig[1, 3], sc; label = "year of publication")
+scatter!(ax2, x, Δη; color = year, Main.DocsSetup.year_scale(year)..., markersize = 9)
+Colorbar(fig[1, 3], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 fig
 ```
 
@@ -128,8 +128,8 @@ VE = V .- V_ideal
 fig = Figure(size = (760, 440))
 ax = Axis(fig[1, 1]; xlabel = "x ethanol", ylabel = "Vᴱ [cm³ mol⁻¹]", title = "Excess molar volume of ethanol + water at 25 °C")
 hlines!(ax, [0.0]; color = "#e8ecff", linewidth = 1.5)
-sc = scatter!(ax, xd, VE; color = yd, markersize = 8)
-Colorbar(fig[1, 2], sc; label = "year of publication")
+sc = scatter!(ax, xd, VE; color = yd, Main.DocsSetup.year_scale(yd)..., markersize = 8)
+Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(yd))
 fig
 ```
 

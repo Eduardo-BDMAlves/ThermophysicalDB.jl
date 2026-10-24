@@ -4,11 +4,11 @@ CurrentModule = ThermophysicalDB
 
 # [Experiment against equations of state](@id tutorial_eos)
 
-An equation of state (EoS) is a model: it closes the thermodynamics of a fluid with a few parameters. Whether it is *good* is an empirical question, and the archive holds the experiments that answer it. This tutorial puts hexane data next to the predictions of four EoS from [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl) [Walker2022](@cite):
+An equation of state (EoS) is a model: it represents the thermodynamics of a fluid with a few parameters. Whether it is *good* is an empirical question, and the archive holds the experiments that answer it. This tutorial puts hexane data next to the predictions of four EoS from [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl) [Walker2022](@cite):
 
 | Model | Family | What it brings |
 |:--|:--|:--|
-| `PR` | cubic (Peng–Robinson [Peng1976](@cite)) | two parameters per fluid, fast; known to be poor for liquid density |
+| `PR` | cubic (Peng–Robinson [Peng1976](@cite)) | three parameters per fluid, fast |
 | `SRK` | cubic (Soave–Redlich–Kwong [Soave1972](@cite)) | the same family, a different attractive term |
 | `PCSAFT` | SAFT (perturbed chain [Gross2001](@cite)) | molecular model with chain length, accurate for liquids |
 | `SAFTVRMie` | SAFT (variable range, Mie potential [Lafitte2013](@cite)) | flexible repulsion and attraction, also predicts derivative properties |
@@ -66,16 +66,16 @@ The saturation pressure is a function of temperature alone, so each experimental
 ```@example eos
 db = database(progress = false)
 
-v = points(db; component = "hexane", exact = true, property = "Vapor or sublimation pressure")
-t = table(v; unitful = true)
+# the temperature window is part of the selection: a range where all four models are well defined
+v = points(
+    db; component = "hexane", exact = true, property = "Vapor or sublimation pressure",
+    temperature = (230u"K", 500u"K"), pure = true
+)
+t = table(v; unitful = true, units = :si)
 
 T = ustrip.(u"K", t.temperature)
 p = ustrip.(u"Pa", t.value)
-
-# keep a range where all four models are well defined
-use = 230 .< T .< 500
-T, p = T[use], p[use]
-year = Float64.(t.year)[use]
+year = Float64.(t.year)
 
 psat(model, T) = Clapeyron.saturation_pressure(model, T)[1]   # first entry is the pressure, Pa
 
@@ -84,7 +84,7 @@ pvap = map(models) do model
 end
 
 dev_p = map(pvap) do q
-    (q .- p) ./ p
+    ((q .- p) ./ p)
 end
 
 map(summarize, dev_p)

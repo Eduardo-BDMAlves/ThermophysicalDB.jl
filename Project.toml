@@ -8,6 +8,7 @@ projects = ["test", "docs"]
 
 [deps]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
+DOI2BibTeX = "f07c2035-147c-4265-9006-0e86cca2fe32"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
@@ -17,10 +18,12 @@ SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 Tar = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
+Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 CodecZlib = "0.7.9"
+DOI2BibTeX = "0.1.7"
 Dates = "1.11.0"
 Downloads = "1.7.0"
 JLD2 = "0.5, 0.6"
@@ -30,5 +33,6 @@ SHA = "1.0.0"
 TOML = "1.0.3"
 Tables = "1.12"
 Tar = "1.10.0"
+Unicode = "1.0.0"
 Unitful = "1"
 julia = "1.10"

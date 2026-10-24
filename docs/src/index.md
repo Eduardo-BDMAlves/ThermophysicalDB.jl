@@ -90,7 +90,7 @@ fig # hide
 <div class="tdb-gallery">
   <a class="tdb-card" href="10-getting-started"><strong>Getting started</strong><span>Install the package, build the database and run your first query.</span></a>
   <a class="tdb-card" href="20-tutorials/10-hexane-conductivity"><strong>Hexane</strong><span>Thermal conductivity against temperature and pressure, with uncertainty bars.</span></a>
-  <a class="tdb-card" href="20-tutorials/20-water-density"><strong>Water density</strong><span>Hundreds of laboratories compared with the Kell equation, filtered in °C and atm.</span></a>
+  <a class="tdb-card" href="20-tutorials/20-water-density"><strong>Water density</strong><span>Hundreds of laboratories compared with the IAPWS-95 equation of Clapeyron.jl, filtered in °C and atm.</span></a>
   <a class="tdb-card" href="20-tutorials/30-vapor-pressure"><strong>Vapor pressure</strong><span>Clausius–Clapeyron and the enthalpy of vaporization of ethanol.</span></a>
   <a class="tdb-card" href="20-tutorials/40-mixtures"><strong>Binary mixtures</strong><span>The viscosity of ethanol + water against composition.</span></a>
   <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against PR, SRK, PC-SAFT and SAFT-VR Mie from Clapeyron.jl.</span></a>

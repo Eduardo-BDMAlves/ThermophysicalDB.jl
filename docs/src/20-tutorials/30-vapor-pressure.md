@@ -52,10 +52,10 @@ On a logarithmic axis the curve spans orders of magnitude, from the triple-point
 ```@example vap
 fig = Figure(size = (760, 460))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "p [kPa]", yscale = log10, title = "Vapor pressure of ethanol")
-sc = scatter!(ax, T, p; color = year, markersize = 7)
+sc = scatter!(ax, T, p; color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
 hlines!(ax, [101.325]; color = (:gray, 0.8), linestyle = :dash)
 text!(ax, minimum(T), 101.325; text = "1 atm", align = (:left, :bottom), color = :gray)
-Colorbar(fig[1, 2], sc; label = "year of publication")
+Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 fig
 ```
 
@@ -78,10 +78,10 @@ round(mean_enthalpy; digits = 2)    # kJ/mol, averaged over the whole range
 ```@example vap
 fig = Figure(size = (760, 460))
 ax = Axis(fig[1, 1]; xlabel = "1/T [10⁻³ K⁻¹]", ylabel = "ln p  [p in kPa]", title = "Clausius–Clapeyron plot")
-sc = scatter!(ax, x, y; color = year, markersize = 7)
+sc = scatter!(ax, x, y; color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
 xs = range(extrema(x)...; length = 50)
 lines!(ax, xs, intercept .+ slope .* xs; color = "#e8ecff", linewidth = 2, label = "linear fit")
-Colorbar(fig[1, 2], sc; label = "year of publication")
+Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 axislegend(ax; position = :rt)
 fig
 ```

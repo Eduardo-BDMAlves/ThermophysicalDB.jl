@@ -85,6 +85,35 @@ const THEME = Theme(;
 )
 
 """
+    year_scale(years) -> NamedTuple
+
+Keyword arguments (`colormap`, `colorrange`) that colour points by publication year with
+one discrete colour per year, sampled from [`FIELD`](@ref). Each year is a band of its own
+(the range is widened by half a year on each side), so a colour in the plot can be matched
+to a year in the colour bar. Use it as `scatter!(...; color = years, year_scale(years)...)`.
+"""
+function year_scale(years)
+    first_year, last_year = floor(Int, minimum(years)), ceil(Int, maximum(years))
+    n = last_year - first_year + 1
+    colors = [FIELD[(i-1)/max(n-1, 1)] for i = 1:n]
+    return (
+        colormap = cgrad(colors; categorical = true),
+        colorrange = (first_year - 0.5, last_year + 0.5),
+    )
+end
+
+"""
+    year_ticks(years)
+
+Decades inside the range of `years`: the ticks of the colour bar of [`year_scale`](@ref).
+They sit at the centre of the band of that year.
+"""
+function year_ticks(years)
+    first_year, last_year = floor(Int, minimum(years)), ceil(Int, maximum(years))
+    return (10*cld(first_year, 10)):10:last_year
+end
+
+"""
     activate!()
 
 Select the PNG backend of CairoMakie (twice the resolution, so figures stay sharp on

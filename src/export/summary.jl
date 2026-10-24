@@ -1,0 +1,688 @@
+# Summary of the articles behind a selection: one row for every (article, property) pair,
+# with the number of points, the ranges of temperature and pressure, the methods and the
+# uncertainty. It can be shown in the REPL, used as a Tables.jl table, or written as LaTeX
+# (citing the keys of the BibTeX export), Markdown or CSV.
+
+# ----------------------------------------------------------------------------------
+# Small helpers
+# ----------------------------------------------------------------------------------
+
+const MONTH_NAMES =
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
+"Month number of a BibTeX `month` field (`jan`, `January`, `1`); 0 when unknown."
+function parse_month(text::Union{Nothing,AbstractString})
+    text === nothing && return 0
+    t = lowercase(strip(String(text)))
+    n = tryparse(Int, t)
+    n !== nothing && return 1 <= n <= 12 ? n : 0
+    idx = findfirst(==(first(t, 3)), MONTH_NAMES)
+    return idx === nothing ? 0 : idx
+end
+
+plain_text(s::AbstractString) = replace(s, r"[{}]" => "")
+
+"""
+    citation_text(entry) -> String
+
+`Chirico (2003)`, `Chirico and Frenkel (2003)` or `Chirico et al. (2003)`; the key when the
+entry has no author.
+"""
+function citation_text(entry::BibEntry)
+    authors = field_value(entry, "author")
+    authors === nothing && return entry.key
+    names = [plain_text(first_author_surname(a)) for a in split(authors, " and ")]
+    year = field_value(entry, "year")
+    tail = year === nothing ? "" : " ($year)"
+    length(names) == 1 && return string(names[1], tail)
+    length(names) == 2 && return string(names[1], " and ", names[2], tail)
+    return string(names[1], " et al.", tail)
+end
+
+const SMALL_WORDS =
+    ("a", "an", "and", "by", "for", "from", "in", "of", "on", "the", "to", "with")
+
+"Initials of the words of a method name, without small words: `Vibrating tube method` becomes `VTM`."
+function abbreviate_method(name::AbstractString)
+    words = split(replace(name, r"[^\p{L}\p{N}]+" => " "))
+    initials = [uppercase(first(w)) for w in words if lowercase(w) ∉ SMALL_WORDS]
+    return isempty(initials) ? String(name) : String(initials)
+end
+
+"""
+    display_method!(legend, abbreviations, name, max_length) -> String
+
+The name itself when it has at most `max_length` characters, otherwise its initials. Two
+different long names with the same initials get a number (`VTM`, `VTM2`). The pairs
+initials => name accumulate in `legend`, to be explained in a note.
+"""
+function display_method!(
+    legend::Dict{String,String},
+    abbreviations::Dict{String,String},
+    name::AbstractString,
+    max_length::Integer,
+)
+    length(name) <= max_length && return String(name)
+    return get!(abbreviations, String(name)) do
+        base = abbreviate_method(name)
+        abbreviation = base
+        k = 1
+        while haskey(legend, abbreviation) && legend[abbreviation] != name
+            k += 1
+            abbreviation = string(base, k)
+        end
+        legend[abbreviation] = String(name)
+        abbreviation
+    end
+end
+
+"Median or mean of `values` (reordered in place); NaN when empty."
+function central(values::Vector{Float64}, statistic::Symbol)
+    n = length(values)
+    n == 0 && return NaN
+    if statistic === :median
+        sort!(values)
+        mid = n ÷ 2
+        return isodd(n) ? values[mid+1] : (values[mid] + values[mid+1]) / 2
+    end
+    return sum(values) / n
+end
+
+"`x` expressed in `to`, given in `from`; NaN stays NaN. Affine units (°C) are handled by Unitful."
+function convert_value(x::Float64, from, to)
+    isfinite(x) || return NaN
+    return Float64(Unitful.ustrip(to, x * from))
+end
+
+# ----------------------------------------------------------------------------------
+# The summary
+# ----------------------------------------------------------------------------------
+
+"""
+    ReferenceSummary
+
+The result of [`reference_summary`](@ref): a Tables.jl table with one row per (article,
+property), plus the explanation of the abbreviated methods (`legend`) and the bibliography
+whose keys the rows use. Its columns are
+
+`key, doi, year, month, citation, property, unit, system, method, method_full, phase,
+n_points, n_uncertainty, T_min, T_max, p_min, p_max, unc_abs, unc_rel`.
+
+`T_min`, `T_max`, `p_min` and `p_max` are in `temperature_unit` and `pressure_unit`;
+`unc_abs` is in `unit` (the unit of the property) and `unc_rel` is a percentage.
+"""
+struct ReferenceSummary
+    columns::NamedTuple
+    legend::Vector{Pair{String,String}}
+    temperature_unit::String
+    pressure_unit::String
+    statistic::Symbol
+    bibliography::Bibliography
+end
+
+const SUMMARY_FIELDS =
+    (:columns, :legend, :temperature_unit, :pressure_unit, :statistic, :bibliography)
+
+function Base.getproperty(s::ReferenceSummary, name::Symbol)
+    name in SUMMARY_FIELDS && return getfield(s, name)
+    return getproperty(getfield(s, :columns), name)
+end
+
+Base.propertynames(s::ReferenceSummary, private::Bool = false) =
+    (propertynames(getfield(s, :columns))..., SUMMARY_FIELDS...)
+
+Base.length(s::ReferenceSummary) = length(getfield(s, :columns).key)
+
+Tables.istable(::Type{ReferenceSummary}) = true
+Tables.columnaccess(::Type{ReferenceSummary}) = true
+Tables.columns(s::ReferenceSummary) = getfield(s, :columns)
+Tables.schema(s::ReferenceSummary) = Tables.schema(getfield(s, :columns))
+
+"""
+    reference_summary(view; temperature_unit = u"K", pressure_unit = u"MPa",
+                      statistic = :median, method_length = 24, policy = :nominal,
+                      online = true, cache = true, refresh = false, include_source = true,
+                      progress = true) -> ReferenceSummary
+
+Summarise the articles behind the points of `view` ([`DataView`](@ref) or
+[`Dataset`](@ref)), one row for every (article, property) pair, so an article that
+measured two properties has two rows.
+
+Each row has the number of points, the ranges of temperature and pressure (in the units
+you choose, any Unitful temperature and pressure unit), the methods and phases, and the
+expanded uncertainty at ``k = 2`` over the points that state one: the `statistic`
+(`:median`, the default, or `:mean`) of the relative uncertainty in percent, and of the
+absolute uncertainty in the unit of the property. A method name longer than
+`method_length` characters is replaced by its initials, and `legend` explains them.
+
+The rows are ordered by year, then by month (when the DOI entry has it), then by the key
+of the entry. The keys are those of [`bibtex`](@ref); the keywords `online`, `cache`,
+`refresh`, `include_source` and `progress` act as there. `policy` is passed to the
+conversion of uncertainties to ``k = 2`` (see [`table`](@ref)).
+"""
+function reference_summary(
+    view::DataView;
+    temperature_unit = u"K",
+    pressure_unit = u"MPa",
+    statistic::Symbol = :median,
+    method_length::Integer = 24,
+    policy::Symbol = :nominal,
+    kwargs...,
+)
+    statistic in (:median, :mean) ||
+        throw(ArgumentError("statistic must be :median or :mean, got :$statistic"))
+    bib = collect_bibliography(view; kwargs...)
+    ds = view.dataset
+    m, ex, rf, pr = ds.measurements, ds.experiments, ds.references, ds.properties
+
+    position = zeros(Int, length(rf))
+    for (k, i) in enumerate(bib.ids)
+        position[i] = k
+    end
+
+    # one accumulator per (reference, property), filled in a single pass over the points
+    index = Dict{Tuple{Int32,Int32},Int}()
+    group_ref = Int32[]
+    group_prop = Int32[]
+    npoints = Int[]
+    tmin, tmax, pmin, pmax = Float64[], Float64[], Float64[], Float64[]
+    methods = Vector{Vector{String}}()
+    phases = Vector{Vector{String}}()
+    systems = Vector{Vector{String}}()
+    relative = Vector{Vector{Float64}}()
+    absolute = Vector{Vector{Float64}}()
+    labels = Vector{Union{Nothing,String}}(nothing, length(ex.reference))
+
+    for r in view.rows
+        e = m.experiment[r]
+        ref = ex.reference[e]
+        ref == NO_ID && continue
+        p = m.property[r]
+        key = (ref, p)
+        g = get(index, key, 0)
+        if g == 0
+            push!(group_ref, ref)
+            push!(group_prop, p)
+            push!(npoints, 0)
+            push!(tmin, Inf)
+            push!(tmax, -Inf)
+            push!(pmin, Inf)
+            push!(pmax, -Inf)
+            push!(methods, String[])
+            push!(phases, String[])
+            push!(systems, String[])
+            push!(relative, Float64[])
+            push!(absolute, Float64[])
+            g = length(group_ref)
+            index[key] = g
+        end
+        npoints[g] += 1
+        T = m.temperature[r]
+        if !isnan(T)
+            tmin[g] = min(tmin[g], T)
+            tmax[g] = max(tmax[g], T)
+        end
+        P = m.pressure[r]
+        if !isnan(P)
+            pmin[g] = min(pmin[g], P)
+            pmax[g] = max(pmax[g], P)
+        end
+        method = pool_string(ds.methods, m.method[r])
+        isempty(method) || method in methods[g] || push!(methods[g], method)
+        phase = pool_string(ds.phases, m.phase[r])
+        isempty(phase) || phase in phases[g] || push!(phases[g], phase)
+        label = labels[e]
+        if label === nothing
+            label = system_label(ds, e)
+            labels[e] = label
+        end
+        label in systems[g] || push!(systems[g], label)
+        u2, _ = k2_uncertainty(m.unc[r], m.unc_k[r], m.unc_level[r], policy)
+        if !isnan(u2)
+            push!(absolute[g], u2)
+            v = m.value[r]
+            (v != 0 && !isnan(v)) && push!(relative[g], 100 * u2 / abs(v))
+        end
+    end
+
+    # order: year, month, key, property
+    entry_of(g) = bib.entries[position[group_ref[g]]]
+    years = Int[
+        something(
+            tryparse(Int, something(field_value(entry_of(g), "year"), "")),
+            Int(rf.year[group_ref[g]]),
+        ) for g in eachindex(group_ref)
+    ]
+    months =
+        Int[parse_month(field_value(entry_of(g), "month")) for g in eachindex(group_ref)]
+    keys_ = String[entry_of(g).key for g in eachindex(group_ref)]
+    names = String[pr.label[group_prop[g]] for g in eachindex(group_ref)]
+    order = sortperm(collect(zip(years, months, lowercase.(keys_), names)))
+
+    legend = Dict{String,String}()
+    abbreviations = Dict{String,String}()
+    method_full = String[join(methods[g], "; ") for g in order]
+    method_shown = String[
+        join(
+            (display_method!(legend, abbreviations, x, method_length) for x in methods[g]),
+            "; ",
+        ) for g in order
+    ]
+
+    from_T, from_p = u"K", u"kPa"
+    columns = (;
+        key = keys_[order],
+        doi = String[rf.doi[group_ref[g]] for g in order],
+        year = years[order],
+        month = months[order],
+        citation = String[citation_text(entry_of(g)) for g in order],
+        property = names[order],
+        unit = String[pr.unit[group_prop[g]] for g in order],
+        system = String[join(systems[g], "; ") for g in order],
+        method = method_shown,
+        method_full = method_full,
+        phase = String[join(phases[g], "; ") for g in order],
+        n_points = npoints[order],
+        n_uncertainty = Int[length(absolute[g]) for g in order],
+        T_min = Float64[convert_value(tmin[g], from_T, temperature_unit) for g in order],
+        T_max = Float64[convert_value(tmax[g], from_T, temperature_unit) for g in order],
+        p_min = Float64[convert_value(pmin[g], from_p, pressure_unit) for g in order],
+        p_max = Float64[convert_value(pmax[g], from_p, pressure_unit) for g in order],
+        unc_abs = Float64[central(absolute[g], statistic) for g in order],
+        unc_rel = Float64[central(relative[g], statistic) for g in order],
+    )
+    return ReferenceSummary(
+        columns,
+        sort!(collect(legend); by = first),
+        string(temperature_unit),
+        string(pressure_unit),
+        statistic,
+        bib,
+    )
+end
+
+reference_summary(ds::Dataset; kwargs...) = reference_summary(DataView(ds); kwargs...)
+
+"""
+    bibtex(summary::ReferenceSummary) -> String
+
+The BibTeX entries whose keys the rows of `summary` use.
+"""
+bibtex(s::ReferenceSummary) = render_bibliography(getfield(s, :bibliography))
+
+# ----------------------------------------------------------------------------------
+# Cells
+# ----------------------------------------------------------------------------------
+
+"A number with at most `digits` significant digits and no trailing `.0`; `--` for NaN."
+function format_number(x::Real, digits::Integer)
+    isnan(x) && return "--"
+    s = string(round(Float64(x); sigdigits = digits))
+    endswith(s, ".0") && (s = chop(s; tail = 2))
+    return s
+end
+
+function format_range(lo::Real, hi::Real, digits::Integer, dash::AbstractString)
+    isnan(lo) && return "--"
+    a, b = format_number(lo, digits), format_number(hi, digits)
+    return a == b ? a : string(a, dash, b)
+end
+
+const LATEX_ESCAPES = Dict{Char,String}(
+    '\\' => "\\textbackslash{}",
+    '&' => "\\&",
+    '%' => "\\%",
+    '$' => "\\\$",
+    '#' => "\\#",
+    '_' => "\\_",
+    '{' => "\\{",
+    '}' => "\\}",
+    '~' => "\\textasciitilde{}",
+    '^' => "\\textasciicircum{}",
+    '°' => "\\textdegree{}",
+    'μ' => "\\textmu{}",
+    'µ' => "\\textmu{}",
+)
+
+latex_escape(s::AbstractString) = join((get(LATEX_ESCAPES, c, string(c)) for c in s))
+
+const SUMMARY_COLUMNS = (
+    :reference,
+    :property,
+    :system,
+    :method,
+    :phase,
+    :points,
+    :temperature,
+    :pressure,
+    :uncertainty,
+    :uncertainty_abs,
+)
+
+"The columns shown by default: the property and the system only when they vary."
+function default_columns(s::ReferenceSummary)
+    c = getfield(s, :columns)
+    cols = Symbol[:reference]
+    length(unique(c.property)) > 1 && push!(cols, :property)
+    length(unique(c.system)) > 1 && push!(cols, :system)
+    any(!isempty, c.method) && push!(cols, :method)
+    append!(cols, (:points, :temperature, :pressure, :uncertainty))
+    return cols
+end
+
+function column_header(s::ReferenceSummary, col::Symbol, latex::Bool)
+    T, p = getfield(s, :temperature_unit), getfield(s, :pressure_unit)
+    esc = latex ? latex_escape : identity
+    col === :reference && return "Reference"
+    col === :property && return "Property"
+    col === :system && return "System"
+    col === :method && return "Method"
+    col === :phase && return "Phase"
+    col === :points && return latex ? "\$N\$" : "N"
+    col === :temperature &&
+        return latex ? string("\$T\$ [", esc(T), "]") : string("T [", T, "]")
+    col === :pressure &&
+        return latex ? string("\$p\$ [", esc(p), "]") : string("p [", p, "]")
+    col === :uncertainty && return latex ? "\$U_\\mathrm{r}\$ [\\%]" : "U_r [%]"
+    col === :uncertainty_abs && return latex ? "\$U\$" : "U"
+    throw(ArgumentError("unknown column :$col; choose from $(SUMMARY_COLUMNS)"))
+end
+
+function cell_value(
+    s::ReferenceSummary,
+    col::Symbol,
+    i::Integer,
+    mode::Symbol,
+    reference::Symbol,
+    digits::Integer,
+    uncertainty_digits::Integer,
+)
+    c = getfield(s, :columns)
+    latex = mode === :latex
+    esc = latex ? latex_escape : identity
+    dash = latex ? "--" : "–"
+    if col === :reference
+        reference === :key && return esc(c.key[i])
+        reference === :cite && latex && return string("\\cite{", c.key[i], "}")
+        return esc(c.citation[i])
+    end
+    col === :property && return esc(c.property[i])
+    col === :system && return esc(c.system[i])
+    col === :method && return esc(c.method[i])
+    col === :phase && return esc(c.phase[i])
+    col === :points && return string(c.n_points[i])
+    col === :temperature && return format_range(c.T_min[i], c.T_max[i], digits, dash)
+    col === :pressure && return format_range(c.p_min[i], c.p_max[i], digits, dash)
+    col === :uncertainty && return format_number(c.unc_rel[i], uncertainty_digits)
+    if col === :uncertainty_abs
+        isnan(c.unc_abs[i]) && return "--"
+        return string(format_number(c.unc_abs[i], uncertainty_digits), " ", esc(c.unit[i]))
+    end
+    throw(ArgumentError("unknown column :$col; choose from $(SUMMARY_COLUMNS)"))
+end
+
+function summary_cells(
+    s::ReferenceSummary,
+    columns,
+    rows,
+    mode::Symbol,
+    reference::Symbol,
+    digits::Integer,
+    uncertainty_digits::Integer,
+)
+    header = String[column_header(s, col, mode === :latex) for col in columns]
+    cells = [
+        String[
+            cell_value(s, col, i, mode, reference, digits, uncertainty_digits) for
+            col in columns
+        ] for i in rows
+    ]
+    return header, cells
+end
+
+function legend_text(s::ReferenceSummary, mode::Symbol)
+    legend = getfield(s, :legend)
+    isempty(legend) && return ""
+    esc = mode === :latex ? latex_escape : identity
+    return join((string(esc(a), ", ", esc(n)) for (a, n) in legend), "; ")
+end
+
+# ----------------------------------------------------------------------------------
+# LaTeX, Markdown, CSV and the REPL
+# ----------------------------------------------------------------------------------
+
+function default_caption(s::ReferenceSummary)
+    stat = getfield(s, :statistic) === :median ? "median" : "mean"
+    return string(
+        "Experimental data of the selected articles: number of points \$N\$, ranges of ",
+        "temperature and pressure, and ",
+        stat,
+        " relative expanded uncertainty \$U_\\mathrm{r}\$ (\$k=2\$) of the points that state one.",
+    )
+end
+
+"""
+    latex_table(summary; columns, caption, label, reference = :cite, digits = 4,
+                uncertainty_digits = 2) -> String
+
+The summary as a `longtable` with `booktabs` rules (load `longtable` and `booktabs`). The
+reference column holds `\\cite{key}` with the keys of the BibTeX export
+(`reference = :text` writes `Author et al. (year)` instead, `:key` the key). Abbreviated
+methods are explained in a note at the end of the table. `columns` is a list taken from
+`:reference, :property, :system, :method, :phase, :points, :temperature, :pressure,
+:uncertainty, :uncertainty_abs`; by default the property and the system appear only when
+they vary. `digits` and `uncertainty_digits` are significant digits. The caption may use
+LaTeX; the rest of the text is escaped.
+"""
+function latex_table(
+    s::ReferenceSummary;
+    columns = default_columns(s),
+    caption::AbstractString = default_caption(s),
+    label::AbstractString = "tab:references",
+    reference::Symbol = :cite,
+    digits::Integer = 4,
+    uncertainty_digits::Integer = 2,
+)
+    header, cells = summary_cells(
+        s,
+        columns,
+        1:length(s),
+        :latex,
+        reference,
+        digits,
+        uncertainty_digits,
+    )
+    n = length(columns)
+    align = join((
+        col === :method ? "p{3.4cm}" :
+        col === :system ? "p{3.2cm}" : col in (:reference, :property, :phase) ? "l" : "c" for col in columns
+    ),)
+    io = IOBuffer()
+    println(io, "% Requires: \\usepackage{booktabs} and \\usepackage{longtable}")
+    println(io, "\\begin{longtable}{", align, "}")
+    println(io, "\\caption{", caption, "}\\label{", label, "}\\\\")
+    head = join(header, " & ") * " \\\\"
+    println(io, "\\toprule\n", head, "\n\\midrule\n\\endfirsthead")
+    println(io, "\\toprule\n", head, "\n\\midrule\n\\endhead")
+    println(
+        io,
+        "\\midrule\n\\multicolumn{",
+        n,
+        "}{r}{\\footnotesize\\emph{continued on the next page}} \\\\\n\\endfoot",
+    )
+    note = :method in columns ? legend_text(s, :latex) : ""
+    if isempty(note)
+        println(io, "\\bottomrule\n\\endlastfoot")
+    else
+        println(
+            io,
+            "\\bottomrule\n\\multicolumn{",
+            n,
+            "}{p{0.95\\linewidth}}{\\footnotesize \\textbf{Methods:} ",
+            note,
+            ".} \\\\\n\\endlastfoot",
+        )
+    end
+    for row in cells
+        println(io, join(row, " & "), " \\\\")
+    end
+    println(io, "\\end{longtable}")
+    return String(take!(io))
+end
+
+"""
+    markdown_table(summary; columns, reference = :text, digits = 4, uncertainty_digits = 2) -> String
+
+The summary as a Markdown (GitHub flavoured) table, with the explanation of abbreviated
+methods below it. The arguments are those of [`latex_table`](@ref).
+"""
+function markdown_table(
+    s::ReferenceSummary;
+    columns = default_columns(s),
+    reference::Symbol = :text,
+    digits::Integer = 4,
+    uncertainty_digits::Integer = 2,
+)
+    header, cells =
+        summary_cells(s, columns, 1:length(s), :text, reference, digits, uncertainty_digits)
+    pipe(x) = replace(x, "|" => "\\|")
+    io = IOBuffer()
+    println(io, "| ", join(pipe.(header), " | "), " |")
+    println(io, "|", join(fill("---", length(columns)), "|"), "|")
+    for row in cells
+        println(io, "| ", join(pipe.(row), " | "), " |")
+    end
+    note = :method in columns ? legend_text(s, :text) : ""
+    isempty(note) || println(io, "\nMethods: ", note, ".")
+    return String(take!(io))
+end
+
+csv_field(x::AbstractString) =
+    any(c -> c in (',', '"', '\n', '\r'), x) ?
+    string('"', replace(x, "\"" => "\"\""), '"') : String(x)
+csv_field(x::Real) = isnan(x) ? "" : string(x)
+
+"""
+    csv_table(summary) -> String
+
+All the columns of the summary as CSV, with full method names and the units in the
+headers (`T_min [K]`, `p_max [MPa]`, `unc_rel [%]`).
+"""
+function csv_table(s::ReferenceSummary)
+    c = getfield(s, :columns)
+    T, p = getfield(s, :temperature_unit), getfield(s, :pressure_unit)
+    names = (
+        "key",
+        "doi",
+        "year",
+        "month",
+        "citation",
+        "property",
+        "unit",
+        "system",
+        "method",
+        "phase",
+        "n_points",
+        "n_uncertainty",
+        string("T_min [", T, "]"),
+        string("T_max [", T, "]"),
+        string("p_min [", p, "]"),
+        string("p_max [", p, "]"),
+        "unc_abs [property unit]",
+        "unc_rel [%]",
+    )
+    fields = (
+        c.key,
+        c.doi,
+        c.year,
+        c.month,
+        c.citation,
+        c.property,
+        c.unit,
+        c.system,
+        c.method_full,
+        c.phase,
+        c.n_points,
+        c.n_uncertainty,
+        c.T_min,
+        c.T_max,
+        c.p_min,
+        c.p_max,
+        c.unc_abs,
+        c.unc_rel,
+    )
+    io = IOBuffer()
+    println(io, join(csv_field.(names), ","))
+    for i = 1:length(s)
+        println(io, join((csv_field(f[i]) for f in fields), ","))
+    end
+    return String(take!(io))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", s::ReferenceSummary; maxrows::Int = 12)
+    n = length(s)
+    println(io, "ReferenceSummary: ", n, n == 1 ? " row" : " rows")
+    n == 0 && return nothing
+    columns = default_columns(s)
+    shown = 1:min(n, maxrows)
+    header, cells = summary_cells(s, columns, shown, :text, :text, 4, 2)
+    widths = [
+        maximum(textwidth, [header[j]; [row[j] for row in cells]]) for
+        j in eachindex(header)
+    ]
+    line(row) = join((rpad(x, widths[j]) for (j, x) in enumerate(row)), "  ")
+    println(io, "  ", line(header))
+    for row in cells
+        println(io, "  ", line(row))
+    end
+    n > maxrows && println(io, "  ... ", n - maxrows, " more rows")
+    note = :method in columns ? legend_text(s, :text) : ""
+    isempty(note) || print(io, "  Methods: ", note)
+    return nothing
+end
+
+Base.show(io::IO, s::ReferenceSummary) = print(io, "ReferenceSummary(", length(s), " rows)")
+
+"""
+    write_references(prefix, view; formats = (:bib, :tex, :md, :csv), table = (;), kwargs...)
+        -> ReferenceSummary
+
+Write the references of a selection in one go, so that the files agree: `prefix.bib` (the
+entries of [`bibtex`](@ref)), `prefix.tex` ([`latex_table`](@ref)), `prefix.md`
+([`markdown_table`](@ref)) and `prefix.csv` ([`csv_table`](@ref)); `formats` chooses
+which. `table` holds the keywords of the table writers (`columns`, `digits`, ...) and the
+rest, those of [`reference_summary`](@ref). The summary is returned.
+
+# Examples
+```julia
+summary = write_references("water", v; pressure_unit = u"kPa", statistic = :mean)
+```
+"""
+function write_references(
+    prefix::AbstractString,
+    view::DataView;
+    formats = (:bib, :tex, :md, :csv),
+    table = (;),
+    kwargs...,
+)
+    s = reference_summary(view; kwargs...)
+    for format in formats
+        if format === :bib
+            write(string(prefix, ".bib"), bibtex(s))
+        elseif format === :tex
+            write(string(prefix, ".tex"), latex_table(s; table...))
+        elseif format === :md
+            write(string(prefix, ".md"), markdown_table(s; table...))
+        elseif format === :csv
+            write(string(prefix, ".csv"), csv_table(s))
+        else
+            throw(
+                ArgumentError("unknown format :$format; choose from :bib, :tex, :md, :csv"),
+            )
+        end
+    end
+    return s
+end
+
+write_references(prefix::AbstractString, ds::Dataset; kwargs...) =
+    write_references(prefix, DataView(ds); kwargs...)
