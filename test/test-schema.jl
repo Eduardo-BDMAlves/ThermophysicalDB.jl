@@ -14,16 +14,21 @@ end
 
 @testitem "references are deduplicated by DOI" tags = [:unit, :fast] begin
     t = ThermophysicalDB.ReferenceTable()
-    a = ThermophysicalDB.add_reference!(t; doi = "10.1/x", year = 2005, authors = ["A, B."])
-    b = ThermophysicalDB.add_reference!(t; doi = "10.1/x", year = 1999)
-    c = ThermophysicalDB.add_reference!(t; doi = "10.1/y")
+    a = ThermophysicalDB.add_reference!(
+        t;
+        doi = "10.5555/tdbfixture-003",
+        year = 2005,
+        authors = ["Poe, B."],
+    )
+    b = ThermophysicalDB.add_reference!(t; doi = "10.5555/tdbfixture-003", year = 1999)
+    c = ThermophysicalDB.add_reference!(t; doi = "10.5555/tdbfixture-004")
     d = ThermophysicalDB.add_reference!(t; title = "no doi")
     e = ThermophysicalDB.add_reference!(t; title = "no doi either")
     @test a == b == 1
     @test (c, d, e) == (2, 3, 4)
     @test length(t) == 4
     @test t.year[a] == 2005
-    @test t.authors[a] == ["A, B."]
+    @test t.authors[a] == ["Poe, B."]
 end
 
 @testitem "compounds are keyed by InChIKey, then by name" tags = [:unit, :fast] begin
@@ -59,7 +64,7 @@ end
     T = ThermophysicalDB
     ds = T.Dataset()
     src = T.intern!(ds.sources, "thermoml")
-    ref = T.add_reference!(ds.references; doi = "10.1/x", source = src)
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-003", source = src)
     co2 = T.add_compound!(ds.compounds; names = ["carbon dioxide"])
     ch4 = T.add_compound!(ds.compounds; names = ["methane"])
     kind = T.intern!(ds.kinds, "Mole fraction")

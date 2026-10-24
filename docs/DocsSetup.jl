@@ -27,20 +27,24 @@ const COLORS = (
 )
 
 # Order of the colour cycle: neighbouring colours differ in hue and brightness.
+# Warm colours (neon, helium, sodium) come early, since this is thermodynamics; mercury
+# and xenon keep the cold side.
 const CYCLE = [
     COLORS.mercury,
     COLORS.neon,
-    COLORS.krypton,
-    COLORS.hydrogen,
+    COLORS.helium,
     COLORS.xenon,
     COLORS.sodium,
+    COLORS.krypton,
+    COLORS.hydrogen,
     COLORS.oxygen,
-    COLORS.argon,
 ]
 
-# Colormap for continuous colours: scatter points coloured by year or pressure, and
-# fields (heatmaps, contours). It is the reverse of `:managua`.
-const FIELD = Reverse(:managua)
+# Colormap for continuous colours (scatter points coloured by temperature, deviation maps,
+# fields): cold to hot, from blue through cyan and a white midpoint to amber and red. The
+# bright midpoint marks zero in diverging data (no deviation) and reads well on the dark
+# panel. Temperature-like and signed quantities use it; positive means hotter or larger.
+const FIELD = cgrad(["#3b6bff", "#2fe0ff", "#f2f5ff", "#ffb000", "#ff3a14"])
 
 # Light grey-blue for text, ticks and spines: legible on the dark panel.
 const NEUTRAL = "#9aa3c7"

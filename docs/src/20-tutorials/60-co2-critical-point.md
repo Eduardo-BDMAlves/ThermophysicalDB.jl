@@ -11,7 +11,7 @@ Physics first. Along the vapor–liquid coexistence curve the two phases become 
 - **The coexistence curve is flat at the top.** Near ``T_\mathrm{c}`` the density difference follows ``\rho_\mathrm{l} - \rho_\mathrm{v} \propto (T_\mathrm{c} - T)^{\beta}``. Real fluids have ``\beta \approx 0.33``; any analytical equation of state, cubic or molecular, is a mean-field theory and gives ``\beta = 1/2``. The model curve is therefore too narrow near the top and too wide away from it.
 - **Response functions diverge.** The isothermal compressibility ``\kappa_T = -\frac{1}{V}\left(\frac{\partial V}{\partial p}\right)_T`` grows without bound at the critical point, because at constant temperature a tiny pressure change moves the fluid between liquid-like and vapor-like densities. A density measured at a given ``(T, p)`` near the critical point is thus extremely sensitive to errors in either variable, in the experiment and in the model.
 
-The models below are the four of the [previous tutorial](@ref tutorial_eos) plus a multiparameter reference equation (`GERG2008`), which for carbon dioxide is accurate to a small fraction of a percent in density away from the critical point and is used here as the yardstick.
+The models below are the four of the [previous tutorial](@ref tutorial_eos) plus a multiparameter reference equation (`GERG2008` [Kunz2012](@cite)), which for carbon dioxide is accurate to a small fraction of a percent in density away from the critical point and is used here as the yardstick.
 
 ```@setup co2
 Main.DocsSetup.activate!()
@@ -38,7 +38,7 @@ M = 0.0440095    # kg/mol, molar mass of carbon dioxide
 
 # One fixed colour per model, used in every figure of this page. The reference
 # equation is drawn in white, the experimental points in grey-blue.
-palette = (PR = "#2fe0ff", SRK = "#ff4fd0", PCSAFT = "#c8ff4d", SAFTVRMie = "#ffb000", GERG2008 = "#e8ecff")
+palette = (PR = "#ffb000", SRK = "#ff4a1c", PCSAFT = "#2fe0ff", SAFTVRMie = "#5c8dff", GERG2008 = "#e8ecff")
 keys(models)
 ```
 
@@ -206,10 +206,10 @@ both = sort!(collect(intersect(keys(Tc_db), keys(ρc_db))))
 only_T = sort!(collect(setdiff(keys(Tc_db), both)))
 only_ρ = sort!(collect(setdiff(keys(ρc_db), both)))
 xmax, ymin = 1250.0, 245.0
-star = (color = "#ff4a1c", strokecolor = "#ff4a1c", strokewidth = 2, markersize = 18)
+star = (color = "#ffd36b", strokecolor = "#ffd36b", strokewidth = 2, markersize = 18)
 isempty(both) || scatter!(
     ax, Float64[ρc_db[d] for d in both], Float64[Tc_db[d] for d in both];
-    marker = :star5, markersize = 20, color = "#ff4a1c", strokecolor = "#090b17", strokewidth = 1,
+    marker = :star5, markersize = 20, color = "#ffd36b", strokecolor = "#090b17", strokewidth = 1,
     label = "ThermoML critical point ($(length(both)))",
 )
 isempty(only_T) || scatter!(
@@ -266,7 +266,7 @@ for (k, (name, dev)) in enumerate(pairs(dev_ρ))
     push!(scatters, scatter!(ax, Td, pd ./ 1e6; color = 100 .* dev, colorrange = (-10, 10), markersize = 7))
     isempty(Tpc) || scatter!(
         ax, first.(Tpc), last.(Tpc);
-        marker = :star5, markersize = 18, color = "#ff4a1c", strokecolor = "#090b17", strokewidth = 1,
+        marker = :star5, markersize = 18, color = "#ffd36b", strokecolor = "#090b17", strokewidth = 1,
     )
 end
 Colorbar(fig[1:2, 3], first(scatters); label = "(ρ_EoS − ρ_exp)/ρ_exp [%]")
@@ -340,10 +340,8 @@ The pressure is on the horizontal axis and the temperature is the colour, so iso
 
 - Change the fluid: `"propane"` or `"methane"` have well-covered critical regions in the archive.
 - Narrow the pressure window to isobars around ``p_\mathrm{c}`` and plot density against temperature to see the steepest part of the transition.
-- The reference equation can also be the one built into Clapeyron from CoolProp (`using CoolProp` and `SingleFluid("carbon dioxide")`), whose carbon dioxide equation is that of Span and Wagner; it is not used here to keep the documentation environment small.
+- The reference equation can also be the one built into Clapeyron from CoolProp (`using CoolProp` and `SingleFluid("carbon dioxide")`), whose carbon dioxide equation is that of Span and Wagner [Span1996](@cite); it is not used here to keep the documentation environment small.
 
 ## References
 
-- R. Span, W. Wagner, "A new equation of state for carbon dioxide covering the fluid region from the triple-point temperature to 1100 K at pressures up to 800 MPa", *Journal of Physical and Chemical Reference Data* **25** (1996) 1509–1596.
-- O. Kunz, W. Wagner, "The GERG-2008 wide-range equation of state for natural gases and other mixtures: an expansion of GERG-2004", *Journal of Chemical & Engineering Data* **57** (2012) 3032–3091.
-- The experimental data come from the ThermoML Archive of NIST/TRC and the articles it indexes; see [About the data](@ref 40-about-data).
+The equations of state and the reference equation are cited in the text; the full entries are in the [Bibliography](@ref bibliography). The experimental data come from the ThermoML Archive of NIST/TRC and the articles it indexes; see [About the data](@ref 40-about-data).

@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 400" role="img" aria-label="Thermometer, beaker with a molecule and a database">
 <defs>
 <radialGradient id="gA" cx="22%" cy="18%" r="60%"><stop offset="0" stop-color="#2fe0ff" stop-opacity=".30"/><stop offset="1" stop-color="#2fe0ff" stop-opacity="0"/></radialGradient>
-<radialGradient id="gB" cx="82%" cy="86%" r="60%"><stop offset="0" stop-color="#ff4fd0" stop-opacity=".26"/><stop offset="1" stop-color="#ff4fd0" stop-opacity="0"/></radialGradient>
-<radialGradient id="gC" cx="86%" cy="14%" r="45%"><stop offset="0" stop-color="#a98bff" stop-opacity=".22"/><stop offset="1" stop-color="#a98bff" stop-opacity="0"/></radialGradient>
+<radialGradient id="gB" cx="82%" cy="86%" r="60%"><stop offset="0" stop-color="#ff4a1c" stop-opacity=".26"/><stop offset="1" stop-color="#ff4a1c" stop-opacity="0"/></radialGradient>
+<radialGradient id="gC" cx="86%" cy="14%" r="45%"><stop offset="0" stop-color="#ffb000" stop-opacity=".22"/><stop offset="1" stop-color="#ffb000" stop-opacity="0"/></radialGradient>
 <filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>
 </defs>
 <rect x="6" y="6" width="508" height="388" rx="26" fill="#090b17" stroke="#2fe0ff" stroke-opacity=".35" stroke-width="1.5"/>

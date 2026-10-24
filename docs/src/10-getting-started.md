@@ -21,7 +21,7 @@ pkg> add CairoMakie Unitful
 ```
 
 !!! tip "Start Julia with several threads"
-    Parsing the archive for the first time runs in parallel. `julia -t auto` uses every core of your machine and makes that first build noticeably faster. Later sessions load the binary cache and do not parse anything.
+    Parsing the archive for the first time runs in parallel (not necessary). `julia -t auto` uses every core of your machine and makes that first build noticeably faster. Later sessions load the binary cache and do not parse anything.
 
 ## Build the database
 
@@ -34,7 +34,7 @@ Everything starts with one call:
 ```@example gs
 using ThermophysicalDB
 
-db = database(progress = false)
+db = database()
 ```
 
 What that call does depends on what is already on your machine:
@@ -42,13 +42,13 @@ What that call does depends on what is already on your machine:
 | Situation | What `database()` does |
 | :-- | :-- |
 | First use ever | Downloads the ThermoML Archive from NIST (about 190 MB), verifies its SHA-256 digest, parses the 11 923 articles, and writes a binary cache next to the archive. This takes a few minutes. |
-| Later sessions | Checks whether NIST published a newer archive (it warns you if so, see [Updates](@ref updates)), then loads the binary cache, which is much faster than parsing. |
+| Later sessions | Checks whether a new version of the database was published (it warns you if so, see [Updates](@ref updates)), then loads the binary cache, which is much faster than parsing. |
 | Same session | Returns the object it already built, immediately. |
 
-The result is a [`Dataset`](@ref): the whole archive in memory, organised as a few relational tables (see the [data model](@ref data_model)). You rarely touch it directly; you hand it to [`points`](@ref).
+The result is a [`Dataset`](@ref): the whole archive in memory, organized as a few relational tables (see the [data model](@ref data_model)). You rarely touch it directly; you hand it to [`points`](@ref).
 
 !!! info "Where do the files go?"
-    `data_dir()` tells you. On Windows it is `%LOCALAPPDATA%\ThermophysicalDB`, on macOS `~/Library/Application Support/ThermophysicalDB` and on Linux `~/.local/share/ThermophysicalDB`. You can move it with [`set_data_dir!`](@ref) or with the environment variable `THERMOPHYSICALDB_DATA_DIR`.
+    `database_dir()` tells you. On Windows it is `%LOCALAPPDATA%\ThermophysicalDB`, on macOS `~/Library/Application Support/ThermophysicalDB` and on Linux `~/.local/share/ThermophysicalDB`. You can move it with [`set_database_dir!`](@ref) or with the environment variable `THERMOPHYSICALDB_DATA_DIR`.
 
 ## Select points
 
@@ -70,7 +70,7 @@ v2 = points(v; year = (2000, nothing))   # only articles from 2000 on
 length(v), length(v2)
 ```
 
-The [manual page on selecting points](@ref selecting) lists every filter, including limits written with Unitful units.
+The [manual page on selecting points](@ref selecting) lists every filter, including limits written with [Unitful](https://github.com/JuliaPhysics/Unitful.jl) units.
 
 ## Get the columns
 

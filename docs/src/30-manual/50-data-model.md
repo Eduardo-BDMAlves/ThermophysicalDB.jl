@@ -16,9 +16,9 @@ A [`Dataset`](@ref) is a small relational database held entirely in memory. Inst
 <defs>
 <marker id="arr-00e5ff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2fe0ff"/></marker>
 <marker id="arr-39ff88" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#58ff7a"/></marker>
-<marker id="arr-9b5cff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#a98bff"/></marker>
+<marker id="arr-9b5cff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff4a1c"/></marker>
 <marker id="arr-ff8a00" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffb000"/></marker>
-<marker id="arr-ff2bd6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff4fd0"/></marker>
+<marker id="arr-ff2bd6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5c8dff"/></marker>
 <marker id="arr-ffe600" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffd36b"/></marker>
 </defs>
 <rect x="20" y="20" width="210" height="118" rx="14" fill="#2fe0ff" fill-opacity="0.13" stroke="#2fe0ff" stroke-width="2"/>
@@ -35,9 +35,9 @@ A [`Dataset`](@ref) is a small relational database held entirely in memory. Inst
 <text x="34" y="278" font-size="13.5" fill="currentColor">inchikey (identity), inchi</text>
 <text x="34" y="297" font-size="13.5" fill="currentColor">formula</text>
 <text x="34" y="316" font-size="13.5" fill="currentColor">names</text>
-<rect x="285" y="100" width="230" height="140" rx="14" fill="#a98bff" fill-opacity="0.13" stroke="#a98bff" stroke-width="2"/>
-<rect x="285" y="100" width="230" height="34" rx="14" fill="#a98bff" fill-opacity="0.9"/>
-<rect x="285" y="120" width="230" height="14" fill="#a98bff" fill-opacity="0.9"/>
+<rect x="285" y="100" width="230" height="140" rx="14" fill="#ff4a1c" fill-opacity="0.13" stroke="#ff4a1c" stroke-width="2"/>
+<rect x="285" y="100" width="230" height="34" rx="14" fill="#ff4a1c" fill-opacity="0.9"/>
+<rect x="285" y="120" width="230" height="14" fill="#ff4a1c" fill-opacity="0.9"/>
 <text x="400.0" y="123" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">experiments</text>
 <text x="299" y="156" font-size="13.5" fill="currentColor">reference  → references</text>
 <text x="299" y="175" font-size="13.5" fill="currentColor">components[1..3] → compounds</text>
@@ -50,9 +50,9 @@ A [`Dataset`](@ref) is a small relational database held entirely in memory. Inst
 <text x="584" y="76" font-size="13.5" fill="currentColor">label, unit</text>
 <text x="584" y="95" font-size="13.5" fill="currentColor">group  → pool</text>
 <text x="584" y="114" font-size="13.5" fill="currentColor">one row per (label, unit)</text>
-<rect x="570" y="168" width="210" height="170" rx="14" fill="#ff4fd0" fill-opacity="0.13" stroke="#ff4fd0" stroke-width="2"/>
-<rect x="570" y="168" width="210" height="34" rx="14" fill="#ff4fd0" fill-opacity="0.9"/>
-<rect x="570" y="188" width="210" height="14" fill="#ff4fd0" fill-opacity="0.9"/>
+<rect x="570" y="168" width="210" height="170" rx="14" fill="#5c8dff" fill-opacity="0.13" stroke="#5c8dff" stroke-width="2"/>
+<rect x="570" y="168" width="210" height="34" rx="14" fill="#5c8dff" fill-opacity="0.9"/>
+<rect x="570" y="188" width="210" height="14" fill="#5c8dff" fill-opacity="0.9"/>
 <text x="675.0" y="191" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">measurements</text>
 <text x="584" y="224" font-size="13.5" fill="currentColor">experiment, property</text>
 <text x="584" y="243" font-size="13.5" fill="currentColor">value, unc, unc_k, unc_level</text>
@@ -69,7 +69,7 @@ A [`Dataset`](@ref) is a small relational database held entirely in memory. Inst
 <text x="250" y="104" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">reference</text>
 <line x1="285" y1="205" x2="232" y2="262" stroke="#58ff7a" stroke-width="2.4" marker-end="url(#arr-39ff88)"/>
 <text x="248" y="248" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">components</text>
-<line x1="570" y1="230" x2="517" y2="200" stroke="#a98bff" stroke-width="2.4" marker-end="url(#arr-9b5cff)"/>
+<line x1="570" y1="230" x2="517" y2="200" stroke="#ff4a1c" stroke-width="2.4" marker-end="url(#arr-9b5cff)"/>
 <text x="538" y="198" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">experiment</text>
 <line x1="675" y1="168" x2="675" y2="120" stroke="#ffb000" stroke-width="2.4" marker-end="url(#arr-ff8a00)"/>
 <text x="715" y="146" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">property</text>

@@ -15,7 +15,7 @@ Main.DocsSetup.activate!()
 ```@example hex
 using ThermophysicalDB, CairoMakie, Unitful
 
-db = database(progress = false)
+db = database()
 v = points(db; component = "hexane", exact = true, property = "Thermal conductivity")
 ```
 
@@ -36,7 +36,7 @@ U = ustrip.(u"W/m/K", t.unc_k2)    # expanded uncertainty restated at k = 2
 (points = length(λ), articles = length(unique(t.doi)), phases = unique(t.phase))
 ```
 
-!!! info "Why Unitful here and not always?"
+!!! info "Why `Unitful` here and not always?"
     A `Vector{<:Quantity}` is fast only if every element has the same unit. `table(v; unitful = true)` therefore refuses a selection that mixes units (say, conductivity and density) and tells you to narrow it with `property`. Without `unitful`, you get plain `Float64` columns and a `unit` column of text, which is the right choice when you want to look at several properties at once.
 
 ## Conductivity against temperature
@@ -49,8 +49,8 @@ has_u = isfinite.(U)
 
 fig = Figure(size = (760, 460))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "λ [W m⁻¹ K⁻¹]", title = "Hexane: λ(T, p)")
-errorbars!(ax, T[has_u], λ[has_u], U[has_u]; color = (:gray, 0.45), whiskerwidth = 4)
-sc = scatter!(ax, T[has_p], λ[has_p]; color = p[has_p], markersize = 8)
+errorbars!(ax, T[has_u .&& has_p], λ[has_u .&& has_p], U[has_u .&& has_p]; color = (:gray, 0.45), whiskerwidth = 4)
+sc = scatter!(ax, T[has_u .&& has_p], λ[has_u .&& has_p]; color = p[has_u .&& has_p], markersize = 8)
 Colorbar(fig[1, 2], sc; label = "p [MPa]")
 fig
 ```
@@ -59,15 +59,15 @@ What to look for: in the liquid, ``\lambda`` falls slowly as the temperature ris
 
 ## Conductivity against pressure
 
-Compression packs molecules closer, so ``\lambda`` grows with ``p``, strongly in the liquid and weakly in a dilute gas. To see this we group the points into 10 K bins of temperature, which acts as a set of nominal isotherms:
+Compression packs molecules closer, so ``\lambda`` grows with ``p``, strongly in the liquid and weakly in a dilute gas. To see this we group the points into 50 K bins of temperature, which acts as a set of nominal isotherms:
 
 ```@example hex
-bin = round.(Int, T ./ 10) .* 10
+bin = round.(Int, T ./ 50) .* 50
 bins = sort(unique(bin[has_p]))
-shade(i) = cgrad(:managua; rev = true)[(i - 1) / max(length(bins) - 1, 1)]
+shade(i) = Main.DocsSetup.FIELD[(i - 1) / max(length(bins) - 1, 1)]
 
 fig = Figure(size = (760, 460))
-ax = Axis(fig[1, 1]; xlabel = "p [MPa]", ylabel = "λ [W m⁻¹ K⁻¹]", title = "Nominal isotherms (10 K bins)")
+ax = Axis(fig[1, 1]; xlabel = "p [MPa]", ylabel = "λ [W m⁻¹ K⁻¹]", title = "Nominal isotherms (50 K bins)")
 for (i, b) in enumerate(bins)
     m = has_p .& (bin .== b)
     order = sortperm(p[m])

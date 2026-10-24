@@ -383,6 +383,8 @@ mjx-container svg path {
   --tdb-violet: var(--neon-violet);
   --tdb-green: var(--neon-green);
   --tdb-pink: var(--neon-pink);
+  --tdb-red: var(--neon-red);
+  --tdb-blue: var(--neon-blue);
 }
 
 :root:root {
@@ -408,15 +410,14 @@ mjx-container svg path {
   --vp-home-hero-name-background: linear-gradient(
     115deg,
     var(--tdb-cyan) 0%,
-    var(--tdb-violet) 40%,
-    var(--tdb-magenta) 70%,
-    var(--tdb-orange) 100%
+    var(--tdb-orange) 55%,
+    var(--tdb-red) 100%
   );
   --vp-home-hero-image-background-image: linear-gradient(
     -45deg,
     var(--neon-cyan) 15%,
-    var(--neon-violet) 50%,
-    var(--neon-magenta) 85%
+    var(--neon-orange) 55%,
+    var(--neon-red) 90%
   );
   --vp-home-hero-image-filter: blur(70px);
 
@@ -461,7 +462,7 @@ mjx-container svg path {
 }
 
 .vp-doc h1 {
-  background: linear-gradient(115deg, var(--tdb-cyan), var(--tdb-violet) 45%, var(--tdb-magenta) 75%, var(--tdb-orange));
+  background: linear-gradient(115deg, var(--tdb-cyan), var(--tdb-orange) 55%, var(--tdb-red));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -469,7 +470,7 @@ mjx-container svg path {
 }
 
 .dark .vp-doc h1 {
-  filter: drop-shadow(0 0 14px rgba(255, 79, 208, 0.35));
+  filter: drop-shadow(0 0 14px rgba(255, 90, 30, 0.35));
 }
 
 .vp-doc h2 {
@@ -487,8 +488,8 @@ mjx-container svg path {
   height: 4px;
   margin-bottom: 12px;
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
-  box-shadow: 0 0 12px rgba(47, 224, 255, 0.6);
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-orange) 60%, var(--neon-red));
+  box-shadow: 0 0 12px rgba(255, 120, 30, 0.55);
 }
 
 .vp-doc h3 {
@@ -510,24 +511,24 @@ mjx-container svg path {
 }
 
 .VPHero .VPButton.brand {
-  background-image: linear-gradient(120deg, var(--neon-cyan), var(--neon-violet));
+  background-image: linear-gradient(120deg, var(--neon-cyan), var(--neon-orange));
   border: none;
   color: #04060d;
   box-shadow: 0 0 22px -4px rgba(47, 224, 255, 0.75);
 }
 
 .VPHero .VPButton.brand:hover {
-  box-shadow: 0 0 32px -2px rgba(255, 79, 208, 0.75);
+  box-shadow: 0 0 32px -2px rgba(255, 90, 30, 0.75);
 }
 
 .VPHero .VPButton.alt {
-  border: 1px solid var(--tdb-magenta);
-  color: var(--tdb-magenta);
+  border: 1px solid var(--tdb-red);
+  color: var(--tdb-red);
   background: transparent;
 }
 
 .VPHero .VPButton.alt:hover {
-  box-shadow: 0 0 22px -4px var(--neon-magenta);
+  box-shadow: 0 0 22px -4px var(--neon-red);
 }
 
 .VPHero .image-src {
@@ -566,11 +567,11 @@ mjx-container svg path {
 }
 
 .VPFeatures .item:nth-child(6n + 1) { --tdb-accent: var(--neon-cyan); }
-.VPFeatures .item:nth-child(6n + 2) { --tdb-accent: var(--neon-magenta); }
+.VPFeatures .item:nth-child(6n + 2) { --tdb-accent: var(--neon-red); }
 .VPFeatures .item:nth-child(6n + 3) { --tdb-accent: var(--neon-lime); }
 .VPFeatures .item:nth-child(6n + 4) { --tdb-accent: var(--neon-yellow); }
 .VPFeatures .item:nth-child(6n + 5) { --tdb-accent: var(--neon-orange); }
-.VPFeatures .item:nth-child(6n + 6) { --tdb-accent: var(--neon-violet); }
+.VPFeatures .item:nth-child(6n + 6) { --tdb-accent: var(--neon-blue); }
 
 /* Gallery of pages on the home page (plain HTML in index.md) */
 .tdb-gallery {
@@ -609,7 +610,7 @@ mjx-container svg path {
 }
 
 .tdb-gallery .tdb-card:nth-child(4n + 1) { --tdb-accent: var(--neon-cyan); --tdb-accent-text: var(--tdb-cyan); }
-.tdb-gallery .tdb-card:nth-child(4n + 2) { --tdb-accent: var(--neon-magenta); --tdb-accent-text: var(--tdb-magenta); }
+.tdb-gallery .tdb-card:nth-child(4n + 2) { --tdb-accent: var(--neon-red); --tdb-accent-text: var(--tdb-red); }
 .tdb-gallery .tdb-card:nth-child(4n + 3) { --tdb-accent: var(--neon-lime); --tdb-accent-text: var(--tdb-lime); }
 .tdb-gallery .tdb-card:nth-child(4n + 4) { --tdb-accent: var(--neon-orange); --tdb-accent-text: var(--tdb-orange); }
 
@@ -621,11 +622,11 @@ mjx-container svg path {
 }
 
 .VPSidebarItem.level-0:nth-of-type(6n + 1) > .item > .text { color: var(--tdb-cyan); }
-.VPSidebarItem.level-0:nth-of-type(6n + 2) > .item > .text { color: var(--tdb-magenta); }
+.VPSidebarItem.level-0:nth-of-type(6n + 2) > .item > .text { color: var(--tdb-red); }
 .VPSidebarItem.level-0:nth-of-type(6n + 3) > .item > .text { color: var(--tdb-lime); }
 .VPSidebarItem.level-0:nth-of-type(6n + 4) > .item > .text { color: var(--tdb-yellow); }
 .VPSidebarItem.level-0:nth-of-type(6n + 5) > .item > .text { color: var(--tdb-orange); }
-.VPSidebarItem.level-0:nth-of-type(6n + 6) > .item > .text { color: var(--tdb-violet); }
+.VPSidebarItem.level-0:nth-of-type(6n + 6) > .item > .text { color: var(--tdb-blue); }
 
 .VPSidebarItem.is-active > .item > .text {
   color: var(--vp-c-brand-1) !important;
@@ -654,9 +655,9 @@ mjx-container svg path {
   box-shadow: 0 0 26px -10px rgba(47, 224, 255, 0.6);
 }
 
-/* Code in blue-cyan, results in magenta */
+/* Code in blue-cyan, results in orange */
 .language- {
-  border-left: 4px solid var(--neon-magenta);
+  border-left: 4px solid var(--neon-orange);
   border-radius: 8px;
 }
 

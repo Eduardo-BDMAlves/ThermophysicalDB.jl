@@ -43,13 +43,13 @@ include("store/database.jl")
 
 export DataView,
     check_update,
-    data_dir,
+    database_dir,
     database,
     ensure_archive,
     install_archive!,
     points,
-    reset_data_dir!,
-    set_data_dir!,
+    reset_database_dir!,
+    set_database_dir!,
     table,
     update_database!
 

@@ -23,9 +23,9 @@ install_archive!
 ## Where the data are stored
 
 ```@docs
-data_dir
-set_data_dir!
-reset_data_dir!
+database_dir
+set_database_dir!
+reset_database_dir!
 ```
 
 ## Selecting and extracting points

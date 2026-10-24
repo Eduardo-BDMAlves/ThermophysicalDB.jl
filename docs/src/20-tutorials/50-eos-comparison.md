@@ -4,14 +4,14 @@ CurrentModule = ThermophysicalDB
 
 # [Experiment against equations of state](@id tutorial_eos)
 
-An equation of state (EoS) is a model: it closes the thermodynamics of a fluid with a few parameters. Whether it is *good* is an empirical question, and the archive holds the experiments that answer it. This tutorial puts hexane data next to the predictions of four EoS from [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl):
+An equation of state (EoS) is a model: it closes the thermodynamics of a fluid with a few parameters. Whether it is *good* is an empirical question, and the archive holds the experiments that answer it. This tutorial puts hexane data next to the predictions of four EoS from [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl) [Walker2022](@cite):
 
 | Model | Family | What it brings |
 |:--|:--|:--|
-| `PR` | cubic (Peng–Robinson) | two parameters per fluid, fast; known to be poor for liquid density |
-| `SRK` | cubic (Soave–Redlich–Kwong) | the same family, a different attractive term |
-| `PCSAFT` | SAFT (perturbed chain) | molecular model with chain length, accurate for liquids |
-| `SAFTVRMie` | SAFT (variable range, Mie potential) | flexible repulsion and attraction, also predicts derivative properties |
+| `PR` | cubic (Peng–Robinson [Peng1976](@cite)) | two parameters per fluid, fast; known to be poor for liquid density |
+| `SRK` | cubic (Soave–Redlich–Kwong [Soave1972](@cite)) | the same family, a different attractive term |
+| `PCSAFT` | SAFT (perturbed chain [Gross2001](@cite)) | molecular model with chain length, accurate for liquids |
+| `SAFTVRMie` | SAFT (variable range, Mie potential [Lafitte2013](@cite)) | flexible repulsion and attraction, also predicts derivative properties |
 
 Cubic equations are built from the van der Waals idea: a repulsive volume term plus an attraction that grows with density. They are tuned to reproduce the critical point and the vapor pressure, and pay for it in the liquid volume, which is typically off by several percent. SAFT models treat the molecule as a chain of segments and account for its connectivity, which is why they can do much better in the liquid. The comparison below makes that difference visible.
 
@@ -162,7 +162,7 @@ The expectation is a systematic offset of several percent for the cubic models a
 
 ## Where does a model fail? A field
 
-Because the deviation depends on both variables, a map on the T–p plane is more informative than a table. The points are coloured with the reversed `:managua` colormap, the default of this documentation for continuous data; the range is symmetric around zero so that white means exact agreement.
+Because the deviation depends on both variables, a map on the T–p plane is more informative than a table. The points are coloured with the cold-to-hot colormap of this documentation: blue where the model underestimates the density, red where it overestimates it, and white at exact agreement. The range is symmetric around zero so that the white midpoint is zero.
 
 ```@example eos
 fig = Figure(size = (940, 420))

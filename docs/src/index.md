@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "ThermophysicalDB.jl"
   text: "Experimental thermophysical data, one call away"
-  tagline: Download the NIST/TRC ThermoML Archive once, keep it up to date, and filter, plot and analyse more than a hundred thousand measured systems from the Julia REPL.
+  tagline: Download thermophysical databases once, keep it up to date, and filter, plot and analyse more than a hundred thousand measured systems from the Julia REPL. Initially only ThermoML is included, but the idea is to add more databases in the future.
   image:
     src: /hero.svg
     alt: Experimental points with uncertainty bars and a fitted curve
@@ -22,17 +22,17 @@ hero:
 
 features:
   - title: One call gets everything
-    details: <code>db = database()</code> downloads the archive from NIST, verifies its SHA-256, parses it once and keeps a binary cache. Later sessions only check for a newer archive and load the cache.
+    details: <code>db = database()</code> downloads all databases validated for the package, verifies its SHA-256 (or equivalent), parses it once and keeps a binary cache. Later sessions only check for a newer archive and load the cache.
   - title: Filter the way you think
-    details: Select by compound, property, temperature and pressure range, author, DOI or year. Chain filters; each one only touches the rows that survived the previous one.
+    details: Select by compound, property, temperature and pressure range, author, DOI, year and more. Chain filters; each one only touches the rows that survived the previous one.
   - title: Units that mean something
     details: Limits accept Unitful quantities such as <code>25u"°C"</code> or <code>1u"atm"</code>, and tables can hand you Unitful columns, in the units of the source or in SI.
   - title: Uncertainty on one footing
     details: Every expanded uncertainty is also restated at k = 2, with an explicit and documented rule, so points from different laboratories can be weighted consistently.
   - title: Tables.jl all the way
     details: A selection is a Tables.jl table made of plain vectors. Plot the columns with Makie, hand them to a DataFrame, or write them to disk, without conversion code.
-  - title: Fails loudly, and tells you what to do
-    details: Downloads are retried through several strategies. If NIST stays unreachable, the error lists every attempt and the way out, including installing the archive from a file.
+  - title: Extensible and versatile
+    details: Capacity to add your own data to a local database formatted accordingly to the same standard used in other databases. Customize the interest parameters and how to interact with then.
 ---
 ```
 
@@ -51,7 +51,7 @@ The first call to [`database`](@ref) downloads and prepares the archive (a few m
 ```@example home
 using ThermophysicalDB, CairoMakie
 
-db = database(progress = false)
+db = database()
 v = points(db; component = "hexane", property = "Thermal conductivity")
 ```
 
@@ -59,16 +59,29 @@ v = points(db; component = "hexane", property = "Thermal conductivity")
 
 ```@example home
 t = table(v)
-with_pressure = .!isnan.(t.pressure)
+```
 
+```@raw html
+<details class="details custom-block"><summary>Show the plotting code</summary>
+```
+
+```@example home
+with_pressure = .!isnan.(t.pressure);
 fig = Figure(size = (720, 420))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "λ [W m⁻¹ K⁻¹]", title = "Thermal conductivity of hexane")
 sc = scatter!(
     ax, t.temperature[with_pressure], t.value[with_pressure];
     color = t.pressure[with_pressure] ./ 1e3, markersize = 9,
 )
-Colorbar(fig[1, 2], sc; label = "p [MPa]")
-fig
+Colorbar(fig[1, 2], sc; label = "p [MPa]");
+```
+
+```@raw html
+</details>
+```
+
+```@example home
+fig # hide
 ```
 
 ## Where to go next
@@ -90,11 +103,11 @@ fig
 
 ## Data source
 
-The data come from the **ThermoML Archive**, created and maintained by the Thermodynamics Research Center (TRC) of the U.S. National Institute of Standards and Technology (NIST) and based on the IUPAC ThermoML standard. ThermophysicalDB.jl is an independent project that downloads, reads and filters that archive; it does not own, modify or redistribute the data. The goal of the package is to bring several experimental databases under one interface, and the ThermoML Archive is the first one supported.
+The data, for now, comes only from the **ThermoML Archive**, created and maintained by the Thermodynamics Research Center (TRC) of the U.S. National Institute of Standards and Technology (NIST) and based on the IUPAC ThermoML standard. ThermophysicalDB.jl is an independent project that downloads, reads and filters that archive; it does not own or redistribute the data, and it never changes the published values: conversions and restated uncertainties are produced on request, apart from them. The goal of the package is to bring several experimental databases under one interface, and the ThermoML Archive is the first one supported.
 
 - Dataset: [doi:10.18434/mds2-2422](https://doi.org/10.18434/mds2-2422)
-- Standard: M. Frenkel *et al.*, *Pure and Applied Chemistry* **78** (2006) 541–612
-- More details and how to cite: [About the data](@ref 40-about-data)
+- Standard: [Frenkel2006](@cite); background in [Frenkel2003](@cite) and [Chirico2003](@cite)
+- More details, the terms of use and how to cite: [About the data](@ref 40-about-data)
 
 ## Contributors
 

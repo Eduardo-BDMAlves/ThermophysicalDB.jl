@@ -7,13 +7,13 @@ const DATA_DIR_ENV = "THERMOPHYSICALDB_DATA_DIR"
 const DATA_DIR_PREFERENCE = "data_dir"
 
 """
-    default_data_dir() -> String
+    default_database_dir() -> String
 
 Platform default for the root data directory: `%LOCALAPPDATA%\\ThermophysicalDB` on
 Windows, `~/Library/Application Support/ThermophysicalDB` on macOS and
 `\$XDG_DATA_HOME/ThermophysicalDB` (default `~/.local/share`) elsewhere.
 """
-function default_data_dir()::String
+function default_database_dir()::String
     if Sys.iswindows()
         base = get(ENV, "LOCALAPPDATA", "")
         isempty(base) && (base = joinpath(homedir(), "AppData", "Local"))
@@ -28,23 +28,23 @@ function default_data_dir()::String
 end
 
 """
-    data_dir(; create = false) -> String
+    database_dir(; create = false) -> String
 
 Root directory where ThermophysicalDB keeps its data. Resolution order:
 
 1. the environment variable `THERMOPHYSICALDB_DATA_DIR`;
-2. the preference stored by [`set_data_dir!`](@ref);
-3. the platform default, see [`default_data_dir`](@ref).
+2. the preference stored by [`set_database_dir!`](@ref);
+3. the platform default, see [`default_database_dir`](@ref).
 
 The directory is only created when `create = true`.
 """
-function data_dir(; create::Bool = false)::String
+function database_dir(; create::Bool = false)::String
     from_env = get(ENV, DATA_DIR_ENV, "")
     dir = if !isempty(from_env)
         from_env
     else
         pref = Preferences.load_preference(@__MODULE__, DATA_DIR_PREFERENCE, nothing)
-        pref isa AbstractString && !isempty(pref) ? String(pref) : default_data_dir()
+        pref isa AbstractString && !isempty(pref) ? String(pref) : default_database_dir()
     end
     dir = abspath(expanduser(dir))
     create && mkpath(dir)
@@ -52,7 +52,7 @@ function data_dir(; create::Bool = false)::String
 end
 
 function subdir(name::AbstractString, create::Bool)::String
-    dir = joinpath(data_dir(), name)
+    dir = joinpath(database_dir(), name)
     create && mkpath(dir)
     return dir
 end
@@ -72,7 +72,7 @@ Directory reserved for the user's own database.
 user_dir(; create::Bool = false) = subdir("user", create)
 
 """
-    set_data_dir!(path) -> String
+    set_database_dir!(path) -> String
 
 Persistently set the root data directory through Preferences.jl. The preference lives in
 the `LocalPreferences.toml` of the *active Julia environment*, so it applies only to that
@@ -82,19 +82,19 @@ environment variable `THERMOPHYSICALDB_DATA_DIR` instead (it takes precedence).
 Existing data is not moved. Returns the path that was stored. The new location is
 guaranteed to be in effect after restarting Julia.
 """
-function set_data_dir!(path::AbstractString)
+function set_database_dir!(path::AbstractString)
     dir = abspath(expanduser(path))
     Preferences.set_preferences!(@__MODULE__, DATA_DIR_PREFERENCE => dir)
     return dir
 end
 
 """
-    reset_data_dir!()
+    reset_database_dir!()
 
-Remove the preference set by [`set_data_dir!`](@ref), so that the platform default (or the
+Remove the preference set by [`set_database_dir!`](@ref), so that the platform default (or the
 environment variable) applies again after restarting Julia.
 """
-function reset_data_dir!()
+function reset_database_dir!()
     Preferences.delete_preferences!(@__MODULE__, DATA_DIR_PREFERENCE)
     return nothing
 end

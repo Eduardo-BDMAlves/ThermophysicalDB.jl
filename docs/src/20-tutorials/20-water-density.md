@@ -6,7 +6,7 @@ CurrentModule = ThermophysicalDB
 
 Liquid water has more experimental density data than almost any other substance in the archive: hundreds of articles, measured with very different instruments over many decades. That makes it the ideal case to show how filtering with everyday units works and how to judge a literature data set against a reference equation.
 
-The reference here is the correlation of Kell (1975) for air-free water at 1 atm, valid from 0 to 150 °C:
+The reference here is the correlation of Kell [Kell1975](@cite) for air-free water at 1 atm, valid from 0 to 150 °C:
 
 ```math
 \rho(T) = \frac{999.83952 + 16.945176\,T - 7.9870401\times10^{-3}\,T^2 - 46.170461\times10^{-6}\,T^3 + 105.56302\times10^{-9}\,T^4 - 280.54253\times10^{-12}\,T^5}{1 + 16.879850\times10^{-3}\,T}\ \mathrm{kg\,m^{-3}}
@@ -103,7 +103,7 @@ ax = Axis(
     xticks = (1:length(periods), string.(periods)), xticklabelrotation = π / 4,
     title = "Scatter of water-density data by period",
 )
-boxplot!(ax, slot, res; color = ("#ff4fd0", 0.7), show_outliers = false)
+boxplot!(ax, slot, res; color = ("#ffb000", 0.7), show_outliers = false)
 fig
 ```
 

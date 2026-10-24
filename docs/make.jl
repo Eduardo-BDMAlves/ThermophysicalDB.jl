@@ -9,6 +9,7 @@
 #   THERMOPHYSICALDB_DOCS_DRAFT=true julia --project=docs docs/make.jl
 
 using Documenter
+using DocumenterCitations
 using DocumenterVitepress
 using ThermophysicalDB
 
@@ -92,6 +93,9 @@ function list_pages()
     return ["index.md"; pages_list]
 end
 
+# Bibliography: entries in docs/src/refs.bib, cited from any page as [Key](@cite)
+const BIB = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :authoryear)
+
 makedocs(;
     modules = [ThermophysicalDB],
     authors = "Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>",
@@ -104,6 +108,7 @@ makedocs(;
         description = "Experimental thermophysical property data from the NIST/TRC ThermoML Archive, ready to filter, plot and analyse in Julia.",
     ),
     pages = list_pages(),
+    plugins = [BIB],
     draft = DRAFT,
     checkdocs = :exports,
     warnonly = [:missing_docs, :cross_references, :autodocs_block],

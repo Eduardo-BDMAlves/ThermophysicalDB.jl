@@ -157,7 +157,8 @@ The look of the site lives in `docs/src/.vitepress/theme/style.css` (colours, ca
 
 - **Page names** follow the template: numbered prefixes (`10-`, `20-`, ...) that set the order, hyphens between words, and numbered folders for sections. A folder needs a title in the `titles` dictionary of `docs/make.jl`.
 - **Units in labels** go in square brackets, never after a slash: `T [K]`, `p [MPa]`, `λ [W m⁻¹ K⁻¹]`. A quantity that is a ratio carries the unit of its scale in brackets, for example `(ρ − ρ_ref)/ρ_ref [%]`. A slash divides quantities; it does not mark a unit.
-- **Pictures** use the shared theme (`Main.DocsSetup.activate!()` in a hidden `@setup` block). Colour continuous data with the default colormap and do not add emoji or icons to the text.
+- **Pictures** use the shared theme (`Main.DocsSetup.activate!()` in a hidden `@setup` block). Colour continuous data with the default colormap (cold to hot: blue, cyan, white, amber, red; blue is low or negative and red is high or positive) and do not add emoji or icons to the text.
+- **References** are entries of `docs/src/refs.bib` (BibTeX) cited with `[Key](@cite)` and listed automatically on the [Bibliography](@ref bibliography) page. Add the entry to the `.bib` file first, with its DOI, and check the volume and pages against the publisher.
 - **Data credit.** Every page that shows archive data should make clear that the data come from the NIST/TRC ThermoML Archive and the original articles, not from this package. See [About the data](@ref 40-about-data).
 
 ## Making a new release

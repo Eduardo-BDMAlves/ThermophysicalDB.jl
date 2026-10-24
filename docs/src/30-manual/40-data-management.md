@@ -8,7 +8,7 @@ CurrentModule = ThermophysicalDB
 
 ## Where the data live
 
-Everything is stored under one root directory, returned by [`data_dir`](@ref):
+Everything is stored under one root directory, returned by [`database_dir`](@ref):
 
 | Platform | Default location |
 | :-- | :-- |
@@ -28,14 +28,14 @@ Inside it, each data source has its own folder. The NIST archive lives in `therm
 To keep the data somewhere else (a larger disk, a shared folder), use either of these. The environment variable wins when both are set:
 
 ```julia
-set_data_dir!("D:/data/thermophysical")   # stored in the active environment's LocalPreferences.toml
+set_database_dir!("D:/data/thermophysical")   # stored in the active environment's LocalPreferences.toml
 ```
 
 ```bash
 export THERMOPHYSICALDB_DATA_DIR=/shared/thermophysical   # applies to every environment
 ```
 
-Existing data are not moved. [`reset_data_dir!`](@ref) removes the preference again.
+Existing data are not moved. [`reset_database_dir!`](@ref) removes the preference again.
 
 ## What `database()` does
 
