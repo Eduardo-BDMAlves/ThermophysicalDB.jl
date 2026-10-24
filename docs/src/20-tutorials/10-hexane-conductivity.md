@@ -92,7 +92,7 @@ ax = Axis(
     fig[1, 1]; xlabel = "U(k = 2)/λ [%]", ylabel = "points",
     title = "Stated uncertainty of the hexane data",
 )
-hist!(ax, relative; bins = 30, color = ("#00e5ff", 0.85), strokewidth = 1, strokecolor = :white)
+hist!(ax, relative; bins = 30, color = ("#2fe0ff", 0.85), strokewidth = 1, strokecolor = :white)
 fig
 ```
 

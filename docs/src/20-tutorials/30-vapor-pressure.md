@@ -118,7 +118,7 @@ end
 
 fig = Figure(size = (760, 420))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "apparent ΔH_vap [kJ mol⁻¹]", title = "Apparent enthalpy of vaporization of ethanol")
-scatterlines!(ax, first.(estimate), last.(estimate); color = "#ff8a00", linewidth = 2.5, markersize = 10)
+scatterlines!(ax, first.(estimate), last.(estimate); color = "#ffb000", linewidth = 2.5, markersize = 10)
 hlines!(ax, [mean_enthalpy]; color = (:gray, 0.8), linestyle = :dash)
 text!(ax, first(first(estimate)), mean_enthalpy; text = "whole-range average", align = (:left, :bottom), color = :gray)
 fig

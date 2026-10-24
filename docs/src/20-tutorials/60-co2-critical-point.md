@@ -38,7 +38,7 @@ M = 0.0440095    # kg/mol, molar mass of carbon dioxide
 
 # One fixed colour per model, used in every figure of this page. The reference
 # equation is drawn in white, the experimental points in grey-blue.
-palette = (PR = "#00e5ff", SRK = "#ff2bd6", PCSAFT = "#b8ff00", SAFTVRMie = "#ff8a00", GERG2008 = "#e8ecff")
+palette = (PR = "#2fe0ff", SRK = "#ff4fd0", PCSAFT = "#c8ff4d", SAFTVRMie = "#ffb000", GERG2008 = "#e8ecff")
 keys(models)
 ```
 
@@ -206,10 +206,10 @@ both = sort!(collect(intersect(keys(Tc_db), keys(ρc_db))))
 only_T = sort!(collect(setdiff(keys(Tc_db), both)))
 only_ρ = sort!(collect(setdiff(keys(ρc_db), both)))
 xmax, ymin = 1250.0, 245.0
-star = (color = "#ffe600", strokecolor = "#ffe600", strokewidth = 2, markersize = 18)
+star = (color = "#ff4a1c", strokecolor = "#ff4a1c", strokewidth = 2, markersize = 18)
 isempty(both) || scatter!(
     ax, Float64[ρc_db[d] for d in both], Float64[Tc_db[d] for d in both];
-    marker = :star5, markersize = 20, color = "#ffe600", strokecolor = "#090b17", strokewidth = 1,
+    marker = :star5, markersize = 20, color = "#ff4a1c", strokecolor = "#090b17", strokewidth = 1,
     label = "ThermoML critical point ($(length(both)))",
 )
 isempty(only_T) || scatter!(
@@ -235,7 +235,7 @@ With the reference equation as a guide, look at the top of each curve. The cubic
 
 ## A map of the deviation in the T–p plane
 
-Density at given ``T`` and ``p`` (the quantity a densimeter measures) does not need the saturation curve: the model volume at that state point is enough. For supercritical states there is a single root, so the default phase detection is used instead of forcing the liquid root. The map shows the relative deviation of each model, with the reversed `:managua` colormap and a range that is symmetric about zero, so that white means agreement. The yellow stars are the critical points reported in the archive (the pairs of critical temperature and pressure of the same article).
+Density at given ``T`` and ``p`` (the quantity a densimeter measures) does not need the saturation curve: the model volume at that state point is enough. For supercritical states there is a single root, so the default phase detection is used instead of forcing the liquid root. The map shows the relative deviation of each model, with the reversed `:managua` colormap and a range that is symmetric about zero, so that white means agreement. The red stars are the critical points reported in the archive (the pairs of critical temperature and pressure of the same article).
 
 ```@example co2
 density(model, p, T) = M / Clapeyron.volume(model, p, T)
@@ -266,7 +266,7 @@ for (k, (name, dev)) in enumerate(pairs(dev_ρ))
     push!(scatters, scatter!(ax, Td, pd ./ 1e6; color = 100 .* dev, colorrange = (-10, 10), markersize = 7))
     isempty(Tpc) || scatter!(
         ax, first.(Tpc), last.(Tpc);
-        marker = :star5, markersize = 18, color = "#ffe600", strokecolor = "#090b17", strokewidth = 1,
+        marker = :star5, markersize = 18, color = "#ff4a1c", strokecolor = "#090b17", strokewidth = 1,
     )
 end
 Colorbar(fig[1:2, 3], first(scatters); label = "(ρ_EoS − ρ_exp)/ρ_exp [%]")

@@ -107,7 +107,7 @@ ax = Axis(
 )
 vlines!(ax, [0.0]; color = "#e8ecff", linewidth = 1.5)
 errorbars!(ax, d[order], 1:length(order), dU[order]; direction = :x, color = (:gray, 0.55), whiskerwidth = 4)
-scatter!(ax, d[order], 1:length(order); color = "#00e5ff", markersize = 7)
+scatter!(ax, d[order], 1:length(order); color = "#2fe0ff", markersize = 7)
 fig
 ```
 

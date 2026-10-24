@@ -8,29 +8,34 @@ module DocsSetup
 
 using CairoMakie
 
-# Neon palette, matching the colours of the site (docs/src/.vitepress/theme). The figures
-# sit on a dark panel in both the light and the dark mode of the site, where these
-# colours read best.
+# Neon palette. The colours are those of gas-discharge tubes: the emission of the noble
+# gases (neon, helium, krypton, argon, xenon) and of a few contrasting gases (mercury
+# vapour, hydrogen, nitrogen, oxygen, sodium vapour). The figures sit on a dark panel in
+# both the light and the dark mode of the site (see style.css), where these colours read
+# best.
 const COLORS = (
-    cyan = "#00e5ff",
-    magenta = "#ff2bd6",
-    lime = "#b8ff00",
-    yellow = "#ffe600",
-    orange = "#ff8a00",
-    violet = "#9b5cff",
-    green = "#39ff88",
-    pink = "#ff4d8d",
+    mercury = "#2fe0ff",
+    neon = "#ff4a1c",
+    krypton = "#c8ff4d",
+    hydrogen = "#ff4fd0",
+    xenon = "#5c8dff",
+    sodium = "#ffb000",
+    oxygen = "#58ff7a",
+    argon = "#a98bff",
+    helium = "#ffd36b",
+    nitrogen = "#ff6fae",
 )
 
+# Order of the colour cycle: neighbouring colours differ in hue and brightness.
 const CYCLE = [
-    COLORS.cyan,
-    COLORS.magenta,
-    COLORS.lime,
-    COLORS.yellow,
-    COLORS.orange,
-    COLORS.violet,
-    COLORS.green,
-    COLORS.pink,
+    COLORS.mercury,
+    COLORS.neon,
+    COLORS.krypton,
+    COLORS.hydrogen,
+    COLORS.xenon,
+    COLORS.sodium,
+    COLORS.oxygen,
+    COLORS.argon,
 ]
 
 # Colormap for continuous colours: scatter points coloured by year or pressure, and

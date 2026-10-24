@@ -103,7 +103,7 @@ ax = Axis(
     xticks = (1:length(periods), string.(periods)), xticklabelrotation = π / 4,
     title = "Scatter of water-density data by period",
 )
-boxplot!(ax, slot, res; color = ("#ff2bd6", 0.7), show_outliers = false)
+boxplot!(ax, slot, res; color = ("#ff4fd0", 0.7), show_outliers = false)
 fig
 ```
 

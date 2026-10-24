@@ -348,24 +348,28 @@ mjx-container svg path {
 
 :root {
   /* light mode: deep neon, readable on white */
-  --tdb-cyan: #009db8;
-  --tdb-magenta: #d4009f;
-  --tdb-lime: #5c9a00;
-  --tdb-yellow: #b38f00;
-  --tdb-orange: #e06a00;
-  --tdb-violet: #6d3df0;
-  --tdb-green: #00a651;
-  --tdb-pink: #e0185f;
+  --tdb-cyan: #0094b0;
+  --tdb-magenta: #c4009b;
+  --tdb-lime: #5f8f00;
+  --tdb-yellow: #a87400;
+  --tdb-orange: #c26a00;
+  --tdb-violet: #6c45e8;
+  --tdb-green: #00963a;
+  --tdb-pink: #d4166a;
+  --tdb-red: #d12a00;
+  --tdb-blue: #2a58e0;
 
   /* fills and glows are always full brightness */
-  --neon-cyan: #00e5ff;
-  --neon-magenta: #ff2bd6;
-  --neon-lime: #b8ff00;
-  --neon-yellow: #ffe600;
-  --neon-orange: #ff8a00;
-  --neon-violet: #9b5cff;
-  --neon-green: #39ff88;
-  --neon-pink: #ff4d8d;
+  --neon-cyan: #2fe0ff;
+  --neon-magenta: #ff4fd0;
+  --neon-lime: #c8ff4d;
+  --neon-yellow: #ffd36b;
+  --neon-orange: #ffb000;
+  --neon-violet: #a98bff;
+  --neon-green: #58ff7a;
+  --neon-pink: #ff6fae;
+  --neon-red: #ff4a1c;
+  --neon-blue: #5c8dff;
 
   --tdb-panel: #090b17;
 }
@@ -385,7 +389,7 @@ mjx-container svg path {
   /* the template's brand colours are called "dark-green"; point them at the palette */
   --vp-dark-green: #00a6c0;
   --vp-dark-green-dark: #009db8;
-  --vp-dark-green-light: #00e5ff;
+  --vp-dark-green-light: #2fe0ff;
   --vp-dark-green-lighter: #7df3ff;
 
   --vp-c-brand-1: #008ba3;
@@ -416,8 +420,8 @@ mjx-container svg path {
   );
   --vp-home-hero-image-filter: blur(70px);
 
-  --vp-custom-block-tip-border: rgba(57, 255, 136, 0.55);
-  --vp-custom-block-tip-bg: rgba(57, 255, 136, 0.08);
+  --vp-custom-block-tip-border: rgba(88, 255, 122, 0.55);
+  --vp-custom-block-tip-bg: rgba(88, 255, 122, 0.08);
   --vp-custom-block-tip-text: var(--vp-c-text-1);
   --vp-custom-block-tip-text-deep: var(--vp-c-text-1);
 }
@@ -427,26 +431,26 @@ mjx-container svg path {
   --vp-c-bg-alt: #090b15;
   --vp-c-bg-elv: #0f1226;
   --vp-c-bg-soft: #0c0f20;
-  --vp-c-divider: rgba(0, 229, 255, 0.16);
+  --vp-c-divider: rgba(47, 224, 255, 0.16);
   --vp-c-gutter: #04050a;
   --vp-c-text-1: #e8ecff;
   --vp-c-text-2: #a7b0d6;
   --vp-c-text-3: #7b84ad;
 
-  --vp-c-brand-1: #00e5ff;
+  --vp-c-brand-1: #2fe0ff;
   --vp-c-brand-2: #6df0ff;
   --vp-c-brand-3: #00b8d4;
-  --vp-c-brand-soft: rgba(0, 229, 255, 0.16);
+  --vp-c-brand-soft: rgba(47, 224, 255, 0.16);
 
-  --vp-button-brand-bg: #00e5ff;
+  --vp-button-brand-bg: #2fe0ff;
   --vp-button-brand-hover-bg: #6df0ff;
   --vp-button-brand-active-bg: #00c4dd;
   --vp-button-brand-text: #04060d;
 
   --vp-home-hero-image-filter: blur(80px);
 
-  --vp-custom-block-tip-border: rgba(57, 255, 136, 0.6);
-  --vp-custom-block-tip-bg: rgba(57, 255, 136, 0.09);
+  --vp-custom-block-tip-border: rgba(88, 255, 122, 0.6);
+  --vp-custom-block-tip-bg: rgba(88, 255, 122, 0.09);
 }
 
 /* ---- Typography ------------------------------------------------------------------- */
@@ -465,7 +469,7 @@ mjx-container svg path {
 }
 
 .dark .vp-doc h1 {
-  filter: drop-shadow(0 0 14px rgba(255, 43, 214, 0.35));
+  filter: drop-shadow(0 0 14px rgba(255, 79, 208, 0.35));
 }
 
 .vp-doc h2 {
@@ -484,7 +488,7 @@ mjx-container svg path {
   margin-bottom: 12px;
   border-radius: 4px;
   background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 12px rgba(47, 224, 255, 0.6);
 }
 
 .vp-doc h3 {
@@ -492,7 +496,7 @@ mjx-container svg path {
 }
 
 .dark .vp-doc h3 {
-  text-shadow: 0 0 14px rgba(0, 229, 255, 0.35);
+  text-shadow: 0 0 14px rgba(47, 224, 255, 0.35);
 }
 
 /* ---- Home page ---------------------------------------------------------------------- */
@@ -509,11 +513,11 @@ mjx-container svg path {
   background-image: linear-gradient(120deg, var(--neon-cyan), var(--neon-violet));
   border: none;
   color: #04060d;
-  box-shadow: 0 0 22px -4px rgba(0, 229, 255, 0.75);
+  box-shadow: 0 0 22px -4px rgba(47, 224, 255, 0.75);
 }
 
 .VPHero .VPButton.brand:hover {
-  box-shadow: 0 0 32px -2px rgba(255, 43, 214, 0.75);
+  box-shadow: 0 0 32px -2px rgba(255, 79, 208, 0.75);
 }
 
 .VPHero .VPButton.alt {
@@ -628,7 +632,7 @@ mjx-container svg path {
 }
 
 .dark .VPSidebarItem.is-active > .item > .text {
-  text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  text-shadow: 0 0 12px rgba(47, 224, 255, 0.6);
 }
 
 .VPNavBar .title {
@@ -644,10 +648,10 @@ mjx-container svg path {
   height: auto;
   margin: 16px auto;
   padding: 10px;
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  border: 1px solid rgba(47, 224, 255, 0.35);
   border-radius: 16px;
   background: var(--tdb-panel);
-  box-shadow: 0 0 26px -10px rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 26px -10px rgba(47, 224, 255, 0.6);
 }
 
 /* Code in blue-cyan, results in magenta */
@@ -686,18 +690,18 @@ mjx-container svg path {
 }
 
 .vp-doc .custom-block.info {
-  border-color: rgba(0, 229, 255, 0.55);
-  background: rgba(0, 229, 255, 0.08);
+  border-color: rgba(47, 224, 255, 0.55);
+  background: rgba(47, 224, 255, 0.08);
 }
 
 .vp-doc .custom-block.warning {
-  border-color: rgba(255, 230, 0, 0.6);
-  background: rgba(255, 230, 0, 0.09);
+  border-color: rgba(255, 211, 107, 0.6);
+  background: rgba(255, 211, 107, 0.09);
 }
 
 .vp-doc .custom-block.danger {
-  border-color: rgba(255, 43, 214, 0.6);
-  background: rgba(255, 43, 214, 0.09);
+  border-color: rgba(255, 79, 208, 0.6);
+  background: rgba(255, 79, 208, 0.09);
 }
 
 /* Short badges used in the text: <span class="tdb-tag cyan">pure</span> */
@@ -715,3 +719,25 @@ mjx-container svg path {
 .tdb-tag.lime { background: var(--neon-lime); }
 .tdb-tag.yellow { background: var(--neon-yellow); }
 .tdb-tag.orange { background: var(--neon-orange); }
+
+/* =====================================================================================
+   Logo next to the site name in the navigation bar
+   The logo is drawn here, from `docs/src/public/logo.svg`, so that it shows in every page
+   (including the ones with the sidebar), whatever the generated site configuration says.
+   Vite turns the absolute url into one that respects the base of the site.
+   ===================================================================================== */
+
+.VPNavBarTitle .title > .VPImage.logo,
+.VPNavBarTitle .title > img.logo {
+  display: none;
+}
+
+.VPNavBarTitle .title::before {
+  content: "";
+  display: inline-block;
+  flex: none;
+  width: 34px;
+  height: 31px;
+  margin-right: 10px;
+  background: url("/logo-tdb.svg") center / contain no-repeat;
+}

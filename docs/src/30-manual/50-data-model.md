@@ -14,66 +14,66 @@ A [`Dataset`](@ref) is a small relational database held entirely in memory. Inst
 <div style="margin: 18px 0">
 <svg viewBox="0 0 800 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Relational layout of the dataset" style="width:100%;max-width:800px;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif">
 <defs>
-<marker id="arr-00e5ff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#00e5ff"/></marker>
-<marker id="arr-39ff88" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#39ff88"/></marker>
-<marker id="arr-9b5cff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9b5cff"/></marker>
-<marker id="arr-ff8a00" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff8a00"/></marker>
-<marker id="arr-ff2bd6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff2bd6"/></marker>
-<marker id="arr-ffe600" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffe600"/></marker>
+<marker id="arr-00e5ff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2fe0ff"/></marker>
+<marker id="arr-39ff88" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#58ff7a"/></marker>
+<marker id="arr-9b5cff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#a98bff"/></marker>
+<marker id="arr-ff8a00" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffb000"/></marker>
+<marker id="arr-ff2bd6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff4fd0"/></marker>
+<marker id="arr-ffe600" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ffd36b"/></marker>
 </defs>
-<rect x="20" y="20" width="210" height="118" rx="14" fill="#00e5ff" fill-opacity="0.13" stroke="#00e5ff" stroke-width="2"/>
-<rect x="20" y="20" width="210" height="34" rx="14" fill="#00e5ff" fill-opacity="0.9"/>
-<rect x="20" y="40" width="210" height="14" fill="#00e5ff" fill-opacity="0.9"/>
+<rect x="20" y="20" width="210" height="118" rx="14" fill="#2fe0ff" fill-opacity="0.13" stroke="#2fe0ff" stroke-width="2"/>
+<rect x="20" y="20" width="210" height="34" rx="14" fill="#2fe0ff" fill-opacity="0.9"/>
+<rect x="20" y="40" width="210" height="14" fill="#2fe0ff" fill-opacity="0.9"/>
 <text x="125.0" y="43" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">references</text>
 <text x="34" y="76" font-size="13.5" fill="currentColor">doi, title, journal, year</text>
 <text x="34" y="95" font-size="13.5" fill="currentColor">authors, volume, pages</text>
 <text x="34" y="114" font-size="13.5" fill="currentColor">source  → pool</text>
-<rect x="20" y="222" width="210" height="118" rx="14" fill="#39ff88" fill-opacity="0.13" stroke="#39ff88" stroke-width="2"/>
-<rect x="20" y="222" width="210" height="34" rx="14" fill="#39ff88" fill-opacity="0.9"/>
-<rect x="20" y="242" width="210" height="14" fill="#39ff88" fill-opacity="0.9"/>
+<rect x="20" y="222" width="210" height="118" rx="14" fill="#58ff7a" fill-opacity="0.13" stroke="#58ff7a" stroke-width="2"/>
+<rect x="20" y="222" width="210" height="34" rx="14" fill="#58ff7a" fill-opacity="0.9"/>
+<rect x="20" y="242" width="210" height="14" fill="#58ff7a" fill-opacity="0.9"/>
 <text x="125.0" y="245" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">compounds</text>
 <text x="34" y="278" font-size="13.5" fill="currentColor">inchikey (identity), inchi</text>
 <text x="34" y="297" font-size="13.5" fill="currentColor">formula</text>
 <text x="34" y="316" font-size="13.5" fill="currentColor">names</text>
-<rect x="285" y="100" width="230" height="140" rx="14" fill="#9b5cff" fill-opacity="0.13" stroke="#9b5cff" stroke-width="2"/>
-<rect x="285" y="100" width="230" height="34" rx="14" fill="#9b5cff" fill-opacity="0.9"/>
-<rect x="285" y="120" width="230" height="14" fill="#9b5cff" fill-opacity="0.9"/>
+<rect x="285" y="100" width="230" height="140" rx="14" fill="#a98bff" fill-opacity="0.13" stroke="#a98bff" stroke-width="2"/>
+<rect x="285" y="100" width="230" height="34" rx="14" fill="#a98bff" fill-opacity="0.9"/>
+<rect x="285" y="120" width="230" height="14" fill="#a98bff" fill-opacity="0.9"/>
 <text x="400.0" y="123" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">experiments</text>
 <text x="299" y="156" font-size="13.5" fill="currentColor">reference  → references</text>
 <text x="299" y="175" font-size="13.5" fill="currentColor">components[1..3] → compounds</text>
 <text x="299" y="194" font-size="13.5" fill="currentColor">kinds[1..3] (composition)</text>
 <text x="299" y="213" font-size="13.5" fill="currentColor">ncomp, number</text>
-<rect x="570" y="20" width="210" height="98" rx="14" fill="#ff8a00" fill-opacity="0.13" stroke="#ff8a00" stroke-width="2"/>
-<rect x="570" y="20" width="210" height="34" rx="14" fill="#ff8a00" fill-opacity="0.9"/>
-<rect x="570" y="40" width="210" height="14" fill="#ff8a00" fill-opacity="0.9"/>
+<rect x="570" y="20" width="210" height="98" rx="14" fill="#ffb000" fill-opacity="0.13" stroke="#ffb000" stroke-width="2"/>
+<rect x="570" y="20" width="210" height="34" rx="14" fill="#ffb000" fill-opacity="0.9"/>
+<rect x="570" y="40" width="210" height="14" fill="#ffb000" fill-opacity="0.9"/>
 <text x="675.0" y="43" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">properties</text>
 <text x="584" y="76" font-size="13.5" fill="currentColor">label, unit</text>
 <text x="584" y="95" font-size="13.5" fill="currentColor">group  → pool</text>
 <text x="584" y="114" font-size="13.5" fill="currentColor">one row per (label, unit)</text>
-<rect x="570" y="168" width="210" height="170" rx="14" fill="#ff2bd6" fill-opacity="0.13" stroke="#ff2bd6" stroke-width="2"/>
-<rect x="570" y="168" width="210" height="34" rx="14" fill="#ff2bd6" fill-opacity="0.9"/>
-<rect x="570" y="188" width="210" height="14" fill="#ff2bd6" fill-opacity="0.9"/>
+<rect x="570" y="168" width="210" height="170" rx="14" fill="#ff4fd0" fill-opacity="0.13" stroke="#ff4fd0" stroke-width="2"/>
+<rect x="570" y="168" width="210" height="34" rx="14" fill="#ff4fd0" fill-opacity="0.9"/>
+<rect x="570" y="188" width="210" height="14" fill="#ff4fd0" fill-opacity="0.9"/>
 <text x="675.0" y="191" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">measurements</text>
 <text x="584" y="224" font-size="13.5" fill="currentColor">experiment, property</text>
 <text x="584" y="243" font-size="13.5" fill="currentColor">value, unc, unc_k, unc_level</text>
 <text x="584" y="262" font-size="13.5" fill="currentColor">temperature, pressure</text>
 <text x="584" y="281" font-size="13.5" fill="currentColor">composition[1..3]</text>
 <text x="584" y="300" font-size="13.5" fill="currentColor">method, phase  → pool</text>
-<rect x="300" y="300" width="200" height="80" rx="14" fill="#ffe600" fill-opacity="0.13" stroke="#ffe600" stroke-width="2"/>
-<rect x="300" y="300" width="200" height="34" rx="14" fill="#ffe600" fill-opacity="0.9"/>
-<rect x="300" y="320" width="200" height="14" fill="#ffe600" fill-opacity="0.9"/>
+<rect x="300" y="300" width="200" height="80" rx="14" fill="#ffd36b" fill-opacity="0.13" stroke="#ffd36b" stroke-width="2"/>
+<rect x="300" y="300" width="200" height="34" rx="14" fill="#ffd36b" fill-opacity="0.9"/>
+<rect x="300" y="320" width="200" height="14" fill="#ffd36b" fill-opacity="0.9"/>
 <text x="400.0" y="323" text-anchor="middle" font-size="16" font-weight="700" fill="#06070d">extras</text>
 <text x="314" y="356" font-size="13.5" fill="currentColor">scope, row, key</text>
 <text x="314" y="375" font-size="13.5" fill="currentColor">number or text</text>
-<line x1="285" y1="140" x2="232" y2="90" stroke="#00e5ff" stroke-width="2.4" marker-end="url(#arr-00e5ff)"/>
+<line x1="285" y1="140" x2="232" y2="90" stroke="#2fe0ff" stroke-width="2.4" marker-end="url(#arr-00e5ff)"/>
 <text x="250" y="104" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">reference</text>
-<line x1="285" y1="205" x2="232" y2="262" stroke="#39ff88" stroke-width="2.4" marker-end="url(#arr-39ff88)"/>
+<line x1="285" y1="205" x2="232" y2="262" stroke="#58ff7a" stroke-width="2.4" marker-end="url(#arr-39ff88)"/>
 <text x="248" y="248" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">components</text>
-<line x1="570" y1="230" x2="517" y2="200" stroke="#9b5cff" stroke-width="2.4" marker-end="url(#arr-9b5cff)"/>
+<line x1="570" y1="230" x2="517" y2="200" stroke="#a98bff" stroke-width="2.4" marker-end="url(#arr-9b5cff)"/>
 <text x="538" y="198" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">experiment</text>
-<line x1="675" y1="168" x2="675" y2="120" stroke="#ff8a00" stroke-width="2.4" marker-end="url(#arr-ff8a00)"/>
+<line x1="675" y1="168" x2="675" y2="120" stroke="#ffb000" stroke-width="2.4" marker-end="url(#arr-ff8a00)"/>
 <text x="715" y="146" text-anchor="middle" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">property</text>
-<line x1="400" y1="340" x2="400" y2="242" stroke="#ffe600" stroke-width="2.4" marker-end="url(#arr-ffe600)"/>
+<line x1="400" y1="340" x2="400" y2="242" stroke="#ffd36b" stroke-width="2.4" marker-end="url(#arr-ffe600)"/>
 <text x="412" y="285" font-size="12.5" font-style="italic" fill="currentColor" fill-opacity="0.8">any row of any table</text>
 <rect x="20" y="404" width="760" height="48" rx="12" fill="#8b93a1" fill-opacity="0.14" stroke="#8b93a1" stroke-width="1.5" stroke-dasharray="6 5"/>
 <text x="400" y="424" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">string pools</text>
