@@ -1,10 +1,17 @@
 [deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Clapeyron = "7c7805af-46cc-48c9-995b-ed0ed2dc909a"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 ThermophysicalDB = "ca26f490-bc68-4489-97cc-95a4c39097e5"
-
-[compat]
-Documenter = "1"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [sources]
 ThermophysicalDB = {path = ".."}
+
+[compat]
+Documenter = "1"
+DocumenterVitepress = "0.3"

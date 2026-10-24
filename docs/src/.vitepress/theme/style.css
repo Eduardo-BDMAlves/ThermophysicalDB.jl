@@ -1,0 +1,717 @@
+/* Customize default theme styling by overriding CSS variables:
+https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css */
+/* Example */
+/* https://github.com/vuejs/vitepress/blob/main/template/.vitepress/theme/style.css */
+
+.VPHero .clip {
+  white-space: pre;
+  max-width: 600px;
+}
+
+/* Fonts */
+@font-face {
+  font-family: JuliaMono-Regular;
+  src: url("https://cdn.jsdelivr.net/gh/cormullion/juliamono/webfonts/JuliaMono-Regular.woff2");
+}
+
+:root {
+scroll-behavior: smooth;
+/* Typography */
+--vp-font-family-base: "Barlow", "Inter var experimental", "Inter var",
+  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+  Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+
+/* Code Snippet font */
+--vp-font-family-mono: JuliaMono-Regular, monospace;
+}
+
+/* Disable contextual alternates (kind of like ligatures but different) in monospace,
+ which turns `/>` to an up arrow and `|>` (the Julia pipe symbol) to an up arrow as well. */
+.mono-no-substitutions {
+font-family: "JuliaMono-Regular", monospace;
+font-feature-settings: "calt" off;
+}
+
+.mono-no-substitutions-alt {
+font-family: "JuliaMono-Regular", monospace;
+font-variant-ligatures: none;
+}
+
+pre, code {
+font-family: "JuliaMono-Regular", monospace;
+font-feature-settings: "calt" off;
+}
+
+/* Colors */
+:root {
+  --julia-blue: #4063D8;
+  --julia-purple: #9558B2;
+  --julia-red: #CB3C33;
+  --julia-green: #389826;
+
+  --vp-c-brand: #0087d7;
+  --vp-c-brand-1: #0890df;
+  --vp-c-brand-2: #0599ef;
+  --vp-c-brand-3: #0c9ff4;
+  --vp-c-brand-light: #0087d7;
+  --vp-c-brand-dark: #5fd7ff;
+  --vp-c-brand-dimm: #212425;
+
+  /* Greens */
+  --vp-dark-green: #155f3e; /* Main accent green */
+  --vp-dark-green-dark: #2b855c;
+  --vp-dark-green-light: #42d392;
+  --vp-dark-green-lighter: #35eb9a;
+    /* Complementary Colors */
+  --vp-dark-gray: #1e1e1e;
+  --vp-dark-gray-soft: #2a2a2a;
+  --vp-dark-gray-mute: #242424;
+  --vp-light-gray: #d1d5db;
+  --vp-tip-bg: rgb(254, 254, 254);
+
+  /* Text Colors */
+  --vp-dark-text: #e5e5e5; /* Primary text color */
+  --vp-dark-subtext: #c1c1c1; /* Subtle text */
+  --vp-source-text: #e5e5e5;
+  /* custom tip */
+  --vp-custom-block-tip-border: var(--vp-c-brand-light);
+  --vp-custom-block-tip-bg: var(--vp-tip-bg);
+}
+
+ /* Reset text color of code blocks to default text color
+  * Vitepress uses --vp-c-brand-1 by default, which makes code look like links (#377) */
+:root {
+  --vp-code-color: var(--vp-c-text-1);
+}
+.custom-block.tip code {
+  color: var(--vp-c-text-1);
+  background-color: var(--vp-code-bg);
+}
+.custom-block.tip a>code {
+  color:var(--vp-c-tip-1);
+}
+
+ /* Component: Button */
+:root {
+  --vp-button-brand-border: var(--vp-light-gray);
+  --vp-button-brand-bg: var(--vp-c-brand-light);
+  --vp-button-brand-hover-border: var(--vp-c-bg-alt);
+  --vp-button-brand-hover-bg: var(--julia-blue);
+}
+
+/* Component: Home */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #9558B2 30%,
+    #CB3C33
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -145deg,
+    #9558b282 30%,
+    #3798269a 30%,
+    #cb3d33e3
+  );
+  --vp-home-hero-image-filter: blur(40px);
+}
+
+/* Hero Section */
+:root.dark {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    var(--julia-purple) 15%,
+    var(--vp-dark-green-light),
+    var(--vp-dark-green)
+
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    var(--vp-dark-green) 30%,
+    var(--vp-dark-green-light),
+    var(--vp-dark-gray) 30%
+  );
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+:root.dark {
+  /* custom tip */
+  --vp-custom-block-tip-border: var(--vp-dark-green-dark);
+  --vp-custom-block-tip-text: var(--vp-dark-subtext);
+  --vp-custom-block-tip-bg: var(--vp-dark-gray-mute);
+}
+
+/**
+ * Colors links
+ * -------------------------------------------------------------------------- */
+
+.dark {
+  --vp-c-brand: var(--vp-dark-green-light);
+  --vp-button-brand-border: var(--vp-dark-green-lighter);
+  --vp-button-brand-bg: var(--vp-dark-green);
+  --vp-c-brand-1: var(--vp-dark-green-light);
+  --vp-c-brand-2: var(--vp-dark-green-lighter);
+  --vp-c-brand-3: var(--vp-dark-green);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(72px);
+  }
+}
+/* Component: MathJax */
+
+
+.mjx-scroll-wrapper {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+mjx-container {
+  display: inline-block;
+  padding: 0.5rem 0;
+  margin: auto 2px -2px;
+  overflow: visible !important;  /* Override MathJax's overflow */
+  text-align: left;
+}
+
+mjx-container > svg {
+  display: inline-block;
+  height: auto;
+}
+
+mjx-container > svg[data-labels="true"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* @mdit/plugin-mathjax theming refs */
+
+mjx-container svg path {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.MathJax_ref {
+  color: var(--vp-c-brand-1);
+}
+
+.MathJax_ref:hover {
+  color: var(--vp-c-brand-2);
+  cursor: pointer;
+}
+
+/* ===== Custom colors for input and output code blocks ===== */
+:root {
+  /* --vp-c-bg-input: #eef0f3; */
+  --vp-c-bg-output: #fbfbfb;
+  --vp-c-bg-output-outline: #e2e2e3;
+}
+
+.dark {
+  /* --vp-c-bg-input: #1a1a1a; */
+  --vp-c-bg-output: #1a1a1a;
+  --vp-c-bg-output-outline: #2e2e32;
+}
+
+/*
+.language-julia {
+  background-color: var(--vp-c-bg-input) !important;
+}
+*/
+
+.language- {
+  background-color: var(--vp-c-bg-output) !important;
+  outline: 1px solid var(--vp-c-bg-output-outline);
+}
+
+/* Julia REPL prompt syntax highlighting */
+/* prompt token behavior */
+.vp-doc .shiki .repl-prompt {
+  opacity: 1.0;
+  user-select: none;
+}
+
+:root:not(.dark) .vp-doc .shiki .repl-prompt-julia {
+  color: var(--vp-dark-green);
+}
+
+:root:not(.dark) .vp-doc .shiki .repl-prompt-pkg {
+  color: var(--vp-c-brand-light);
+}
+
+.dark .vp-doc .shiki .repl-prompt-julia {
+  color: var(--vp-dark-green-light);
+}
+
+.dark .vp-doc .shiki .repl-prompt-pkg {
+  color: var(--vp-c-brand-dark);
+}
+
+/* ===== Sidebar Drawer Toggle ===== */
+/* Smooth transitions for sidebar collapse/expand on desktop */
+@media (min-width: 960px) {
+  .VPSidebar {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease;
+  }
+
+  .VPContent.has-sidebar {
+    transition: padding-left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding-right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Smooth transitions for navbar elements (needed for expand-back too) */
+  .VPNavBar.has-sidebar .content {
+    transition: padding-left 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .VPNavBar.has-sidebar .divider {
+    transition: padding-left 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .VPNavBar.has-sidebar .title {
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease !important;
+  }
+
+  /* Collapsed state: zero the sidebar width variable so all layout formulas
+     (VitePress defaults + Enhanced Readabilities plugin) adjust automatically */
+  html.sidebar-drawer-collapsed {
+    --vp-sidebar-width: 0px !important;
+  }
+
+  html.sidebar-drawer-collapsed .VPSidebar {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Original width mode only: let content fill space up to the aside */
+  html.sidebar-drawer-collapsed
+    body:not(.VPNolebaseEnhancedReadabilitiesLayoutSwitchFullWidth):not(.VPNolebaseEnhancedReadabilitiesLayoutSwitchSidebarWidthAdjustableOnly):not(.VPNolebaseEnhancedReadabilitiesLayoutSwitchBothWidthAdjustable)
+    .VPDoc.has-sidebar .container {
+    display: flex;
+    justify-content: center;
+    max-width: 992px;
+  }
+
+  html.sidebar-drawer-collapsed
+    body:not(.VPNolebaseEnhancedReadabilitiesLayoutSwitchFullWidth):not(.VPNolebaseEnhancedReadabilitiesLayoutSwitchSidebarWidthAdjustableOnly):not(.VPNolebaseEnhancedReadabilitiesLayoutSwitchBothWidthAdjustable)
+    .VPDoc.has-sidebar .content-container {
+    max-width: none;
+  }
+
+  /* Collapse the navbar title area (site logo + name) */
+  html.sidebar-drawer-collapsed .VPNavBar.has-sidebar .title,
+  html.sidebar-drawer-collapsed .VPNavBar.has-sidebar > .wrapper > .container > .title {
+    width: 0 !important;
+    overflow: hidden;
+    opacity: 0;
+    padding: 0 !important;
+    pointer-events: none;
+  }
+
+  /* Move drawer button closer to the edge */
+  html.sidebar-drawer-collapsed .VPNavBar.has-sidebar .content,
+  html.sidebar-drawer-collapsed .VPNavBar.has-sidebar > .wrapper > .container > .content {
+    padding-left: 8px !important;
+  }
+}
+
+
+/* =====================================================================================
+   ThermophysicalDB.jl theme: neon
+   Everything below sits on top of the DocumenterVitepress template above. Selectors are
+   written as `:root:root` / `:root.dark` so they win over the template's `.dark { ... }`
+   rules whatever the order in which the files are loaded.
+
+   Dark mode gets the full-brightness neon colours and the glow. Light mode keeps the same
+   hues in deeper tones, so text and thin lines stay legible on white.
+   ===================================================================================== */
+
+:root {
+  /* light mode: deep neon, readable on white */
+  --tdb-cyan: #009db8;
+  --tdb-magenta: #d4009f;
+  --tdb-lime: #5c9a00;
+  --tdb-yellow: #b38f00;
+  --tdb-orange: #e06a00;
+  --tdb-violet: #6d3df0;
+  --tdb-green: #00a651;
+  --tdb-pink: #e0185f;
+
+  /* fills and glows are always full brightness */
+  --neon-cyan: #00e5ff;
+  --neon-magenta: #ff2bd6;
+  --neon-lime: #b8ff00;
+  --neon-yellow: #ffe600;
+  --neon-orange: #ff8a00;
+  --neon-violet: #9b5cff;
+  --neon-green: #39ff88;
+  --neon-pink: #ff4d8d;
+
+  --tdb-panel: #090b17;
+}
+
+:root.dark {
+  --tdb-cyan: var(--neon-cyan);
+  --tdb-magenta: var(--neon-magenta);
+  --tdb-lime: var(--neon-lime);
+  --tdb-yellow: var(--neon-yellow);
+  --tdb-orange: var(--neon-orange);
+  --tdb-violet: var(--neon-violet);
+  --tdb-green: var(--neon-green);
+  --tdb-pink: var(--neon-pink);
+}
+
+:root:root {
+  /* the template's brand colours are called "dark-green"; point them at the palette */
+  --vp-dark-green: #00a6c0;
+  --vp-dark-green-dark: #009db8;
+  --vp-dark-green-light: #00e5ff;
+  --vp-dark-green-lighter: #7df3ff;
+
+  --vp-c-brand-1: #008ba3;
+  --vp-c-brand-2: #00a6c0;
+  --vp-c-brand-3: #00c2e0;
+  --vp-c-brand-soft: rgba(0, 194, 224, 0.14);
+
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: #04060d;
+  --vp-button-brand-bg: #00d0ec;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-bg: #43e6ff;
+  --vp-button-brand-active-bg: #00b4cf;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    115deg,
+    var(--tdb-cyan) 0%,
+    var(--tdb-violet) 40%,
+    var(--tdb-magenta) 70%,
+    var(--tdb-orange) 100%
+  );
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    var(--neon-cyan) 15%,
+    var(--neon-violet) 50%,
+    var(--neon-magenta) 85%
+  );
+  --vp-home-hero-image-filter: blur(70px);
+
+  --vp-custom-block-tip-border: rgba(57, 255, 136, 0.55);
+  --vp-custom-block-tip-bg: rgba(57, 255, 136, 0.08);
+  --vp-custom-block-tip-text: var(--vp-c-text-1);
+  --vp-custom-block-tip-text-deep: var(--vp-c-text-1);
+}
+
+:root.dark {
+  --vp-c-bg: #06070d;
+  --vp-c-bg-alt: #090b15;
+  --vp-c-bg-elv: #0f1226;
+  --vp-c-bg-soft: #0c0f20;
+  --vp-c-divider: rgba(0, 229, 255, 0.16);
+  --vp-c-gutter: #04050a;
+  --vp-c-text-1: #e8ecff;
+  --vp-c-text-2: #a7b0d6;
+  --vp-c-text-3: #7b84ad;
+
+  --vp-c-brand-1: #00e5ff;
+  --vp-c-brand-2: #6df0ff;
+  --vp-c-brand-3: #00b8d4;
+  --vp-c-brand-soft: rgba(0, 229, 255, 0.16);
+
+  --vp-button-brand-bg: #00e5ff;
+  --vp-button-brand-hover-bg: #6df0ff;
+  --vp-button-brand-active-bg: #00c4dd;
+  --vp-button-brand-text: #04060d;
+
+  --vp-home-hero-image-filter: blur(80px);
+
+  --vp-custom-block-tip-border: rgba(57, 255, 136, 0.6);
+  --vp-custom-block-tip-bg: rgba(57, 255, 136, 0.09);
+}
+
+/* ---- Typography ------------------------------------------------------------------- */
+
+:root:root {
+  --vp-font-family-base: "Inter", "Inter var", system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.vp-doc h1 {
+  background: linear-gradient(115deg, var(--tdb-cyan), var(--tdb-violet) 45%, var(--tdb-magenta) 75%, var(--tdb-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+}
+
+.dark .vp-doc h1 {
+  filter: drop-shadow(0 0 14px rgba(255, 43, 214, 0.35));
+}
+
+.vp-doc h2 {
+  border-top: none;
+  padding-top: 8px;
+  margin-top: 40px;
+  letter-spacing: -0.01em;
+}
+
+/* a neon bar before every section title */
+.vp-doc h2::before {
+  content: "";
+  display: block;
+  width: 52px;
+  height: 4px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+}
+
+.vp-doc h3 {
+  color: var(--tdb-cyan);
+}
+
+.dark .vp-doc h3 {
+  text-shadow: 0 0 14px rgba(0, 229, 255, 0.35);
+}
+
+/* ---- Home page ---------------------------------------------------------------------- */
+
+.VPHero .text {
+  letter-spacing: -0.02em;
+}
+
+.VPHero .tagline {
+  max-width: 560px;
+}
+
+.VPHero .VPButton.brand {
+  background-image: linear-gradient(120deg, var(--neon-cyan), var(--neon-violet));
+  border: none;
+  color: #04060d;
+  box-shadow: 0 0 22px -4px rgba(0, 229, 255, 0.75);
+}
+
+.VPHero .VPButton.brand:hover {
+  box-shadow: 0 0 32px -2px rgba(255, 43, 214, 0.75);
+}
+
+.VPHero .VPButton.alt {
+  border: 1px solid var(--tdb-magenta);
+  color: var(--tdb-magenta);
+  background: transparent;
+}
+
+.VPHero .VPButton.alt:hover {
+  box-shadow: 0 0 22px -4px var(--neon-magenta);
+}
+
+.VPHero .image-src {
+  max-width: 440px;
+  width: 100%;
+  border-radius: 24px;
+}
+
+.VPFeatures .item .VPFeature {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tdb-accent, var(--neon-cyan)) 45%, transparent);
+  border-radius: 16px;
+  background: var(--vp-c-bg-soft);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.VPFeatures .item .VPFeature::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--tdb-accent, var(--neon-cyan));
+  box-shadow: 0 0 14px var(--tdb-accent, var(--neon-cyan));
+}
+
+.VPFeatures .item .VPFeature:hover {
+  transform: translateY(-3px);
+  border-color: var(--tdb-accent, var(--neon-cyan));
+  box-shadow: 0 0 0 1px var(--tdb-accent, var(--neon-cyan)), 0 0 30px -6px var(--tdb-accent, var(--neon-cyan));
+}
+
+.VPFeatures .item .VPFeature .icon {
+  background: color-mix(in srgb, var(--tdb-accent, var(--neon-cyan)) 18%, transparent);
+  border-radius: 12px;
+}
+
+.VPFeatures .item:nth-child(6n + 1) { --tdb-accent: var(--neon-cyan); }
+.VPFeatures .item:nth-child(6n + 2) { --tdb-accent: var(--neon-magenta); }
+.VPFeatures .item:nth-child(6n + 3) { --tdb-accent: var(--neon-lime); }
+.VPFeatures .item:nth-child(6n + 4) { --tdb-accent: var(--neon-yellow); }
+.VPFeatures .item:nth-child(6n + 5) { --tdb-accent: var(--neon-orange); }
+.VPFeatures .item:nth-child(6n + 6) { --tdb-accent: var(--neon-violet); }
+
+/* Gallery of pages on the home page (plain HTML in index.md) */
+.tdb-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin: 24px 0 8px;
+}
+
+.tdb-card {
+  display: block;
+  padding: 18px 18px 16px;
+  border: 1px solid color-mix(in srgb, var(--tdb-accent, var(--neon-cyan)) 40%, transparent);
+  border-left: 5px solid var(--tdb-accent, var(--neon-cyan));
+  border-radius: 14px;
+  background: var(--vp-c-bg-soft);
+  text-decoration: none !important;
+  color: var(--vp-c-text-1) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tdb-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 28px -6px var(--tdb-accent, var(--neon-cyan));
+}
+
+.tdb-card strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--tdb-accent-text, var(--tdb-cyan));
+}
+
+.tdb-card span {
+  font-size: 0.9em;
+  color: var(--vp-c-text-2);
+}
+
+.tdb-gallery .tdb-card:nth-child(4n + 1) { --tdb-accent: var(--neon-cyan); --tdb-accent-text: var(--tdb-cyan); }
+.tdb-gallery .tdb-card:nth-child(4n + 2) { --tdb-accent: var(--neon-magenta); --tdb-accent-text: var(--tdb-magenta); }
+.tdb-gallery .tdb-card:nth-child(4n + 3) { --tdb-accent: var(--neon-lime); --tdb-accent-text: var(--tdb-lime); }
+.tdb-gallery .tdb-card:nth-child(4n + 4) { --tdb-accent: var(--neon-orange); --tdb-accent-text: var(--tdb-orange); }
+
+/* ---- Sidebar and navigation ----------------------------------------------------------- */
+
+.VPSidebarItem.level-0 > .item > .text {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.VPSidebarItem.level-0:nth-of-type(6n + 1) > .item > .text { color: var(--tdb-cyan); }
+.VPSidebarItem.level-0:nth-of-type(6n + 2) > .item > .text { color: var(--tdb-magenta); }
+.VPSidebarItem.level-0:nth-of-type(6n + 3) > .item > .text { color: var(--tdb-lime); }
+.VPSidebarItem.level-0:nth-of-type(6n + 4) > .item > .text { color: var(--tdb-yellow); }
+.VPSidebarItem.level-0:nth-of-type(6n + 5) > .item > .text { color: var(--tdb-orange); }
+.VPSidebarItem.level-0:nth-of-type(6n + 6) > .item > .text { color: var(--tdb-violet); }
+
+.VPSidebarItem.is-active > .item > .text {
+  color: var(--vp-c-brand-1) !important;
+}
+
+.dark .VPSidebarItem.is-active > .item > .text {
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+}
+
+.VPNavBar .title {
+  font-weight: 700;
+}
+
+/* ---- Content ------------------------------------------------------------------------------ */
+
+/* Figures of the executed examples sit on a dark panel in both modes, where neon reads best */
+.vp-doc img:not(.VPImage) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 16px auto;
+  padding: 10px;
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 16px;
+  background: var(--tdb-panel);
+  box-shadow: 0 0 26px -10px rgba(0, 229, 255, 0.6);
+}
+
+/* Code in blue-cyan, results in magenta */
+.language- {
+  border-left: 4px solid var(--neon-magenta);
+  border-radius: 8px;
+}
+
+.vp-doc div[class*="language-julia"] {
+  border-left: 4px solid var(--neon-cyan);
+  border-radius: 8px;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+}
+
+.vp-doc th {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-text-1);
+  border-bottom: 2px solid var(--neon-cyan);
+}
+
+.vp-doc tr:nth-child(2n) {
+  background: var(--vp-c-bg-soft);
+}
+
+.vp-doc .custom-block {
+  border-radius: 12px;
+}
+
+.vp-doc .custom-block.info {
+  border-color: rgba(0, 229, 255, 0.55);
+  background: rgba(0, 229, 255, 0.08);
+}
+
+.vp-doc .custom-block.warning {
+  border-color: rgba(255, 230, 0, 0.6);
+  background: rgba(255, 230, 0, 0.09);
+}
+
+.vp-doc .custom-block.danger {
+  border-color: rgba(255, 43, 214, 0.6);
+  background: rgba(255, 43, 214, 0.09);
+}
+
+/* Short badges used in the text: <span class="tdb-tag cyan">pure</span> */
+.tdb-tag {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: 700;
+  vertical-align: middle;
+  color: #04060d;
+}
+.tdb-tag.cyan { background: var(--neon-cyan); }
+.tdb-tag.magenta { background: var(--neon-magenta); }
+.tdb-tag.lime { background: var(--neon-lime); }
+.tdb-tag.yellow { background: var(--neon-yellow); }
+.tdb-tag.orange { background: var(--neon-orange); }

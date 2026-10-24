@@ -134,16 +134,31 @@ We try to keep a linear history in this repo, so it is important to keep your br
 
 ## Building and viewing the documentation locally
 
-Following the latest suggestions, we recommend using `LiveServer` to build the documentation.
-Here is how you do it:
+The site is built with [Documenter.jl](https://documenter.juliadocs.org) and [DocumenterVitepress.jl](https://luxdl.github.io/DocumenterVitepress.jl/dev/). The tutorials execute real code against the ThermoML Archive, so building them needs the database.
 
 1. Run `julia --project=docs` to open Julia in the environment of the docs.
 1. If this is the first time building the docs
    1. Press `]` to enter `pkg` mode
    1. Run `pkg> dev .` to use the development version of your package
    1. Press backspace to leave `pkg` mode
-1. Run `julia> using LiveServer`
-1. Run `julia> servedocs()`
+1. Build the site with `julia> include("docs/make.jl")`. The first build downloads and parses the archive (a few minutes); later builds load the binary cache. Starting Julia with `-t auto` makes the parsing faster.
+
+To edit text without running any example, use the draft mode, which skips every executed block:
+
+```bash
+THERMOPHYSICALDB_DOCS_DRAFT=true julia --project=docs docs/make.jl
+```
+
+To keep the data somewhere else than the default location, set `THERMOPHYSICALDB_DATA_DIR` before starting Julia (see [Downloads, updates and cache](@ref updates)).
+
+The look of the site lives in `docs/src/.vitepress/theme/style.css` (colours, cards, figures), the logo and the hero picture in `docs/src/assets`, and the shared plot theme of the examples in `docs/DocsSetup.jl`. To preview the generated Markdown with live reload, build once and then call `DocumenterVitepress.dev_docs("docs/build")` from a second Julia session, as explained in the DocumenterVitepress manual.
+
+### Conventions for pages and figures
+
+- **Page names** follow the template: numbered prefixes (`10-`, `20-`, ...) that set the order, hyphens between words, and numbered folders for sections. A folder needs a title in the `titles` dictionary of `docs/make.jl`.
+- **Units in labels** go in square brackets, never after a slash: `T [K]`, `p [MPa]`, `λ [W m⁻¹ K⁻¹]`. A quantity that is a ratio carries the unit of its scale in brackets, for example `(ρ − ρ_ref)/ρ_ref [%]`. A slash divides quantities; it does not mark a unit.
+- **Pictures** use the shared theme (`Main.DocsSetup.activate!()` in a hidden `@setup` block). Colour continuous data with the default colormap and do not add emoji or icons to the text.
+- **Data credit.** Every page that shows archive data should make clear that the data come from the NIST/TRC ThermoML Archive and the original articles, not from this package. See [About the data](@ref 40-about-data).
 
 ## Making a new release
 
