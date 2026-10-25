@@ -427,6 +427,11 @@ end
     [Toy] tags = [:unit] begin
     using XLSX
     T = ThermophysicalDB
+    # XLSX.readtable returns a DataTable (columns and labels), not a tuple
+    function readsheet(file, sheet)
+        table = XLSX.readtable(file, sheet)
+        return table.data, table.column_labels
+    end
     ds = Toy.build()
     mktempdir() do tmp
         file = joinpath(tmp, "all.xlsx")
@@ -436,7 +441,7 @@ end
                   ["carbon dioxide + methane", "water", "references", "origin"]
         end
 
-        data, labels = XLSX.readtable(file, "water")
+        data, labels = readsheet(file, "water")
         @test Symbol("temperature [K]") in labels
         @test Symbol("value [see unit]") in labels && :unit in labels
         @test !(Symbol("x2 [-]") in labels)                   # a pure system has one composition
@@ -444,11 +449,11 @@ end
         @test column(:property)[1] == "Mass density"
         @test column(Symbol("value [see unit]"))[1] == 998.0
 
-        data, labels = XLSX.readtable(file, "references")
+        data, labels = readsheet(file, "references")
         @test :key in labels
         @test "Moe1990" in data[findfirst(==(:key), labels)]
 
-        data, labels = XLSX.readtable(file, "origin")
+        data, labels = readsheet(file, "origin")
         @test labels == [:field, :value]
         @test data[1][1] == "data origin"
 
@@ -465,7 +470,7 @@ end
         XLSX.openxlsx(single) do book
             @test XLSX.sheetnames(book) == ["points", "references", "origin"]
         end
-        data, labels = XLSX.readtable(single, "points")
+        data, labels = readsheet(single, "points")
         @test length(data[1]) == 8
 
         # the origin sheet is absent for data that are not from the archive
