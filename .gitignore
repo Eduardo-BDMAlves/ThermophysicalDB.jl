@@ -11,3 +11,8 @@ docs/build/
 env
 node_modules
 dev/
+# Never commit archive data (see NOTICE.md)
+*.tgz
+*.tgz.sha256
+ThermoML.xsd
+*.jld2

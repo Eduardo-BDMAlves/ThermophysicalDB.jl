@@ -9,3 +9,47 @@ authors:
   - given-names: Eduardo Bader Dalfovo Mohr
     family-names: Alves
     email: eduardo.alves@polo.ufsc.br
+repository-code: "https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl"
+url: "https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable"
+license: MIT
+abstract: >-
+  A Julia package that downloads, caches and queries experimental thermophysical
+  property data from public databases, starting with the NIST/TRC ThermoML Archive.
+  The package does not contain or redistribute any data.
+references:
+  - type: data
+    title: "ThermoML/Data Archive"
+    authors:
+      - name: "NIST Thermodynamics Research Center (TRC)"
+    doi: 10.18434/mds2-2422
+    url: "https://data.nist.gov/od/id/mds2-2422"
+  - type: article
+    title: "XML-based IUPAC standard for experimental, predicted, and critically evaluated thermodynamic property data storage and capture (ThermoML) (IUPAC Recommendations 2006)"
+    authors:
+      - family-names: Frenkel
+        given-names: M.
+      - family-names: Chirico
+        given-names: R. D.
+      - family-names: Diky
+        given-names: V.
+      - family-names: Dong
+        given-names: Q.
+      - family-names: Marsh
+        given-names: K. N.
+      - family-names: Dymond
+        given-names: J. H.
+      - family-names: Wakeham
+        given-names: W. A.
+      - family-names: Stein
+        given-names: S. E.
+      - family-names: Königsberger
+        given-names: E.
+      - family-names: Goodwin
+        given-names: A. R. H.
+    journal: "Pure and Applied Chemistry"
+    year: 2006
+    volume: 78
+    issue: 3
+    start: 541
+    end: 612
+    doi: 10.1351/pac200678030541

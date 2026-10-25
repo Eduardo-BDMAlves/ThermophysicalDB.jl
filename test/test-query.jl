@@ -10,16 +10,16 @@
         mole = T.intern!(ds.kinds, "Mole fraction")
         r1 = T.add_reference!(
             ds.references;
-            doi = "10.1007/s10765-005-5566-6",
+            doi = "10.5555/tdbfixture-001",
             year = 2005,
-            authors = ["Patek, J.", "Klomfar, J."],
+            authors = ["Doe, J.", "Roe, R."],
             source = nist,
         )
         r2 = T.add_reference!(
             ds.references;
-            doi = "10.1021/je000000x",
+            doi = "10.5555/tdbfixture-002",
             year = 1990,
-            authors = ["Someone, A."],
+            authors = ["Moe, A."],
             source = nist,
         )
         r3 = T.add_reference!(ds.references; title = "bench", source = mine)
@@ -147,10 +147,10 @@ end
 
     @test length(T.points(ds; source = "user")) == 1
     @test_throws ArgumentError T.points(ds; source = "nowhere")
-    @test length(T.points(ds; author = "patek")) == 4
+    @test length(T.points(ds; author = "doe")) == 4
     @test length(T.points(ds; year = 2005)) == 4
     @test length(T.points(ds; year = (1980, 1999))) == 3
-    @test length(T.points(ds; doi = "10.1021/JE000000X")) == 3
+    @test length(T.points(ds; doi = "10.5555/TDBFIXTURE-002")) == 3
 
     chained = T.points(T.points(ds; component = "methane"); temperature = (320, 400))
     direct = T.points(ds; component = "methane", temperature = (320, 400))

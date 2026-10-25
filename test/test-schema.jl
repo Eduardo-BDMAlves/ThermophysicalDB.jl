@@ -14,16 +14,21 @@ end
 
 @testitem "references are deduplicated by DOI" tags = [:unit, :fast] begin
     t = ThermophysicalDB.ReferenceTable()
-    a = ThermophysicalDB.add_reference!(t; doi = "10.1/x", year = 2005, authors = ["A, B."])
-    b = ThermophysicalDB.add_reference!(t; doi = "10.1/x", year = 1999)
-    c = ThermophysicalDB.add_reference!(t; doi = "10.1/y")
+    a = ThermophysicalDB.add_reference!(
+        t;
+        doi = "10.5555/tdbfixture-003",
+        year = 2005,
+        authors = ["Poe, B."],
+    )
+    b = ThermophysicalDB.add_reference!(t; doi = "10.5555/tdbfixture-003", year = 1999)
+    c = ThermophysicalDB.add_reference!(t; doi = "10.5555/tdbfixture-004")
     d = ThermophysicalDB.add_reference!(t; title = "no doi")
     e = ThermophysicalDB.add_reference!(t; title = "no doi either")
     @test a == b == 1
     @test (c, d, e) == (2, 3, 4)
     @test length(t) == 4
     @test t.year[a] == 2005
-    @test t.authors[a] == ["A, B."]
+    @test t.authors[a] == ["Poe, B."]
 end
 
 @testitem "compounds are keyed by InChIKey, then by name" tags = [:unit, :fast] begin
@@ -59,7 +64,7 @@ end
     T = ThermophysicalDB
     ds = T.Dataset()
     src = T.intern!(ds.sources, "thermoml")
-    ref = T.add_reference!(ds.references; doi = "10.1/x", source = src)
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-003", source = src)
     co2 = T.add_compound!(ds.compounds; names = ["carbon dioxide"])
     ch4 = T.add_compound!(ds.compounds; names = ["methane"])
     kind = T.intern!(ds.kinds, "Mole fraction")
@@ -102,4 +107,41 @@ end
     # Break an invariant: a measurement pointing at a missing experiment.
     T.add_measurement!(ds.measurements; experiment = 99, property = prop, value = 1.0)
     @test_throws ArgumentError T.validate(ds)
+end
+
+@testitem "schema_tables describes every column and every relation of the Dataset" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    tables = T.schema_tables()
+    pools = T.schema_pools()
+    names = [t.name for t in tables]
+
+    @test names ==
+          [:references, :compounds, :properties, :experiments, :measurements, :extras]
+    @test length(pools) == 7
+
+    # every column of every table is described, apart from the lookup dictionary
+    ds = T.Dataset()
+    for t in tables
+        fields = [f for f in fieldnames(typeof(getfield(ds, t.name))) if f !== :index]
+        @test [c.name for c in t.columns] == fields
+    end
+
+    # every relation points to something that exists, and none of the declarations is stale
+    for t in tables, c in t.columns
+        c.role in (:table, :pool) && @test c.target in vcat(names, pools)
+    end
+    declared = Set(keys(T.FOREIGN_KEYS))
+    described =
+        Set((t.name, c.name) for t in tables for c in t.columns if c.target !== :none)
+    @test declared == described
+
+    # shapes
+    measurements = only(t for t in tables if t.name === :measurements)
+    composition = only(c for c in measurements.columns if c.name === :composition)
+    @test composition.arity == T.MAX_COMPONENTS && composition.eltype == "Float64"
+    experiment = only(c for c in measurements.columns if c.name === :experiment)
+    @test experiment.role === :table && experiment.target === :experiments
+    references = only(t for t in tables if t.name === :references)
+    @test [c.name for c in references.columns if c.role === :unique] == [:doi]
 end

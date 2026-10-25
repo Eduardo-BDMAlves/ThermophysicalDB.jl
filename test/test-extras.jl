@@ -1,7 +1,7 @@
 @testitem "extras attach free-form fields to any table" tags = [:unit, :fast] begin
     T = ThermophysicalDB
     ds = T.Dataset()
-    ref = T.add_reference!(ds.references; doi = "10.1/x")
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-003")
     comp = T.add_compound!(ds.compounds; names = ["water"])
     experiment = T.add_experiment!(ds.experiments; reference = ref, components = [comp])
     prop = T.add_property!(ds.properties, "Mass density", "kg/m3")
@@ -29,7 +29,7 @@ end
 @testitem "extras reject invalid input and the last write wins" tags = [:unit, :fast] begin
     T = ThermophysicalDB
     ds = T.Dataset()
-    ref = T.add_reference!(ds.references; doi = "10.1/x")
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-003")
     @test_throws ArgumentError T.add_extra!(ds, :nowhere, 1, "k", 1.0)
     @test_throws ArgumentError T.add_extra!(ds, :reference, 1, "", 1.0)
     @test_throws ArgumentError T.add_extra!(ds, :reference, 2, "k", 1.0)

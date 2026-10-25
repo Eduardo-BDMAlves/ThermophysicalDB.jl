@@ -2,18 +2,19 @@
     # A miniature article with the same structure as the real archive: a mixture with a
     # composition constraint and T/P variables, a pure compound with a constraint on P and
     # a "Frequency" condition plus a ratio-type property, and an unsupported 4-component
-    # system. The numbers are synthetic.
+    # system. Everything here is fictitious: the bibliographic data do not describe a real
+    # article (the DOI uses the Crossref test prefix) and no number comes from the archive.
     const JSON = """
     {
       "Citation": {
-        "sAuthor": ["Patek, J.", "Klomfar, J."],
+        "sAuthor": ["Doe, J.", "Roe, R."],
         "sKeyword": ["carbon dioxide", "methane"],
-        "sTitle": "Thermal Conductivity of CO2 + CH4",
-        "sDOI": "10.1007/s10765-005-5566-6",
-        "sPubName": "Int. J. Thermophys.",
+        "sTitle": "Thermal Conductivity of a Fictitious Binary Gas Mixture",
+        "sDOI": "10.5555/tdbfixture-001",
+        "sPubName": "Fictitious Journal of Thermophysics",
         "yrPubYr": "2005",
-        "sVol": "26",
-        "sPage": "577-592",
+        "sVol": "1",
+        "sPage": "1-12",
         "eType": "journal"
       },
       "Compound": [
@@ -107,14 +108,11 @@ end
 @testitem "parse_article extracts conditions, uncertainty and qualifiers" setup =
     [ThermoMLFixture] tags = [:unit, :fast] begin
     T = ThermophysicalDB
-    a = T.parse_article(
-        "10.1007/s10765-005-5566-6.json",
-        Vector{UInt8}(ThermoMLFixture.JSON),
-    )
+    a = T.parse_article("10.5555/tdbfixture-001.json", Vector{UInt8}(ThermoMLFixture.JSON))
     @test a.error == ""
-    @test a.doi == "10.1007/s10765-005-5566-6"
+    @test a.doi == "10.5555/tdbfixture-001"
     @test a.year == 2005
-    @test a.authors == ["Patek, J.", "Klomfar, J."]
+    @test a.authors == ["Doe, J.", "Roe, R."]
     @test a.extras == ["keywords" => "carbon dioxide; methane"]
     @test length(a.compounds) == 3
     @test a.compounds[3].inchikey == ""
@@ -155,8 +153,8 @@ end
     not_object = T.parse_article("y.json", Vector{UInt8}("[1, 2]"))
     @test occursin("not an object", not_object.error)
     # Missing optional parts are tolerated, and the file name stands in for the DOI.
-    bare = T.parse_article("10.1/z.json", Vector{UInt8}("{}"))
-    @test bare.error == "" && bare.doi == "10.1/z"
+    bare = T.parse_article("10.5555/tdbfixture-005.json", Vector{UInt8}("{}"))
+    @test bare.error == "" && bare.doi == "10.5555/tdbfixture-005"
 end
 
 @testitem "build_dataset merges articles into a queryable dataset" setup =
@@ -166,7 +164,7 @@ end
         archive = joinpath(dir, "t.tgz")
         Fixtures.make_tgz(
             archive,
-            Dict("10.1007/s10765-005-5566-6.json" => ThermoMLFixture.JSON),
+            Dict("10.5555/tdbfixture-001.json" => ThermoMLFixture.JSON),
         )
         ds, report =
             @test_logs (:info, r"skipped") (:info, r"ReactionData") match_mode = :any T.build_dataset(
@@ -217,7 +215,10 @@ end
     T = ThermophysicalDB
     mktempdir() do dir
         archive = joinpath(dir, "t.tgz")
-        files = Dict("bad.json" => "{not json", "10.1/x.json" => ThermoMLFixture.JSON)
+        files = Dict(
+            "bad.json" => "{not json",
+            "10.5555/tdbfixture-003.json" => ThermoMLFixture.JSON,
+        )
         Fixtures.make_tgz(archive, files)
         ds, report = @test_logs (:warn, r"could not be parsed") (:info, r"skipped") (
             :info,

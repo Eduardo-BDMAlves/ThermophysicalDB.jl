@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning].
 ## [Unreleased]
 
 - Initial release
+- Added NOTICE.md, legal notices in the README and in the documentation, and the data source references in CITATION.cff
+- Test fixtures use fictitious bibliographic data
 
 <!-- Links -->
 

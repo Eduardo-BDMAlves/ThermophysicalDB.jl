@@ -20,7 +20,7 @@
     @test all(isempty, texts[2:end])
 
     # The lookup dictionaries are rebuilt, so adding known things reuses their rows.
-    @test T.add_reference!(copied.references; doi = "10.1007/s10765-005-5566-6") == 1
+    @test T.add_reference!(copied.references; doi = "10.5555/tdbfixture-001") == 1
     @test T.add_compound!(copied.compounds; inchikey = "VNWKTOKETHGBQD-UHFFFAOYSA-N") == 2
     @test T.add_property!(copied.properties, "Mass density", "kg/m3") == 2
     @test T.intern!(copied.sources, "user") == 2
@@ -67,7 +67,7 @@ end
     mktempdir() do tmp
         tgz = Fixtures.make_tgz(
             joinpath(tmp, "payload.tgz"),
-            Dict("10.1007/s10765-005-5566-6.json" => ThermoMLFixture.JSON),
+            Dict("10.5555/tdbfixture-001.json" => ThermoMLFixture.JSON),
         )
         release = Fixtures.make_release("2099-01-01")
         dir = joinpath(tmp, "thermoml")
