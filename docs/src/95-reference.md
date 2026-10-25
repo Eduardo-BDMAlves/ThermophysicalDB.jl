@@ -36,6 +36,13 @@ DataView
 table
 ```
 
+## Exporting points
+
+```@docs
+export_points
+ThermophysicalDB.ExportReport
+```
+
 ## References of a selection
 
 ```@docs

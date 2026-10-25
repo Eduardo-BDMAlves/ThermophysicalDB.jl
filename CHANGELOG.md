@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning].
 ## [Unreleased]
 
 - Initial release
+- Added `export_points`, which writes the points of a selection to `.csv`, `.xlsx` (through the XLSX package extension), `.json`, `.jld2` and a ThermoML-format subset, chosen by the extension of the path, or to a directory holding all of them
 - Added NOTICE.md, legal notices in the README and in the documentation, and the data source references in CITATION.cff
 - Test fixtures use fictitious bibliographic data
 

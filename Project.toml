@@ -21,6 +21,12 @@ Tar = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
+[weakdeps]
+XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
+
+[extensions]
+ThermophysicalDBXLSXExt = "XLSX"
+
 [compat]
 CodecZlib = "0.7.9"
 DOI2BibTeX = "0.1.7"
@@ -35,4 +41,5 @@ Tables = "1.12"
 Tar = "1.10.0"
 Unicode = "1.0.0"
 Unitful = "1"
+XLSX = "0.10, 0.11, 0.12, 0.13"
 julia = "1.13"

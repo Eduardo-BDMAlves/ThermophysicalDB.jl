@@ -45,6 +45,7 @@ include("store/cache.jl")
 include("store/database.jl")
 include("export/bibtex.jl")
 include("export/summary.jl")
+include("export/points.jl")
 
 export DataView,
     bibtex,
@@ -53,6 +54,7 @@ export DataView,
     database_dir,
     database,
     ensure_archive,
+    export_points,
     install_archive!,
     latex_table,
     markdown_table,
