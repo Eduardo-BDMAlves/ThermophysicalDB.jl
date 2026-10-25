@@ -115,6 +115,13 @@ The data, for now, comes only from the **ThermoML Archive**, created and maintai
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Eduardo-BDMAlves"><img src="https://avatars.githubusercontent.com/Eduardo-BDMAlves?v=4&s=100" width="100px;" alt="Eduardo Bader Dalfovo Mohr Alves"/><br /><sub><b>Eduardo Bader Dalfovo Mohr Alves</b></sub></a><br /><a href="https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/commits?author=Eduardo-BDMAlves" title="Code">💻</a> <a href="https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/commits?author=Eduardo-BDMAlves" title="Documentation">📖</a> <a href="https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/commits?author=Eduardo-BDMAlves" title="Tests">⚠️</a> <a href="https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/commits?author=Eduardo-BDMAlves" title="Design">🎨</a> <a href="https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/commits?author=Eduardo-BDMAlves" title="Data">🔣</a> <a href="#ideas-Eduardo-BDMAlves" title="Ideas, Planning, & Feedback">🤔</a></td>
+    </tr>
+  </tbody>
+</table>
 
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->

@@ -64,7 +64,7 @@ ethanol_fraction(t) = ifelse.(startswith.(t.components, "ethanol"), t.x1, t.x2)
 
 keep = (tv.xkind .== "Mole fraction") .& isfinite.(ethanol_fraction(tv))
 x = ethanol_fraction(tv)[keep]
-η = ustrip.(u"mPa*s", tv.value)[keep]
+η = tv.value[keep]
 year = Float64.(tv.year)[keep]
 
 length(x)
@@ -75,10 +75,10 @@ length(x)
 The pure end members come from the same database, so mixture and references share the same sources of error (and any tendency of a laboratory to over- or under-estimate). Medians guard against a stray point:
 
 ```@example mix
-pure_median(name, property, unit) = median(ustrip.(unit, table(pure(name, property); unitful = true).value))
+pure_median(name, property) = median(table(pure(name, property); unitful = true).value)
 
-η_ethanol = pure_median("ethanol", "Viscosity", u"mPa*s")
-η_water = pure_median("water", "Viscosity", u"mPa*s")
+η_ethanol = pure_median("ethanol", "Viscosity")
+η_water = pure_median("water", "Viscosity")
 (η_ethanol = η_ethanol, η_water = η_water)
 ```
 
@@ -87,12 +87,12 @@ pure_median(name, property, unit) = median(ustrip.(unit, table(pure(name, proper
 
 fig = Figure(size = (900, 420))
 ax1 = Axis(fig[1, 1]; xlabel = "x ethanol", ylabel = "η [mPa s]", title = "Viscosity at 25 °C")
-sc = scatter!(ax1, x, η; color = year, Main.DocsSetup.year_scale(year)..., markersize = 9)
-hlines!(ax1, [η_ethanol, η_water]; color = (:gray, 0.7), linestyle = :dash)
+sc = scatter!(ax1, x, ustrip.(u"mPa*s", η); color = year, Main.DocsSetup.year_scale(year)..., markersize = 9)
+hlines!(ax1, ustrip.(u"mPa*s", [η_ethanol, η_water]); color = (:gray, 0.7), linestyle = :dash)
 
 ax2 = Axis(fig[1, 2]; xlabel = "x ethanol", ylabel = "Δη [mPa s]", title = "Viscosity deviation")
 hlines!(ax2, [0.0]; color = "#e8ecff", linewidth = 1.5)
-scatter!(ax2, x, Δη; color = year, Main.DocsSetup.year_scale(year)..., markersize = 9)
+scatter!(ax2, x, ustrip.(u"mPa*s", Δη); color = year, Main.DocsSetup.year_scale(year)..., markersize = 9)
 Colorbar(fig[1, 3], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 fig
 ```
@@ -104,18 +104,18 @@ The viscosity of the mixture rises above *both* pure components at intermediate 
 The density data give the second signature. We turn each mixture density into a molar volume with the molar masses of the pure components, and subtract the ideal molar volume built from the pure densities:
 
 ```@example mix
-M_ethanol = 46.068     # g/mol
-M_water = 18.015       # g/mol
+M_ethanol = 46.068u"g/mol"
+M_water = 18.015u"g/mol"
 
 td = table(mixture("Mass density"); unitful = true)
 use = (td.xkind .== "Mole fraction") .& isfinite.(ethanol_fraction(td))
 
 xd = ethanol_fraction(td)[use]
-ρ = ustrip.(u"g/cm^3", td.value)[use]            # g/cm³, so V is in cm³/mol
+ρ = td.value[use]
 yd = Float64.(td.year)[use]
 
-ρ_ethanol = pure_median("ethanol", "Mass density", u"g/cm^3")
-ρ_water = pure_median("water", "Mass density", u"g/cm^3")
+ρ_ethanol = pure_median("ethanol", "Mass density")
+ρ_water = pure_median("water", "Mass density")
 
 V = (xd .* M_ethanol .+ (1 .- xd) .* M_water) ./ ρ
 V_ideal = xd .* (M_ethanol / ρ_ethanol) .+ (1 .- xd) .* (M_water / ρ_water)
@@ -128,7 +128,7 @@ VE = V .- V_ideal
 fig = Figure(size = (760, 440))
 ax = Axis(fig[1, 1]; xlabel = "x ethanol", ylabel = "Vᴱ [cm³ mol⁻¹]", title = "Excess molar volume of ethanol + water at 25 °C")
 hlines!(ax, [0.0]; color = "#e8ecff", linewidth = 1.5)
-sc = scatter!(ax, xd, VE; color = yd, Main.DocsSetup.year_scale(yd)..., markersize = 8)
+sc = scatter!(ax, xd, ustrip.(u"cm^3/mol", VE); color = yd, Main.DocsSetup.year_scale(yd)..., markersize = 8)
 Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(yd))
 fig
 ```

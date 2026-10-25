@@ -14,6 +14,7 @@ using DocumenterVitepress
 using ThermophysicalDB
 
 include("DocsSetup.jl")
+include("SchemaDiagrams.jl")
 
 DocMeta.setdocmeta!(
     ThermophysicalDB,

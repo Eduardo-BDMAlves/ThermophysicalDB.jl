@@ -96,38 +96,3 @@ using CSV
 CSV.write("water_vapor_pressure.csv", v)          # a selection is a table
 CSV.write("water_si.csv", table(v; units = :si))  # so is the NamedTuple
 ```
-
-## The catalog of units
-
-The archive uses a closed set of units. All of them are known to the package, which converts them to SI and to Unitful. A property without a unit in its name (a refractive index, a ratio) is dimensionless and has an empty `unit`.
-
-| Native unit (`unit` column) | Unitful | SI unit (`units = :si`) | Factor to SI |
-| :-- | :-- | :-- | --: |
-| `K` | `K` | `K` | 1 |
-| `kPa` | `kPa` | `Pa` | 1000 |
-| `kg/m3` | `kg/m^3` | `kg/m^3` | 1 |
-| `Pa*s` | `Pa*s` | `Pa*s` | 1 |
-| `m/s` | `m/s` | `m/s` | 1 |
-| `N/m` | `N/m` | `N/m` | 1 |
-| `S/m` | `S/m` | `S/m` | 1 |
-| `m2/s` | `m^2/s` | `m^2/s` | 1 |
-| `W/m/K` | `W/m/K` | `W/m/K` | 1 |
-| `kJ/mol` | `kJ/mol` | `J/mol` | 1000 |
-| `J/K/mol` | `J/K/mol` | `J/K/mol` | 1 |
-| `J/K/kg` | `J/K/kg` | `J/K/kg` | 1 |
-| `J/K/m3` | `J/K/m^3` | `J/K/m^3` | 1 |
-| `m3/mol` | `m^3/mol` | `m^3/mol` | 1 |
-| `m3/kg` | `m^3/kg` | `m^3/kg` | 1 |
-| `m6/mol2` | `m^6/mol^2` | `m^6/mol^2` | 1 |
-| `mol/kg` | `mol/kg` | `mol/kg` | 1 |
-| `mol/m3` | `mol/m^3` | `mol/m^3` | 1 |
-| `mol/dm3` | `mol/dm^3` | `mol/m^3` | 1000 |
-| `S*m2/mol` | `S*m^2/mol` | `S*m^2/mol` | 1 |
-| `1/K` | `K^-1` | `K^-1` | 1 |
-| `1/kPa` | `kPa^-1` | `Pa^-1` | 0.001 |
-| `kPa/K` | `kPa/K` | `Pa/K` | 1000 |
-| `K/kPa` | `K/kPa` | `K/Pa` | 0.001 |
-| `kPa*kg/mol` | `kPa*kg/mol` | `Pa*kg/mol` | 1000 |
-| `kPa*dm3/mol` | `kPa*dm^3/mol` | `Pa*m^3/mol` | 1 |
-
-Conversions are purely multiplicative, since temperatures in the archive are always kelvin. If the archive ever introduces a unit that is not in this catalog, `units = :si` leaves that property in its native unit, and `unitful = true` raises an error instead of guessing.

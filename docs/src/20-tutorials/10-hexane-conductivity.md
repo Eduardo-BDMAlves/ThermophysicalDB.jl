@@ -23,21 +23,18 @@ v = points(db; component = "hexane", exact = true, property = "Thermal conductiv
 
 ## Unitful columns
 
-Because the selection holds a single property, all its values share one unit, and [`table`](@ref) can return `Unitful` quantities. Converting to the units we want to plot is then explicit and cannot go wrong silently:
+The columns of [`table`](@ref) are quantities:
 
 ```@example hex
 t = table(v; unitful = true)
 
-T = ustrip.(u"K", t.temperature)
-p = ustrip.(u"MPa", t.pressure)
-λ = ustrip.(u"W/m/K", t.value)
-U = ustrip.(u"W/m/K", t.unc_k2)    # expanded uncertainty restated at k = 2
+T = t.temperature
+p = t.pressure
+λ = t.value
+U = t.unc_k2    # expanded uncertainty restated at k = 2
 
 (points = length(λ), articles = length(unique(t.doi)), phases = unique(t.phase))
 ```
-
-!!! info "Why `Unitful` here and not always?"
-    A `Vector{<:Quantity}` is fast only if every element has the same unit. `table(v; unitful = true)` therefore refuses a selection that mixes units (say, conductivity and density) and tells you to narrow it with `property`. Without `unitful`, you get plain `Float64` columns and a `unit` column of text, which is the right choice when you want to look at several properties at once.
 
 ## Conductivity against temperature
 
@@ -46,11 +43,15 @@ Colour shows the pressure of each point and the bars are the expanded uncertaint
 ```@example hex
 has_p = isfinite.(p)
 has_u = isfinite.(U)
+shown = has_u .& has_p
 
 fig = Figure(size = (760, 460))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "λ [W m⁻¹ K⁻¹]", title = "Hexane: λ(T, p)")
-errorbars!(ax, T[has_u .&& has_p], λ[has_u .&& has_p], U[has_u .&& has_p]; color = (:gray, 0.45), whiskerwidth = 4)
-sc = scatter!(ax, T[has_u .&& has_p], λ[has_u .&& has_p]; color = p[has_u .&& has_p], markersize = 8)
+errorbars!(
+    ax, ustrip.(u"K", T[shown]), ustrip.(u"W/m/K", λ[shown]), ustrip.(u"W/m/K", U[shown]);
+    color = (:gray, 0.45), whiskerwidth = 4,
+)
+sc = scatter!(ax, ustrip.(u"K", T[shown]), ustrip.(u"W/m/K", λ[shown]); color = ustrip.(u"MPa", p[shown]), markersize = 8)
 Colorbar(fig[1, 2], sc; label = "p [MPa]")
 fig
 ```
@@ -62,7 +63,7 @@ What to look for: in the liquid, ``\lambda`` falls slowly as the temperature ris
 Compression packs molecules closer, so ``\lambda`` grows with ``p``, strongly in the liquid and weakly in a dilute gas. To see this we group the points into 50 K bins of temperature, which acts as a set of nominal isotherms:
 
 ```@example hex
-bin = round.(Int, T ./ 50) .* 50
+bin = round.(Int, T ./ 50u"K") .* 50
 bins = sort(unique(bin[has_p]))
 shade(i) = Main.DocsSetup.FIELD[(i - 1) / max(length(bins) - 1, 1)]
 
@@ -72,7 +73,7 @@ for (i, b) in enumerate(bins)
     m = has_p .& (bin .== b)
     order = sortperm(p[m])
     scatterlines!(
-        ax, p[m][order], λ[m][order];
+        ax, ustrip.(u"MPa", p[m][order]), ustrip.(u"W/m/K", λ[m][order]);
         color = shade(i), label = "$b K", markersize = 6, linewidth = 1.4,
     )
 end
@@ -85,7 +86,7 @@ fig
 The relative expanded uncertainty, ``U/\lambda``, summarises how well each laboratory claims to know its own number. The histogram counts points; its width tells you how much weight a fit should give to different articles.
 
 ```@example hex
-relative = 100 .* U[has_u] ./ λ[has_u]
+relative = 100 .* Float64.(U[has_u] ./ λ[has_u])
 
 fig = Figure(size = (760, 360))
 ax = Axis(

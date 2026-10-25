@@ -108,3 +108,40 @@ end
     T.add_measurement!(ds.measurements; experiment = 99, property = prop, value = 1.0)
     @test_throws ArgumentError T.validate(ds)
 end
+
+@testitem "schema_tables describes every column and every relation of the Dataset" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    tables = T.schema_tables()
+    pools = T.schema_pools()
+    names = [t.name for t in tables]
+
+    @test names ==
+          [:references, :compounds, :properties, :experiments, :measurements, :extras]
+    @test length(pools) == 7
+
+    # every column of every table is described, apart from the lookup dictionary
+    ds = T.Dataset()
+    for t in tables
+        fields = [f for f in fieldnames(typeof(getfield(ds, t.name))) if f !== :index]
+        @test [c.name for c in t.columns] == fields
+    end
+
+    # every relation points to something that exists, and none of the declarations is stale
+    for t in tables, c in t.columns
+        c.role in (:table, :pool) && @test c.target in vcat(names, pools)
+    end
+    declared = Set(keys(T.FOREIGN_KEYS))
+    described =
+        Set((t.name, c.name) for t in tables for c in t.columns if c.target !== :none)
+    @test declared == described
+
+    # shapes
+    measurements = only(t for t in tables if t.name === :measurements)
+    composition = only(c for c in measurements.columns if c.name === :composition)
+    @test composition.arity == T.MAX_COMPONENTS && composition.eltype == "Float64"
+    experiment = only(c for c in measurements.columns if c.name === :experiment)
+    @test experiment.role === :table && experiment.target === :experiments
+    references = only(t for t in tables if t.name === :references)
+    @test [c.name for c in references.columns if c.role === :unique] == [:doi]
+end

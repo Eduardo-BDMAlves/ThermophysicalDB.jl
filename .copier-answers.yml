@@ -1,7 +1,7 @@
 # Changes here will be overwritten by Copier
 AddPrecommitUpdateCI: false
 Authors: Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>
-JuliaMinVersion: '1.10'
+JuliaMinVersion: '1.13'
 License: MIT
 LicenseCopyrightHolders: Eduardo Bader Dalfovo Mohr Alves
 PackageName: ThermophysicalDB

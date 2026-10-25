@@ -34,7 +34,7 @@ models = (
     GERG2008 = GERG2008(fluid),
 )
 
-M = 0.0440095    # kg/mol, molar mass of carbon dioxide
+M = 44.0095u"g/mol"    # molar mass of carbon dioxide
 
 # One fixed colour per model, used in every figure of this page. The reference
 # equation is drawn in white, the experimental points in grey-blue.
@@ -46,16 +46,25 @@ A model that does not converge at a state point returns `NaN` through this helpe
 
 ```@example co2
 function predict(f, model, args...)
-    out = Vector{Float64}(undef, length(first(args)))
-    for i in eachindex(out)
-        out[i] = try
-            Float64(f(model, (a[i] for a in args)...))
+    raw = map(eachindex(first(args))) do i
+        try
+            f(model, (a[i] for a in args)...)
         catch
-            NaN
+            missing
         end
     end
-    return out
+    first_ok = findfirst(!ismissing, raw)
+    if first_ok === nothing
+        @warn "No state point converged; check the arguments of the model call."
+        return fill(NaN, length(raw))
+    end
+    failed = NaN * oneunit(raw[first_ok])
+    return typeof(failed)[ismissing(r) ? failed : r for r in raw]
 end
+
+# a dimensionless quantity (any combination of units) as a plain number, for plotting and statistics
+plain(x::Unitful.AbstractQuantity) = Float64(ustrip(uconvert(NoUnits, x)))
+plain(x::Real) = Float64(x)
 
 function summarize(dev)
     ok = filter(isfinite, dev)
@@ -69,19 +78,22 @@ end
 Every model has its own critical point, found from the condition that the first and second derivatives of pressure with respect to volume vanish. The pure-fluid parameters of cubic equations are *built* from the real critical point, whereas SAFT parameters are fitted to saturation data far from it, so the SAFT critical temperatures drift upward. This is the known overestimate of the critical temperature of mean-field SAFT models:
 
 ```@example co2
-crit = map(crit_pure, models)    # (Tc, pc, Vc) of each model, SI units
+crit = map(models) do model
+    Tc, pc, Vc = crit_pure(model)
+    (T = Tc * u"K", p = pc * u"Pa", ρ = M / (Vc * u"m^3/mol"))
+end
 
 [
-    (model = name, Tc = round(c[1]; digits = 2), pc = round(c[2] / 1e6; digits = 3), ρc = round(M / c[3]; digits = 1))
+    (model = name, Tc = round(u"K", c.T; digits = 2), pc = round(u"MPa", c.p; digits = 3), ρc = round(u"kg/m^3", c.ρ; digits = 1))
     for (name, c) in pairs(crit)
 ]
 ```
 
-Temperatures are in K, pressures in MPa and densities in kg m⁻³. Because `GERG2008` reproduces the real critical point, its values are taken as the reference one:
+Because `GERG2008` reproduces the real critical point, its values are taken as the reference one:
 
 ```@example co2
-Tref, pref, _ = crit.GERG2008
-(Tref = Tref, pref = pref / 1e6)
+Tref, pref = crit.GERG2008.T, crit.GERG2008.p
+(Tref = Tref, pref = uconvert(u"MPa", pref))
 ```
 
 ## Critical constants in the archive
@@ -93,10 +105,10 @@ function critical_values(property, unit)
     v = try
         points(db; component = "carbon dioxide", exact = true, property)
     catch
-        return Dict{String,Float64}()
+        return Dict{String,typeof(1.0unit)}()
     end
     t = table(v; unitful = true)
-    return Dict(zip(t.doi, ustrip.(unit, t.value)))
+    return Dict(zip(t.doi, uconvert.(unit, t.value)))
 end
 
 Tc_db = critical_values("Critical temperature", u"K")
@@ -106,25 +118,25 @@ pc_db = critical_values("Critical pressure", u"MPa")
 (Tc = sort(collect(values(Tc_db))), pc = sort(collect(values(pc_db))), ρc = sort(collect(values(ρc_db))))
 ```
 
-Temperatures are in K, pressures in MPa and densities in kg m⁻³. Their scatter is the uncertainty with which the critical point of a real fluid is known, even for a substance as well studied as this one.
+Their scatter is the uncertainty with which the critical point of a real fluid is known, even for a substance as well studied as this one.
 
 ## Vapor pressure up to the critical temperature
 
 ```@example co2
 v = points(
     db; component = "carbon dioxide", exact = true, property = "Vapor or sublimation pressure",
-    temperature = (240u"K", Tref * u"K"),
+    temperature = (240u"K", Tref),
 )
 t = table(v; unitful = true)
 
-T = ustrip.(u"K", t.temperature)
-p = ustrip.(u"Pa", t.value)
+T = t.temperature
+p = t.value
 year = Float64.(t.year)
 
-psat(model, T) = Clapeyron.saturation_pressure(model, T)[1]
+psat(model, T) = Clapeyron.saturation_pressure(model, T)[1] * u"Pa"
 
 dev_p = map(models) do model
-    (predict(psat, model, T) .- p) ./ p
+    plain.((predict(psat, model, T) .- p) ./ p)
 end
 
 (points = length(p), table = map(summarize, dev_p))
@@ -135,21 +147,21 @@ Points between a model's own critical temperature and the real one (for the mode
 ```@example co2
 fig = Figure(size = (900, 440))
 ax1 = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "p [MPa]", title = "Vapor pressure of carbon dioxide")
-scatter!(ax1, T, p ./ 1e6; color = "#9aa3c7", markersize = 6, label = "ThermoML")
+scatter!(ax1, ustrip.(u"K", T), ustrip.(u"MPa", p); color = "#9aa3c7", markersize = 6, label = "ThermoML")
 for (name, model) in pairs(models)
-    Ts = range(240, 0.9995 * crit[name][1]; length = 100)
-    lines!(ax1, Ts, predict(psat, model, Ts) ./ 1e6; color = palette[name], linewidth = 2.5, label = String(name))
+    Ts = range(240.0u"K", 0.9995 * crit[name].T; length = 100)
+    lines!(ax1, ustrip.(u"K", Ts), ustrip.(u"MPa", predict(psat, model, Ts)); color = palette[name], linewidth = 2.5, label = String(name))
 end
-vlines!(ax1, [Tref]; color = (:gray, 0.8), linestyle = :dash)
+vlines!(ax1, [ustrip(u"K", Tref)]; color = (:gray, 0.8), linestyle = :dash)
 axislegend(ax1; position = :lt)
 
 ax2 = Axis(fig[1, 2]; xlabel = "T [K]", ylabel = "(p_EoS − p_exp)/p_exp [%]", title = "Deviation")
 hlines!(ax2, [0.0]; color = "#e8ecff", linewidth = 1.5)
 for (name, dev) in pairs(dev_p)
-    scatter!(ax2, T, 100 .* dev; color = palette[name], markersize = 5, label = String(name))
+    scatter!(ax2, ustrip.(u"K", T), 100 .* dev; color = palette[name], markersize = 5, label = String(name))
 end
-vlines!(ax2, [Tref]; color = (:gray, 0.8), linestyle = :dash)
-limits!(ax2, nothing, nothing, -10, 10)
+vlines!(ax2, [ustrip(u"K", Tref)]; color = (:gray, 0.8), linestyle = :dash)
+ylims!(ax2, -10.0, 10.0)
 fig
 ```
 
@@ -166,17 +178,18 @@ vd = points(
 )
 td = table(vd; unitful = true)
 
-Td = ustrip.(u"K", td.temperature)
-pd = ustrip.(u"Pa", td.pressure)
-ρ = ustrip.(u"kg/m^3", td.value)
+Td = td.temperature
+pd = td.pressure
+ρ = td.value
 
 function coexistence(model, Ts)
-    ρl = fill(NaN, length(Ts))
-    ρv = fill(NaN, length(Ts))
+    ρl = fill(NaN * u"kg/m^3", length(Ts))
+    ρv = fill(NaN * u"kg/m^3", length(Ts))
     for (i, T) in enumerate(Ts)
         try
-            _, vl, vv = Clapeyron.saturation_pressure(model, T)
-            ρl[i], ρv[i] = M / vl, M / vv
+            p = psat(model, T)
+            ρl[i] = mass_density(model, p, T; phase = :liquid)
+            ρv[i] = mass_density(model, p, T; phase = :vapour)
         catch
         end
     end
@@ -193,13 +206,13 @@ ax = Axis(
     title = "Coexistence curve of carbon dioxide",
 )
 for (name, model) in pairs(models)
-    Ts = range(250, 0.9995 * crit[name][1]; length = 150)
+    Ts = range(250.0u"K", 0.9995 * crit[name].T; length = 150)
     ρl, ρv = coexistence(model, Ts)
     # liquid and vapor branches share one colour; only one carries the legend entry
-    lines!(ax, ρl, Ts; color = palette[name], linewidth = name == :GERG2008 ? 3.5 : 2.5, label = String(name))
-    lines!(ax, ρv, Ts; color = palette[name], linewidth = name == :GERG2008 ? 3.5 : 2.5)
+    lines!(ax, ustrip.(u"kg/m^3", ρl), ustrip.(u"K", Ts); color = palette[name], linewidth = name == :GERG2008 ? 3.5 : 2.5, label = String(name))
+    lines!(ax, ustrip.(u"kg/m^3", ρv), ustrip.(u"K", Ts); color = palette[name], linewidth = name == :GERG2008 ? 3.5 : 2.5)
 end
-hlines!(ax, [Tref]; color = (:gray, 0.8), linestyle = :dash)
+hlines!(ax, [ustrip(u"K", Tref)]; color = (:gray, 0.8), linestyle = :dash)
 # critical constants of the archive: stars where an article gives both Tc and ρc; a mark on
 # the right edge for a Tc alone and on the bottom edge for a ρc alone
 both = sort!(collect(intersect(keys(Tc_db), keys(ρc_db))))
@@ -208,21 +221,21 @@ only_ρ = sort!(collect(setdiff(keys(ρc_db), both)))
 xmax, ymin = 1250.0, 245.0
 star = (color = "#ffd36b", strokecolor = "#ffd36b", strokewidth = 2, markersize = 18)
 isempty(both) || scatter!(
-    ax, Float64[ρc_db[d] for d in both], Float64[Tc_db[d] for d in both];
+    ax, ustrip.(u"kg/m^3", [ρc_db[d] for d in both]), ustrip.(u"K", [Tc_db[d] for d in both]);
     marker = :star5, markersize = 20, color = "#ffd36b", strokecolor = "#090b17", strokewidth = 1,
     label = "ThermoML critical point ($(length(both)))",
 )
 isempty(only_T) || scatter!(
-    ax, fill(xmax, length(only_T)), Float64[Tc_db[d] for d in only_T];
+    ax, fill(xmax, length(only_T)), ustrip.(u"K", [Tc_db[d] for d in only_T]);
     marker = :hline, star..., label = "ThermoML Tc alone ($(length(only_T)))",
 )
 isempty(only_ρ) || scatter!(
-    ax, Float64[ρc_db[d] for d in only_ρ], fill(ymin, length(only_ρ));
+    ax, ustrip.(u"kg/m^3", [ρc_db[d] for d in only_ρ]), fill(ymin, length(only_ρ));
     marker = :vline, star..., label = "ThermoML ρc alone ($(length(only_ρ)))",
 )
 # translucent, outlined markers: dense groups look darker and every point stays visible
 scatter!(
-    ax, ρ, Td;
+    ax, ustrip.(u"kg/m^3", ρ), ustrip.(u"K", Td);
     color = ("#9aa3c7", 0.35), strokecolor = "#9aa3c7", strokewidth = 1, markersize = 9,
     label = "ThermoML ($(length(ρ)) points)",
 )
@@ -238,16 +251,14 @@ With the reference equation as a guide, look at the top of each curve. The cubic
 Density at given ``T`` and ``p`` (the quantity a densimeter measures) does not need the saturation curve: the model volume at that state point is enough. For supercritical states there is a single root, so the default phase detection is used instead of forcing the liquid root. The map shows the relative deviation of each model, with the reversed `:managua` colormap and a range that is symmetric about zero, so that white means agreement. The red stars are the critical points reported in the archive (the pairs of critical temperature and pressure of the same article).
 
 ```@example co2
-density(model, p, T) = M / Clapeyron.volume(model, p, T)
-
 ρmodel = map(models) do model
-    predict(density, model, pd, Td)
+    predict(mass_density, model, pd, Td)
 end
 dev_ρ = map(ρmodel) do q
-    (q .- ρ) ./ ρ
+    plain.((q .- ρ) ./ ρ)
 end
 
-near = abs.(Td .- Tref) .<= 10          # within 10 K of the reference critical temperature
+near = abs.(Td .- Tref) .<= 10u"K"          # within 10 K of the reference critical temperature
 (all = map(summarize, dev_ρ), near = map(d -> summarize(d[near]), dev_ρ))
 ```
 
@@ -263,9 +274,9 @@ for (k, (name, dev)) in enumerate(pairs(dev_ρ))
         fig[fld1(k, 2), mod1(k, 2)];
         xlabel = fld1(k, 2) == 2 ? "T [K]" : "", ylabel = mod1(k, 2) == 1 ? "p [MPa]" : "", title = String(name),
     )
-    push!(scatters, scatter!(ax, Td, pd ./ 1e6; color = 100 .* dev, colorrange = (-10, 10), markersize = 7))
+    push!(scatters, scatter!(ax, ustrip.(u"K", Td), ustrip.(u"MPa", pd); color = 100 .* dev, colorrange = (-10, 10), markersize = 7))
     isempty(Tpc) || scatter!(
-        ax, first.(Tpc), last.(Tpc);
+        ax, ustrip.(u"K", first.(Tpc)), ustrip.(u"MPa", last.(Tpc));
         marker = :star5, markersize = 18, color = "#ffd36b", strokecolor = "#090b17", strokewidth = 1,
     )
 end
@@ -280,7 +291,7 @@ The figure shows the first four models. `GERG2008`, the reference equation, is i
 The archive holds more than densities. Which properties does it have for carbon dioxide close to the critical point? A count answers that, with a window of 10 K around the critical temperature and 5 to 12 MPa:
 
 ```@example co2
-window = (Tref - 10, Tref + 10) .* u"K"
+window = (Tref - 10u"K", Tref + 10u"K")
 pwindow = (5u"MPa", 12u"MPa")
 
 function coverage(property)
@@ -322,7 +333,7 @@ for (j, (property, label, unit)) in enumerate((
         color = ustrip.(u"K", t.temperature), colorrange = (270, 340),
         strokecolor = "#e8ecff", strokewidth = 0.6, markersize = 9,
     ))
-    vlines!(ax, [pref / 1e6]; color = (:gray, 0.8), linestyle = :dash)
+    vlines!(ax, [ustrip(u"MPa", pref)]; color = (:gray, 0.8), linestyle = :dash)
 end
 isempty(scatters) || Colorbar(fig[1, 3], first(scatters); label = "T [K]")
 fig

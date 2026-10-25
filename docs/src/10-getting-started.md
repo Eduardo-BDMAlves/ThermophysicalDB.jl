@@ -8,7 +8,7 @@ This page takes you from an empty Julia environment to a plotted selection of ex
 
 ## Installation
 
-ThermophysicalDB.jl requires Julia 1.10 or later. Until the package is registered in the General registry, install it from GitHub:
+ThermophysicalDB.jl requires Julia 1.13 or later. Until the package is registered in the General registry, install it from GitHub:
 
 ```julia-repl
 pkg> add https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl

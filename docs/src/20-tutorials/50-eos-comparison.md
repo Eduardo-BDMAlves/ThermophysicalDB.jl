@@ -21,7 +21,7 @@ Main.DocsSetup.activate!()
 
 ## Models and a safe evaluator
 
-All four models are built from a list of component names. Clapeyron works in SI units (K, Pa, m³ per mole for a pure fluid), so predictions are compared with the data after converting the data, not the model.
+All four models are built from a list of component names.
 
 ```@example eos
 using ThermophysicalDB, CairoMakie, Unitful, Statistics
@@ -37,31 +37,41 @@ models = (
 keys(models)
 ```
 
-An EoS can fail to converge at a state point, especially near the critical point or in a metastable region. The helper below turns any failure into `NaN`, so one bad point never aborts a whole comparison. It also returns a vector of the same length as the data, which keeps the columns aligned with the table.
+An EoS can fail to converge at a state point, especially near the critical point or in a metastable region. The helper below turns any failure into `NaN`, so one bad point never aborts a whole comparison. It also returns a vector of the same length as the data, which keeps the columns aligned with the table. If no point at all converges the helper warns, because a `NaN` column usually means a wrong call, not a hard state.
 
 ```@example eos
 function predict(f, model, args...)
-    out = Vector{Float64}(undef, length(first(args)))
-    for i in eachindex(out)
-        out[i] = try
-            Float64(f(model, (a[i] for a in args)...))
+    raw = map(eachindex(first(args))) do i
+        try
+            f(model, (a[i] for a in args)...)
         catch
-            NaN
+            missing
         end
     end
-    return out
+    first_ok = findfirst(!ismissing, raw)
+    if first_ok === nothing
+        @warn "No state point converged; check the arguments of the model call."
+        return fill(NaN, length(raw))
+    end
+    failed = NaN * oneunit(raw[first_ok])
+    return typeof(failed)[ismissing(r) ? failed : r for r in raw]
 end
 
-# average absolute relative deviation (percent) and bias (percent), ignoring NaN
+# a dimensionless quantity (any combination of units) as a plain number, for plotting and statistics
+plain(x::Unitful.AbstractQuantity) = Float64(ustrip(uconvert(NoUnits, x)))
+plain(x::Real) = Float64(x)
+
+# average absolute relative deviation and bias, in percent, ignoring NaN
 function summarize(dev)
     ok = filter(isfinite, dev)
-    return (; n = length(ok), AARD = round(100 * mean(abs, ok); digits = 2), bias = round(100 * mean(ok); digits = 2))
+    isempty(ok) && return (; n = 0, AARD = NaN * u"percent", bias = NaN * u"percent")
+    return (; n = length(ok), AARD = round(100 * mean(abs, ok); digits = 4) * u"percent", bias = round(100 * mean(ok); digits = 4) * u"percent")
 end
 ```
 
 ## Vapor pressure
 
-The saturation pressure is a function of temperature alone, so each experimental point maps to one model call. [`table`](@ref) with `unitful = true` gives the temperature in kelvin and the value in the unit of the source, which we convert to pascal.
+The saturation pressure is a function of temperature alone, so each experimental point maps to one model call.
 
 ```@example eos
 db = database(progress = false)
@@ -71,20 +81,20 @@ v = points(
     db; component = "hexane", exact = true, property = "Vapor or sublimation pressure",
     temperature = (230u"K", 500u"K"), pure = true
 )
-t = table(v; unitful = true, units = :si)
+t = table(v; unitful = true)
 
-T = ustrip.(u"K", t.temperature)
-p = ustrip.(u"Pa", t.value)
+T = t.temperature
+p = t.value
 year = Float64.(t.year)
 
-psat(model, T) = Clapeyron.saturation_pressure(model, T)[1]   # first entry is the pressure, Pa
+psat(model, T) = Clapeyron.saturation_pressure(model, T)[1] * u"Pa"   # first entry is the pressure
 
 pvap = map(models) do model
     predict(psat, model, T)
 end
 
 dev_p = map(pvap) do q
-    ((q .- p) ./ p)
+    plain.((q .- p) ./ p)
 end
 
 map(summarize, dev_p)
@@ -95,23 +105,23 @@ map(summarize, dev_p)
 ```@example eos
 fig = Figure(size = (900, 440))
 ax1 = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "p [kPa]", yscale = log10, title = "Vapor pressure of hexane")
-scatter!(ax1, T, p ./ 1e3; color = "#e8ecff", markersize = 6, label = "ThermoML")
+scatter!(ax1, ustrip.(u"K", T), ustrip.(u"kPa", p); color = "#e8ecff", markersize = 6, label = "ThermoML")
 Ts = range(extrema(T)...; length = 80)
 for (name, model) in pairs(models)
-    lines!(ax1, Ts, predict(psat, model, Ts) ./ 1e3; linewidth = 2.5, label = String(name))
+    lines!(ax1, ustrip.(u"K", Ts), ustrip.(u"kPa", predict(psat, model, Ts)); linewidth = 2.5, label = String(name))
 end
 axislegend(ax1; position = :lt)
 
 ax2 = Axis(fig[1, 2]; xlabel = "T [K]", ylabel = "(p_EoS − p_exp)/p_exp [%]", title = "Relative deviation")
 hlines!(ax2, [0.0]; color = "#e8ecff", linewidth = 1.5)
 for (name, dev) in pairs(dev_p)
-    scatter!(ax2, T, 100 .* dev; markersize = 5, label = String(name))
+    scatter!(ax2, ustrip.(u"K", T), 100 .* dev; markersize = 5, label = String(name))
 end
-limits!(ax2, nothing, nothing, -15, 15)
+ylims!(ax2, -15.0, 15.0)
 fig
 ```
 
-Cubic equations are fitted to the vapor pressure, so they should do well here. If a SAFT model is farther away, that is not a defect: its parameters were regressed on both the vapor pressure and the liquid density of many fluids, and the compromise shows.
+Cubic equations are fitted to the vapor pressure, so they should do well here. Note that with this simple procedure, combined with the previous statistical analysis, one can evaluate the quality of each EoS at specific ranges of pressure and temperature.
 
 ## Liquid density
 
@@ -121,23 +131,22 @@ Density depends on two variables, so the selection needs a pressure. We take liq
 vd = points(
     db; component = "hexane", exact = true, property = "Mass density",
     temperature = (250u"K", 420u"K"), pressure = (1u"kPa", 60u"MPa"),
+    pure = true,
 )
 td = table(vd; unitful = true)
 
-Td = ustrip.(u"K", td.temperature)
-pd = ustrip.(u"Pa", td.pressure)
-ρ = ustrip.(u"kg/m^3", td.value)
+Td = td.temperature
+pd = td.pressure
+ρ = td.value
 yd = Float64.(td.year)
 
-M = 0.086175    # kg/mol, molar mass of n-hexane
-
-liquid_density(model, p, T) = M / Clapeyron.volume(model, p, T; phase = :liquid)
+liquid_density(model, P, T) = mass_density(model, P, T, phase = :liquid)
 
 ρmodel = map(models) do model
     predict(liquid_density, model, pd, Td)
 end
 dev_ρ = map(ρmodel) do q
-    (q .- ρ) ./ ρ
+    plain.((q .- ρ) ./ ρ)
 end
 
 map(summarize, dev_ρ)
@@ -150,7 +159,7 @@ fig = Figure(size = (900, 440))
 ax = Axis(fig[1, 1]; xlabel = "model", ylabel = "(ρ_EoS − ρ_exp)/ρ_exp [%]", title = "Liquid density of hexane")
 labels = collect(keys(dev_ρ))
 for (i, name) in enumerate(labels)
-    d = filter(isfinite, 100 .* dev_ρ[name])
+    d = filter(isfinite, Float64.(dev_ρ[name]))
     boxplot!(ax, fill(i, length(d)), d; color = (Main.DocsSetup.CYCLE[i], 0.7), show_outliers = false, width = 0.6)
 end
 ax.xticks = (1:length(labels), String.(labels))
@@ -169,7 +178,7 @@ fig = Figure(size = (940, 420))
 for (j, name) in enumerate((:PR, :PCSAFT))
     ax = Axis(fig[1, j]; xlabel = "T [K]", ylabel = j == 1 ? "p [MPa]" : "", title = String(name))
     sc = scatter!(
-        ax, Td, pd ./ 1e6; color = 100 .* dev_ρ[name], colorrange = (-8, 8), markersize = 8,
+        ax, ustrip.(u"K", Td), ustrip.(u"MPa", pd); color = 100 .* dev_ρ[name], colorrange = (-8, 8), markersize = 8,
     )
     j == 2 && Colorbar(fig[1, 3], sc; label = "density deviation [%]")
 end
@@ -177,22 +186,6 @@ fig
 ```
 
 The structure of the map shows *where* the problem lives: whether it grows with pressure (compressibility of the liquid) or with temperature (approach to the critical point).
-
-## Which laboratories disagree with every model?
-
-A deviation that is the same for all four models is more likely to come from the data than from the models. The median over the models points to the sources worth inspecting:
-
-```@example eos
-consensus = [median(filter(isfinite, [dev_ρ[k][i] for k in keys(dev_ρ)])) for i in eachindex(ρ)]
-
-by_doi = Dict{String,Vector{Float64}}()
-for (d, c) in zip(td.doi, consensus)
-    isfinite(c) && push!(get!(by_doi, d, Float64[]), c)
-end
-
-ranked = sort(collect(by_doi); by = kv -> -abs(median(kv.second)))
-[(doi = first(kv), n = length(last(kv)), median_deviation_percent = round(100 * median(last(kv)); digits = 2)) for kv in first(ranked, 5)]
-```
 
 ## Going further
 

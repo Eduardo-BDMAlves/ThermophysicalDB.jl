@@ -1,5 +1,28 @@
 {
   "projectName": "ThermophysicalDB",
   "projectOwner": "Eduardo-BDMAlves",
-  "files": ["README.md", "docs/src/index.md"]
+  "files": [
+    "README.md",
+    "docs/src/index.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "Eduardo-BDMAlves",
+      "name": "Eduardo Bader Dalfovo Mohr Alves",
+      "avatar_url": "https://avatars.githubusercontent.com/Eduardo-BDMAlves?v=4",
+      "profile": "https://github.com/Eduardo-BDMAlves",
+      "contributions": [
+        "code",
+        "doc",
+        "test",
+        "design",
+        "data",
+        "ideas"
+      ]
+    }
+  ]
 }

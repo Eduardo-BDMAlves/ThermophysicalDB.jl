@@ -36,8 +36,8 @@ v = points(db; component = "ethanol", exact = true, property = "Vapor or sublima
 ```@example vap
 t = table(v; unitful = true)
 
-T = ustrip.(u"K", t.temperature)
-p = ustrip.(u"kPa", t.value)
+T = t.temperature
+p = t.value
 year = Float64.(t.year)
 
 (points = length(p), articles = length(unique(t.doi)), T_range = extrema(T))
@@ -52,9 +52,9 @@ On a logarithmic axis the curve spans orders of magnitude, from the triple-point
 ```@example vap
 fig = Figure(size = (760, 460))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "p [kPa]", yscale = log10, title = "Vapor pressure of ethanol")
-sc = scatter!(ax, T, p; color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
-hlines!(ax, [101.325]; color = (:gray, 0.8), linestyle = :dash)
-text!(ax, minimum(T), 101.325; text = "1 atm", align = (:left, :bottom), color = :gray)
+sc = scatter!(ax, ustrip.(u"K", T), ustrip.(u"kPa", p); color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
+hlines!(ax, [ustrip(u"kPa", 1u"atm")]; color = (:gray, 0.8), linestyle = :dash)
+text!(ax, minimum(ustrip.(u"K", T)), ustrip(u"kPa", 1u"atm"); text = "1 atm", align = (:left, :bottom), color = :gray)
 Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 fig
 ```
@@ -64,15 +64,15 @@ fig
 Plotting ``\ln p`` against ``1000/T`` straightens the curve. The line is a least-squares fit over the whole range, and the enthalpy follows from its slope. Because the fit pretends ``\Delta H_\mathrm{vap}`` is constant, the number is an *average* over the range, not a value at a particular temperature:
 
 ```@example vap
-x = 1000 ./ T          # 1000 K / T, so the slope is per 1000 K⁻¹
-y = log.(p)            # p in kPa
+x = 1000u"K" ./ T          # so the slope is per 1000 K⁻¹
+y = log.(p ./ 1u"kPa")     # ln of p in kPa
 
 slope = cov(x, y) / var(x)
 intercept = mean(y) - slope * mean(x)
 
-R = 8.314462618e-3     # kJ mol⁻¹ K⁻¹
-mean_enthalpy = -R * 1000 * slope
-round(mean_enthalpy; digits = 2)    # kJ/mol, averaged over the whole range
+R = 8.314462618u"J/mol/K"
+mean_enthalpy = uconvert(u"kJ/mol", -R * 1000u"K" * slope)
+round(u"kJ/mol", mean_enthalpy; digits = 2)    # averaged over the whole range
 ```
 
 ```@example vap
@@ -91,13 +91,13 @@ fig
 The normal boiling point is the temperature at which the vapor pressure equals 1 atm. A short local fit around that pressure gives it directly from the data, which you can compare with the tabulated value of about 351.4 K:
 
 ```@example vap
-target = log(101.325)
+target = log(1u"atm" / 1u"kPa")
 near = abs.(y .- target) .< 0.15
 local_slope = cov(x[near], y[near]) / var(x[near])
 local_intercept = mean(y[near]) - local_slope * mean(x[near])
 
-boiling_point = 1000 / ((target - local_intercept) / local_slope)
-(points_used = count(near), T_boiling = round(boiling_point; digits = 2))
+boiling_point = 1000u"K" / ((target - local_intercept) / local_slope)
+(points_used = count(near), T_boiling = round(u"K", boiling_point; digits = 2))
 ```
 
 ## The enthalpy is not constant
@@ -105,22 +105,22 @@ boiling_point = 1000 / ((target - local_intercept) / local_slope)
 Real enthalpies of vaporization fall as the temperature rises and vanish at the critical point, where liquid and vapor become identical. The Clausius–Clapeyron assumptions also degrade near the critical point, so the estimates below describe the *apparent* enthalpy ``-R\,\mathrm{d}\ln p/\mathrm{d}(1/T)``. Fitting a line in a sliding 30 K window shows the trend:
 
 ```@example vap
-centers = range(ceil(minimum(T)), floor(maximum(T)); step = 10)
-estimate = Tuple{Float64,Float64}[]
+centers = range(ceil(u"K", minimum(T)), floor(u"K", maximum(T)); step = 10u"K")
+estimate = Tuple{typeof(1.0u"K"),typeof(1.0u"kJ/mol")}[]
 for c in centers
-    window = abs.(T .- c) .<= 15
+    window = abs.(T .- c) .<= 15u"K"
     count(window) >= 8 || continue
     spread = var(x[window])
     spread > 0 || continue
     s = cov(x[window], y[window]) / spread
-    push!(estimate, (c, -R * 1000 * s))
+    push!(estimate, (c, uconvert(u"kJ/mol", -R * 1000u"K" * s)))
 end
 
 fig = Figure(size = (760, 420))
 ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "apparent ΔH_vap [kJ mol⁻¹]", title = "Apparent enthalpy of vaporization of ethanol")
-scatterlines!(ax, first.(estimate), last.(estimate); color = "#ffb000", linewidth = 2.5, markersize = 10)
-hlines!(ax, [mean_enthalpy]; color = (:gray, 0.8), linestyle = :dash)
-text!(ax, first(first(estimate)), mean_enthalpy; text = "whole-range average", align = (:left, :bottom), color = :gray)
+scatterlines!(ax, ustrip.(u"K", first.(estimate)), ustrip.(u"kJ/mol", last.(estimate)); color = "#ffb000", linewidth = 2.5, markersize = 10)
+hlines!(ax, [ustrip(u"kJ/mol", mean_enthalpy)]; color = (:gray, 0.8), linestyle = :dash)
+text!(ax, ustrip(u"K", first(first(estimate))), ustrip(u"kJ/mol", mean_enthalpy); text = "whole-range average", align = (:left, :bottom), color = :gray)
 fig
 ```
 

@@ -22,7 +22,7 @@ Main.DocsSetup.activate!()
 
 ## Select in °C and atm
 
-Limits can be written with `Unitful.jl` units. They are converted to the units the data use (K and kPa), so you never convert by hand:
+Limits are written with `Unitful.jl` units:
 
 ```@example water
 using ThermophysicalDB, CairoMakie, Unitful, Statistics
@@ -43,8 +43,8 @@ v = points(
 ```@example water
 t = table(v; unitful = true)
 
-Tc = ustrip.(u"°C", t.temperature)
-ρ = uconvert.(u"kg/m^3", t.value)
+T = t.temperature
+ρ = t.value
 year = Float64.(t.year)
 
 (points = length(ρ), articles = length(unique(t.doi)))
@@ -52,7 +52,7 @@ year = Float64.(t.year)
 
 ## The model at exactly 1 atm
 
-To check the quality of the experimental data of papers within the dataset, it is possible to apply the reference model of IAPWS95 at the exact atmospheric pressure. The Clapeyron package offers a simple interface for using Quantity data similar to this package.
+To check the quality of the experimental data of papers within the dataset, we apply the reference model IAPWS95 at the exact atmospheric pressure.
 
 ```@example water
 using Clapeyron
@@ -64,11 +64,10 @@ mass_density(model, 1u"atm", 25u"°C")
 The experiments repeat the same temperatures many times (a laboratory measures several samples at 298.15 K, say), and an evaluation of a multiparameter Helmholtz equation is far more expensive than a lookup. So the model is computed once per distinct temperature and reused for every point:
 
 ```@example water
-Tk = t.temperature
-by_temperature = Dict(T => mass_density(model, 1u"atm", T) for T in unique(Tk))
-ρ_model = [by_temperature[T] for T in Tk]
+by_temperature = Dict(Ti => mass_density(model, 1u"atm", Ti) for Ti in unique(T))
+ρ_model = [by_temperature[Ti] for Ti in T]
 
-(distinct_temperatures = length(by_temperature), points = length(Tk))
+(distinct_temperatures = length(by_temperature), points = length(T))
 ```
 
 ## The anomaly of water
@@ -78,9 +77,9 @@ Plotted on this scale, the experimental points fall on the curve and the maximum
 ```@example water
 fig = Figure(size = (760, 460))
 ax = Axis(fig[1, 1]; xlabel = "T [°C]", ylabel = "ρ [kg m⁻³]", title = "Density of liquid water at 1 atm")
-sc = scatter!(ax, Tc, ustrip.(u"kg/m^3", ρ); color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
-tt = collect(range(0, 99; length = 200))
-lines!(ax, tt, ustrip.(u"kg/m^3", mass_density.(Ref(model), 1u"atm", tt .* u"°C")); color = "#e8ecff", linewidth = 2, label = "IAPWS-95")
+sc = scatter!(ax, ustrip.(u"°C", T), ustrip.(u"kg/m^3", ρ); color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
+tt = collect(range(0, 99; length = 200)) .* u"°C"
+lines!(ax, ustrip.(u"°C", tt), ustrip.(u"kg/m^3", mass_density.(Ref(model), 1u"atm", tt)); color = "#e8ecff", linewidth = 2, label = "IAPWS-95")
 Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 axislegend(ax; position = :rt)
 fig
@@ -88,7 +87,7 @@ fig
 
 ## Residuals: how far is each paper?
 
-The relative deviation from the equation, in parts per million, shows what the previous plot hides. The subtraction and the division are done with quantities, so a mismatch of units would be an error and not a silent mistake; the result is dimensionless. Points outside the displayed window are counted, not drawn.
+The relative deviation from the equation, in parts per million, shows what the previous plot hides. Points outside the displayed window are counted, not drawn.
 
 ```@example water
 res = 1e6 .* Float64.((ρ .- ρ_model) ./ ρ_model)
@@ -102,7 +101,7 @@ ax = Axis(
     limits = (nothing, (-window, window)),
 )
 hlines!(ax, [0.0]; color = "#e8ecff", linewidth = 1.5)
-sc = scatter!(ax, Tc, res; color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
+sc = scatter!(ax, ustrip.(u"°C", T), res; color = year, Main.DocsSetup.year_scale(year)..., markersize = 7)
 Colorbar(fig[1, 2], sc; label = "year of publication", ticks = Main.DocsSetup.year_ticks(year))
 fig
 ```
