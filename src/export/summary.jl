@@ -563,58 +563,48 @@ csv_field(x::AbstractString) =
 csv_field(x::Real) = isnan(x) ? "" : string(x)
 
 """
+    summary_fields(summary) -> Vector{Pair{String,Any}}
+
+Every column of the summary with the header it has in the CSV and Excel exports: the units
+are in the header (`T_min [K]`, `p_max [MPa]`, `unc_rel [%]`) and the method is written out.
+"""
+function summary_fields(s::ReferenceSummary)
+    c = getfield(s, :columns)
+    T, p = getfield(s, :temperature_unit), getfield(s, :pressure_unit)
+    return Pair{String,Any}[
+        "key"=>c.key,
+        "doi"=>c.doi,
+        "year"=>c.year,
+        "month"=>c.month,
+        "citation"=>c.citation,
+        "property"=>c.property,
+        "unit"=>c.unit,
+        "system"=>c.system,
+        "method"=>c.method_full,
+        "phase"=>c.phase,
+        "n_points"=>c.n_points,
+        "n_uncertainty"=>c.n_uncertainty,
+        string("T_min [", T, "]")=>c.T_min,
+        string("T_max [", T, "]")=>c.T_max,
+        string("p_min [", p, "]")=>c.p_min,
+        string("p_max [", p, "]")=>c.p_max,
+        "unc_abs [property unit]"=>c.unc_abs,
+        "unc_rel [%]"=>c.unc_rel,
+    ]
+end
+
+"""
     csv_table(summary) -> String
 
 All the columns of the summary as CSV, with full method names and the units in the
 headers (`T_min [K]`, `p_max [MPa]`, `unc_rel [%]`).
 """
 function csv_table(s::ReferenceSummary)
-    c = getfield(s, :columns)
-    T, p = getfield(s, :temperature_unit), getfield(s, :pressure_unit)
-    names = (
-        "key",
-        "doi",
-        "year",
-        "month",
-        "citation",
-        "property",
-        "unit",
-        "system",
-        "method",
-        "phase",
-        "n_points",
-        "n_uncertainty",
-        string("T_min [", T, "]"),
-        string("T_max [", T, "]"),
-        string("p_min [", p, "]"),
-        string("p_max [", p, "]"),
-        "unc_abs [property unit]",
-        "unc_rel [%]",
-    )
-    fields = (
-        c.key,
-        c.doi,
-        c.year,
-        c.month,
-        c.citation,
-        c.property,
-        c.unit,
-        c.system,
-        c.method_full,
-        c.phase,
-        c.n_points,
-        c.n_uncertainty,
-        c.T_min,
-        c.T_max,
-        c.p_min,
-        c.p_max,
-        c.unc_abs,
-        c.unc_rel,
-    )
+    fields = summary_fields(s)
     io = IOBuffer()
-    println(io, join(csv_field.(names), ","))
+    println(io, join((csv_field(first(f)) for f in fields), ","))
     for i = 1:length(s)
-        println(io, join((csv_field(f[i]) for f in fields), ","))
+        println(io, join((csv_field(last(f)[i]) for f in fields), ","))
     end
     return String(take!(io))
 end

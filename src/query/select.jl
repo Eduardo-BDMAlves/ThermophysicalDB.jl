@@ -14,6 +14,7 @@ end
 DataView(ds::Dataset) = DataView(ds, collect(Int32(1):Int32(length(ds.measurements))))
 
 Base.length(view::DataView) = length(view.rows)
+Base.isempty(view::DataView) = isempty(view.rows)
 
 # ----------------------------------------------------------------------------------
 # Range arguments
