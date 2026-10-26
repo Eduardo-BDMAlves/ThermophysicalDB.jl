@@ -12,8 +12,10 @@ using DOI2BibTeX: DOI2BibTeX
 using Downloads: Downloads
 using JLD2: JLD2
 using JSON: JSON
+using LinearAlgebra: I, Symmetric, cholesky!, issuccess, lu
 using Preferences: Preferences
 using SHA: SHA
+using SpecialFunctions: SpecialFunctions
 using TOML: TOML
 using Tables: Tables
 using Tar: Tar
@@ -46,6 +48,15 @@ include("store/database.jl")
 include("export/bibtex.jl")
 include("export/summary.jl")
 include("export/points.jl")
+include("outliers/stats.jl")
+include("outliers/esd.jl")
+include("outliers/physical.jl")
+include("outliers/polyfit.jl")
+include("outliers/prepare.jl")
+include("outliers/trend.jl")
+include("outliers/surface.jl")
+include("outliers/detect.jl")
+include("outliers/pipeline.jl")
 
 export DataView,
     bibtex,
@@ -53,12 +64,16 @@ export DataView,
     csv_table,
     database_dir,
     database,
+    diagnostics,
     ensure_archive,
+    esd,
     export_points,
+    find_outliers,
     install_archive!,
     latex_table,
     markdown_table,
     points,
+    reasons,
     reference_summary,
     reset_database_dir!,
     set_database_dir!,

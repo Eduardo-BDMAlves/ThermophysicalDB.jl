@@ -86,7 +86,7 @@ Exporting a directory therefore gives, in one call, the raw points in four forma
 
 ## Where the data come from
 
-When some of the points come from the ThermoML Archive, every file carries a note saying so: the origin, the DOI of the dataset, the version of the archive on this computer, the date of the export, and that the data are modified (reformatted, possibly converted) and were not evaluated by NIST/TRC. See [About the data](@ref about_data) for what to cite. Points that come from elsewhere, such as your own data, carry no note. The note sits where each format can hold it without disturbing the table:
+When some of the points come from the ThermoML Archive, every file carries a note saying so: the origin, the DOI of the dataset, the version of the archive on this computer, the date of the export, and that the data are modified (reformatted, possibly converted) and were not evaluated by NIST/TRC. See [About the data](@ref 40-about-data) for what to cite. Points that come from elsewhere, such as your own data, carry no note. The note sits where each format can hold it without disturbing the table:
 
 | Format | Where |
 |---|---|

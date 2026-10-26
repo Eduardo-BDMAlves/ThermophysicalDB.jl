@@ -57,6 +57,17 @@ ThermophysicalDB.ReferenceSummary
 ThermophysicalDB.BibtexReport
 ```
 
+## Detecting outliers
+
+```@docs
+find_outliers
+reasons
+diagnostics
+esd
+ThermophysicalDB.esd_critical_values
+ThermophysicalDB.OutlierResult
+```
+
 ## The dataset
 
 ```@docs
