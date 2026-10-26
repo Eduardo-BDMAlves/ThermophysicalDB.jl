@@ -89,7 +89,7 @@ function schema_tables()
         columns = SchemaColumn[]
         T = fieldtype(Dataset, tname)
         for cname in fieldnames(T)
-            cname === :index && continue
+            cname in DERIVED_FIELDS && continue
             element, arity = column_shape(fieldtype(T, cname))
             key = (tname, cname)
             target = get(FOREIGN_KEYS, key, :none)

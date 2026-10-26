@@ -12,7 +12,7 @@ const TABLE_NAMES =
 
 function store_columns!(sink, table, prefix::AbstractString)
     for name in fieldnames(typeof(table))
-        name === :index && continue
+        name in DERIVED_FIELDS && continue
         value = getfield(table, name)
         if value isa Tuple
             for (i, column) in enumerate(value)
@@ -27,7 +27,7 @@ end
 
 function fill_columns!(table, source, prefix::AbstractString)
     for name in fieldnames(typeof(table))
-        name === :index && continue
+        name in DERIVED_FIELDS && continue
         value = getfield(table, name)
         if value isa Tuple
             for (i, column) in enumerate(value)

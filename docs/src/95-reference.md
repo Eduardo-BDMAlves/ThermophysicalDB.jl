@@ -32,6 +32,9 @@ reset_database_dir!
 
 ```@docs
 points
+mixture
+find_compounds
+ThermophysicalDB.CompoundMatches
 DataView
 table
 ```

@@ -55,25 +55,25 @@ end
 
 # Compounds matching one user string: InChIKey (any case), molecular formula (exact,
 # because "CO" and "Co" differ) or any recorded name (any case).
-function matching_compounds(ds::Dataset, text::AbstractString)
-    t = ds.compounds
-    lowered = lowercase(strip(text))
-    upper = uppercase(strip(text))
-    found = Int32[]
-    for c = 1:length(t)
-        hit = t.inchikey[c] == upper || t.formula[c] == strip(text)
-        hit = hit || any(name -> lowercase(name) == lowered, t.names[c])
-        hit && push!(found, Int32(c))
-    end
-    isempty(found) && throw(ArgumentError("no compound matches \"$text\""))
-    return found
+# One group of acceptable compound ids per requested component. A component is a name,
+# formula or InChIKey (see `matching_compounds`), a compound id, or the result of
+# `find_compounds` (every compound it lists counts as the same component).
+function resolve_group(ds::Dataset, id::Integer)
+    1 <= id <= length(ds.compounds) ||
+        throw(ArgumentError("compound id $id is out of range 1:$(length(ds.compounds))"))
+    return Int32[id]
+end
+resolve_group(ds::Dataset, text::AbstractString) = matching_compounds(ds, text)
+function resolve_group(::Dataset, found::CompoundMatches)
+    isempty(found.id) && throw(ArgumentError("no compound in the result of find_compounds"))
+    return found.id
 end
 
-# One group of acceptable compound ids per requested component.
-resolve_components(ds::Dataset, text::AbstractString) = [matching_compounds(ds, text)]
-function resolve_components(ds::Dataset, texts::AbstractVector{<:AbstractString})
-    isempty(texts) && throw(ArgumentError("component list is empty"))
-    return [matching_compounds(ds, text) for text in texts]
+const ComponentSpec = Union{AbstractString,Integer,CompoundMatches}
+resolve_components(ds::Dataset, one::ComponentSpec) = [resolve_group(ds, one)]
+function resolve_components(ds::Dataset, list::AbstractVector)
+    isempty(list) && throw(ArgumentError("component list is empty"))
+    return [resolve_group(ds, item) for item in list]
 end
 
 function component_matches(
@@ -167,7 +167,10 @@ end
 Select experimental points. Every keyword is optional and they combine with AND; calling
 it on a [`DataView`](@ref) refines that view, so filters can be chained.
 
-- `component`: a name, formula or InChIKey, or a vector of them. With `match = :any`
+- `component`: a name, formula or InChIKey, or a vector of them. Names are matched
+  loosely (case, accents, hyphens and spaces are ignored, so `"iso-butane"` finds
+  `"isobutane"`; see [`find_compounds`](@ref)); a compound id or the result of
+  [`find_compounds`](@ref) is accepted too. With `match = :any`
   (default) a system qualifies if it contains any of them, with `match = :all` if it
   contains all of them. `exact = true` requires the system to consist of exactly the
   listed components (`component = "methane", exact = true` is pure methane).
@@ -182,6 +185,9 @@ it on a [`DataView`](@ref) refines that view, so filters can be chained.
 A component or property that matches nothing throws an `ArgumentError`, so a typo is
 never mistaken for "no data".
 """
+find_compounds(view::DataView, text::AbstractString; kwargs...) =
+    find_compounds(view.dataset, text; kwargs...)
+
 points(ds::Dataset; kwargs...) = points(DataView(ds); kwargs...)
 
 function points(
@@ -218,4 +224,33 @@ function points(
         push!(rows, r)
     end
     return DataView(ds, rows)
+end
+
+"""
+    mixture(dataset_or_view, components...; exact = true, kwargs...) -> DataView
+
+Points of the systems made of the given components, in any order: `mixture(db, "nitrogen",
+"isobutane")` is the binary nitrogen + isobutane. It is
+`points(db; component = [components...], match = :all, exact = true, kwargs...)`, so
+components are matched loosely (see [`find_compounds`](@ref)) and every other keyword of
+[`points`](@ref) (`property`, `temperature`, ...) can be added. With `exact = false` systems
+that contain further components are included.
+
+When nothing is found, a message tells whether the components do occur together with
+others, so an empty result can be told apart from a too strict one.
+"""
+function mixture(source::Union{Dataset,DataView}, components...; exact::Bool = true, kwargs...)
+    length(components) >= 2 ||
+        throw(ArgumentError("a mixture needs at least two components"))
+    wanted = collect(components)
+    found = points(source; component = wanted, match = :all, exact, kwargs...)
+    if isempty(found) && exact
+        wider = points(source; component = wanted, match = :all, kwargs...)
+        if isempty(wider)
+            @info "no system contains all of these components with the given filters" components
+        else
+            @info "no system consists of exactly these components; $(length(wider)) points belong to systems that also contain others (use exact = false)" components
+        end
+    end
+    return found
 end

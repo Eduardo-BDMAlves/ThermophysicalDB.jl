@@ -311,3 +311,90 @@ end
         @test dimension(uparse(spec.si)) == dimension(uparse(spec.unitful))
     end
 end
+
+@testitem "compound names are matched loosely and misses suggest alternatives" tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    ib = T.add_compound!(
+        ds.compounds;
+        inchikey = "NNPPMTNAJDCUHE-UHFFFAOYSA-N",
+        names = ["2-methylpropane", "R-600a", "isobutane"],
+        formula = "C4H10",
+    )
+    n2 = T.add_compound!(ds.compounds; inchikey = "IJGRMHOSHXDMSA-UHFFFAOYSA-N", names = ["nitrogen"], formula = "N2")
+    nb = T.add_compound!(ds.compounds; names = ["butane"], formula = "C4H10")
+    hx = T.add_compound!(ds.compounds; names = ["n-hexane"], formula = "C6H14")
+    ol = T.add_compound!(ds.compounds; names = ["isobutanol"], formula = "C4H10O")
+    sulfur = T.add_compound!(ds.compounds; names = ["sulfur dioxide"], formula = "O2S")
+    ipa = T.add_compound!(ds.compounds; names = ["propan-2-ol"], formula = "C3H8O")
+    ids(text) = T.matching_compounds(ds, text)
+
+    @test ids("isobutane") == [ib]
+    for spelling in ("Iso-Butane", "ISO BUTANE", "i-butane", "R600a", "r-600a", "2-Methylpropane")
+        @test ids(spelling) == [ib]
+    end
+    @test ids("Nitrogen") == [n2]
+    @test ids("dinitrogen") == [n2]            # spelling variant
+    @test ids("butane") == [nb]                # a loose variant never overrides an exact name
+    @test ids("n-butane") == [nb]
+    @test ids("hexane") == [hx]                # "n-hexane" is also reachable as "hexane"
+    @test ids("n-hexane") == [hx]
+    @test ids("sulphur dioxide") == [sulfur]
+    @test ids("IPA") == [ipa]                  # abbreviation
+    @test ids("N2") == [n2]                    # formula as written
+    @test ids("C4H10") == [ib, nb]
+    @test ids("nnppmtnajdcuhe-uhfffaoysa-n") == [ib]
+
+    err = try
+        ids("isobutano")
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("did you mean", err.msg) && occursin("isobutane", err.msg)
+    @test_throws ArgumentError ids("zzzzzzzz")
+    @test_throws ArgumentError ids("---")
+
+    # The index follows additions made after it was built.
+    @test_throws ArgumentError ids("propane")
+    T.add_compound!(ds.compounds; names = ["propane"], formula = "C3H8")
+    @test length(ids("propane")) == 1
+    T.add_compound!(ds.compounds; names = ["propane", "dimethylmethane"], formula = "C3H8")
+    @test ids("dimethylmethane") == ids("propane")
+end
+
+@testitem "find_compounds ranks matches and counts points; mixture selects binaries" setup = [Toy] tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = Toy.build()
+    found = T.find_compounds(ds, "Carbon-Dioxide")
+    @test found.name == ["carbon dioxide"]
+    @test found.match == [:exact]
+    @test found.points == [5]
+    @test occursin("carbon dioxide", sprint(show, found))
+
+    near = T.find_compounds(ds, "metane")           # one letter missing
+    @test near.name == ["methane"] && near.match == [:similar]
+    part = T.find_compounds(ds, "carbon")
+    @test part.match == [:contains] && part.name == ["carbon dioxide"]
+    @test isempty(T.find_compounds(ds, "zzzzzzzz"))
+    @test T.Tables.columntable(found).formula == ["CO2"]
+
+    # A result can be used as the component of a selection, and so can an id.
+    @test length(T.points(ds; component = found)) == 5
+    @test length(T.points(ds; component = Int(found.id[1]))) == 5
+    @test length(T.points(ds; component = [found, "methane"], match = :all)) == 5
+    @test_throws ArgumentError T.points(ds; component = 99)
+
+    both = T.mixture(ds, "Methane", "carbon-dioxide")
+    @test length(both) == 5
+    @test length(T.mixture(ds, "methane", "water")) == 0
+    @test length(T.mixture(ds, "methane", "carbon dioxide"; temperature = (320, 400))) ==
+          length(T.points(ds; component = ["methane", "carbon dioxide"], exact = true, temperature = (320, 400)))
+    @test_throws ArgumentError T.mixture(ds, "methane")
+    @test_logs (:info, r"no system contains all") T.mixture(ds, "methane", "water")
+    @test isempty(@test_logs (:info, r"given filters") T.mixture(ds, "methane", "carbon dioxide"; temperature = (1, 2)))
+    # Inexact selection of a binary reports nothing and keeps every point.
+    @test length(T.mixture(ds, "methane", "carbon dioxide"; exact = false)) == 5
+end
