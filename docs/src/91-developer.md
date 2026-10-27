@@ -35,7 +35,6 @@ In particular, the Julia code is formatted using [JuliaFormatter.jl](https://git
 julia> # Press ]
 pkg> activate
 pkg> add JuliaFormatter
-
 ```
 
 To install `pre-commit`, we recommend using [pipx](https://pipx.pypa.io) as follows:
