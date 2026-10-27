@@ -230,8 +230,9 @@ function didyoumean(ds::Dataset, text::AbstractString; count::Int = 4)
     for (id, _) in approximate_matches(name_index(ds.compounds), text)
         # Show the synonym that is closest to what was typed, not just the first one.
         synonyms = ds.compounds.names[id]
-        name = isempty(synonyms) ? primary_name(ds.compounds, id) :
-               argmin(s -> edit_distance(base, normalize_name(s), 64), synonyms)
+        name =
+            isempty(synonyms) ? primary_name(ds.compounds, id) :
+            argmin(s -> edit_distance(base, normalize_name(s), 64), synonyms)
         name in names || push!(names, "\"$name\"")
         length(names) >= count && break
     end
@@ -273,16 +274,18 @@ Tables.schema(m::CompoundMatches) = Tables.schema(Tables.columns(m))
 
 function Base.show(io::IO, m::CompoundMatches)
     n = length(m)
-    print(io, "CompoundMatches: ", n, n == 1 ? " compound" : " compounds", " for \"", m.query, "\"")
+    print(
+        io,
+        "CompoundMatches: ",
+        n,
+        n == 1 ? " compound" : " compounds",
+        " for \"",
+        m.query,
+        "\"",
+    )
     n == 0 && return nothing
-    cells = [
-        string.(m.id),
-        m.name,
-        m.formula,
-        m.inchikey,
-        string.(m.points),
-        string.(m.match),
-    ]
+    cells =
+        [string.(m.id), m.name, m.formula, m.inchikey, string.(m.points), string.(m.match)]
     heads = ["id", "name", "formula", "InChIKey", "points", "match"]
     clip(s) = length(s) > 40 ? first(s, 37) * "..." : s
     cells = [clip.(c) for c in cells]
