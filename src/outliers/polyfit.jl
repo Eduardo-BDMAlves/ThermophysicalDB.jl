@@ -24,7 +24,7 @@ const SCALE_CONSISTENCY = MAD_TO_SD
 """
 Largest variance inflation factor (VIF) that a fit may have. The VIF of a coefficient is the
 factor by which the collinearity of the design inflates its variance
-([Belsley1980](@cite)); it is `Aⱼⱼ (A⁻¹)ⱼⱼ` for the normal matrix `A`. A window whose points
+([Belsley2005](@cite)); it is `Aⱼⱼ (A⁻¹)ⱼⱼ` for the normal matrix `A`. A window whose points
 lie almost on a line or a curve in the space of the coordinates has an enormous VIF, and its
 fitted surface is then determined by rounding errors; such windows are discarded.
 """
@@ -80,7 +80,7 @@ end
 Variance of a standard normal variable conditioned on `|Z| ≤ c`:
 `1 - 2c φ(c) / (2Φ(c) - 1)`. A scale estimated from residuals that were kept because they lie
 within `c` of the fit is too small by the square root of this factor, and dividing by it makes
-the estimate consistent again ([RousseeuwLeroy1987](@cite)). `c = Inf` gives 1.
+the estimate consistent again ([Rousseeuw2003](@cite)). `c = Inf` gives 1.
 """
 function truncated_variance(c::Real)
     isinf(c) && return 1.0
@@ -278,7 +278,7 @@ keeps the best `q` points, which is a truncated sample, so the scale estimated f
 small and `z` would be inflated for every point of an honest data set. After each fit the
 inliers are recomputed as the points with `|z| ≤ cutoff` under the scale of that fit, which
 is corrected for the truncation at `cutoff` (see [`truncated_variance`](@ref)); the process
-settles at a scale that agrees with the data ([RousseeuwLeroy1987](@cite)). At most
+settles at a scale that agrees with the data ([Rousseeuw2003](@cite)). At most
 $(MAX_REWEIGHTING_STEPS) steps are taken.
 """
 function robust_refit(
