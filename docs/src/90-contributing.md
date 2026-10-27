@@ -1,6 +1,6 @@
 # [Contributing guidelines](@id contributing)
 
-First of all, thanks for the interest!
+First, thanks for the interest!
 
 We welcome all kinds of contribution, including, but not limited to code, documentation, examples, configuration, issue creating, etc.
 

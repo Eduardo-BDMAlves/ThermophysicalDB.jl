@@ -6,7 +6,7 @@ CurrentModule = ThermophysicalDB
 
 Liquid water has more experimental density data than almost any other substance in the archive: hundreds of articles, measured with very different instruments over many decades. That makes it the ideal case to show how filtering with everyday units works and how to judge a literature data set against a reference equation.
 
-The reference here is the IAPWS-95 formulation [WagnerPruss2002](@cite), as implemented in [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl) [Walker2022](@cite). IAPWS-95 is a *fundamental equation*: a single expression for the Helmholtz energy ``A(T, \rho)`` of water, fitted to a very large body of data. Every other property follows from derivatives of it. The pressure, for instance, is
+The reference here is the IAPWS-95 formulation [Wagner2002](@cite), as implemented in [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl) [Walker2022](@cite). IAPWS-95 is a *fundamental equation*: a single expression for the Helmholtz energy ``A(T, \rho)`` of water, fitted to a very large body of data. Every other property follows from derivatives of it. The pressure, for instance, is
 
 ```math
 p = -\left(\frac{\partial A}{\partial V}\right)_T ,

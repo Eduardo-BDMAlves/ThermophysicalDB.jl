@@ -32,6 +32,9 @@ reset_database_dir!
 
 ```@docs
 points
+mixture
+find_compounds
+ThermophysicalDB.CompoundMatches
 DataView
 table
 ```
@@ -81,5 +84,5 @@ These docstrings document the implementation. They are not part of the public in
 ```@autodocs
 Modules = [ThermophysicalDB]
 Public = false
-Filter = x -> x !== ThermophysicalDB.Dataset
+Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.CompoundMatches, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult))
 ```

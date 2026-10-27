@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning].
 - Initial release
 - Added `export_points`, which writes the points of a selection to `.csv`, `.xlsx` (through the XLSX package extension), `.json`, `.jld2` and a ThermoML-format subset, chosen by the extension of the path, or to a directory holding all of them
 - Added NOTICE.md, legal notices in the README and in the documentation, and the data source references in CITATION.cff
-- Added `find_outliers`, which splits a selection into kept points, outliers and disputed points with the reason for each (physical rules, local parabolas along each axis, a joint surface when several axes vary, and the generalized ESD test), plus `reasons`, `diagnostics` and `esd`; see the manual page "Detecting outliers"
+- Added `find_outliers`, which splits a selection into kept points, outliers and disputed points with the reason for each (physical rules, local parabolas along each axis, a joint surface when several axes vary, and the generalized ESD test), plus `reasons`, `diagnostics` and `esd`; see the manual page "Detecting outliers". The analysis is deterministic (no Monte Carlo, no random sampling) and the joint surface is processed in tiles with a screening step, which keeps large selections fast. The result prints only statistics (counts by category and reason, coverage, and the certainty of the flags); per-point detail is requested with `reasons`
+- Added `find_compounds` and `mixture`: compound names are matched ignoring case, accents, hyphens and spaces (`"iso-butane"` finds `"isobutane"`), with spelling variants and a short list of abbreviations; a name that matches nothing suggests the closest ones. `points` accepts a compound id or the result of `find_compounds` as `component`, and `mixture(db, "nitrogen", "isobutane")` selects a system made of exactly those components
 - Test fixtures use fictitious bibliographic data
 
 <!-- Links -->

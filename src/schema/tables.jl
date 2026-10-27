@@ -76,6 +76,24 @@ end
 # ----------------------------------------------------------------------------------
 
 """
+    NameIndex
+
+Normalised-name lookup of a [`CompoundTable`](@ref), built lazily on first use and rebuilt
+when compounds or names have been added since. It is derived data: never stored in the
+cache, and not a column of the table. `ids` maps a normalised name to the compounds that
+carry it and `keys` lists the distinct normalised names (for approximate matching).
+"""
+struct NameIndex
+    ncompounds::Int
+    nnames::Int
+    ids::Dict{String,Vector{Int32}}
+    keys::Vector{String}
+end
+
+# Fields that are derived from the columns and therefore neither stored nor described.
+const DERIVED_FIELDS = (:index, :lookup)
+
+"""
     CompoundTable()
 
 One row per distinct chemical species, shared by every source. The identity key is the
@@ -89,6 +107,7 @@ struct CompoundTable
     formula::Vector{String}
     names::Vector{Vector{String}}
     index::Dict{String,Int32}
+    lookup::Base.RefValue{Union{Nothing,NameIndex}}
 end
 
 function CompoundTable()
@@ -99,6 +118,7 @@ function CompoundTable()
         String[],
         Vector{String}[],
         Dict{String,Int32}(),
+        Ref{Union{Nothing,NameIndex}}(nothing),
     )
 end
 

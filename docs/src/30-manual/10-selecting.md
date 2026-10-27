@@ -33,7 +33,7 @@ length(everything)
 
 ## Components
 
-`component` accepts a name, a molecular formula or an InChIKey. Names match any name recorded for the compound, ignoring case; formulas are case sensitive (`"CO"` and `"Co"` differ); InChIKeys ignore case.
+`component` accepts a name, a molecular formula, an InChIKey, a compound id or the result of [`find_compounds`](@ref). Names match any name recorded for the compound and are compared loosely: case, accents, hyphens and spaces are ignored (`"Iso-Butane"` is `"isobutane"`), `"n-hexane"` also finds `"hexane"`, and a few abbreviations and alternative spellings (`"IPA"`, `"sulphur"`) are understood. Formulas are case sensitive (`"CO"` and `"Co"` differ) and a formula can be shared by several compounds (`"C4H10"` is butane and isobutane); InChIKeys ignore case.
 
 ```@example sel
 a = points(db; component = "methane")
@@ -51,6 +51,22 @@ A list of components, together with `match` and `exact`, defines what kind of *s
 | `component = [...]`, `match = :all` | it contains **every** listed component | mixtures containing both |
 | `component = [...]`, `exact = true` | it consists of **exactly** the listed components | the binary and nothing else |
 | `component = "methane", exact = true` | it is the pure compound | pure methane |
+
+### Looking the compounds up first
+
+The safest way to select a system is to look the compounds up and pass their ids. [`find_compounds`](@ref) lists what a text refers to, with the number of measurements of each compound, so the spelling that has data is obvious:
+
+```@example sel
+find_compounds(db, "methane"; limit = 3)
+```
+
+```@example sel
+ch4 = find_compounds(db, "methane").id[1]
+co2 = find_compounds(db, "carbon dioxide").id[1]
+length(points(db; component = [ch4, co2], match = :all, exact = true))
+```
+
+[`mixture`](@ref) is the short form for a system made of exactly the given components, in any order: `mixture(db, "methane", "carbon dioxide")`. When a name matches nothing, the error suggests the closest names.
 
 `pure = true` keeps single-component systems and `pure = false` keeps mixtures, independent of which compounds they contain.
 

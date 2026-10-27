@@ -123,7 +123,9 @@ end
     # every column of every table is described, apart from the lookup dictionary
     ds = T.Dataset()
     for t in tables
-        fields = [f for f in fieldnames(typeof(getfield(ds, t.name))) if f !== :index]
+        fields = [
+            f for f in fieldnames(typeof(getfield(ds, t.name))) if !(f in T.DERIVED_FIELDS)
+        ]
         @test [c.name for c in t.columns] == fields
     end
 

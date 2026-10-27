@@ -36,6 +36,7 @@ include("schema/pool.jl")
 include("schema/tables.jl")
 include("schema/dataset.jl")
 include("schema/relations.jl")
+include("query/compounds.jl")
 include("query/select.jl")
 include("parse/types.jl")
 include("parse/article.jl")
@@ -68,10 +69,12 @@ export DataView,
     ensure_archive,
     esd,
     export_points,
+    find_compounds,
     find_outliers,
     install_archive!,
     latex_table,
     markdown_table,
+    mixture,
     points,
     reasons,
     reference_summary,
