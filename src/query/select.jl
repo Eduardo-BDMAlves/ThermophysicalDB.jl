@@ -161,6 +161,9 @@ end
 # The public filter
 # ----------------------------------------------------------------------------------
 
+find_compounds(view::DataView, text::AbstractString; kwargs...) =
+    find_compounds(view.dataset, text; kwargs...)
+
 """
     points(dataset_or_view; kwargs...) -> DataView
 
@@ -185,9 +188,6 @@ it on a [`DataView`](@ref) refines that view, so filters can be chained.
 A component or property that matches nothing throws an `ArgumentError`, so a typo is
 never mistaken for "no data".
 """
-find_compounds(view::DataView, text::AbstractString; kwargs...) =
-    find_compounds(view.dataset, text; kwargs...)
-
 points(ds::Dataset; kwargs...) = points(DataView(ds); kwargs...)
 
 function points(
@@ -239,7 +239,12 @@ that contain further components are included.
 When nothing is found, a message tells whether the components do occur together with
 others, so an empty result can be told apart from a too strict one.
 """
-function mixture(source::Union{Dataset,DataView}, components...; exact::Bool = true, kwargs...)
+function mixture(
+    source::Union{Dataset,DataView},
+    components...;
+    exact::Bool = true,
+    kwargs...,
+)
     length(components) >= 2 ||
         throw(ArgumentError("a mixture needs at least two components"))
     wanted = collect(components)
