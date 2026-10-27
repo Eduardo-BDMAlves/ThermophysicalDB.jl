@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 400" role="img" aria-label="Thermometer, beaker with a molecule and a database">
+<defs>
+<radialGradient id="gA" cx="22%" cy="18%" r="60%"><stop offset="0" stop-color="#2fe0ff" stop-opacity=".30"/><stop offset="1" stop-color="#2fe0ff" stop-opacity="0"/></radialGradient>
+<radialGradient id="gB" cx="82%" cy="86%" r="60%"><stop offset="0" stop-color="#ff4a1c" stop-opacity=".26"/><stop offset="1" stop-color="#ff4a1c" stop-opacity="0"/></radialGradient>
+<radialGradient id="gC" cx="86%" cy="14%" r="45%"><stop offset="0" stop-color="#ffb000" stop-opacity=".22"/><stop offset="1" stop-color="#ffb000" stop-opacity="0"/></radialGradient>
+<filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<rect x="6" y="6" width="508" height="388" rx="26" fill="#090b17" stroke="#2fe0ff" stroke-opacity=".35" stroke-width="1.5"/>
+<rect x="6" y="6" width="508" height="388" rx="26" fill="url(#gA)"/><rect x="6" y="6" width="508" height="388" rx="26" fill="url(#gB)"/><rect x="6" y="6" width="508" height="388" rx="26" fill="url(#gC)"/>
+<g opacity=".9">
+<circle cx="52" cy="70" r="3" fill="#c8ff4d"/><circle cx="470" cy="330" r="3.5" fill="#ff4a1c"/><circle cx="440" cy="64" r="2.5" fill="#5c8dff"/><circle cx="70" cy="300" r="2.5" fill="#ffb000"/><circle cx="96" cy="120" r="2" fill="#58ff7a"/><circle cx="430" cy="250" r="2" fill="#2fe0ff"/>
+</g>
+<g transform="translate(131 38) scale(1.45)" filter="url(#blur)" opacity=".55"><path d="M33,44 A13,13 0 0 1 59,44 V131.8 A24,24 0 1 1 33,131.8 Z" fill="#10142a" stroke="#4063D8" stroke-width="5" stroke-linejoin="round"/>
+<rect x="41" y="75" width="10" height="77" rx="5" fill="#CB3C33"/><circle cx="46" cy="152" r="14" fill="#CB3C33"/><line x1="66" y1="52" x2="78" y2="52" stroke="#389826" stroke-width="4" stroke-linecap="round"/><line x1="66" y1="74" x2="73" y2="74" stroke="#389826" stroke-width="4" stroke-linecap="round"/><line x1="66" y1="96" x2="78" y2="96" stroke="#389826" stroke-width="4" stroke-linecap="round"/><line x1="66" y1="118" x2="73" y2="118" stroke="#389826" stroke-width="4" stroke-linecap="round"/>
+<path d="M106,44 H174 V92 Q174,102 164,102 H116 Q106,102 106,92 Z" fill="#4063D8" fill-opacity=".30"/>
+<line x1="140" y1="68" x2="123.5" y2="87.5" stroke="#e8ecff" stroke-width="3.375" opacity=".55" stroke-linecap="round"/><line x1="140" y1="68" x2="156.5" y2="87.5" stroke="#e8ecff" stroke-width="3.375" opacity=".55" stroke-linecap="round"/>
+<circle cx="140" cy="68" r="9.75" fill="#9558B2"/><circle cx="123.5" cy="87.5" r="6.0" fill="#389826"/><circle cx="156.5" cy="87.5" r="6.0" fill="#389826"/>
+<path d="M98,31 L106,36 V92 Q106,102 116,102 H164 Q174,102 174,92 V36 L182,31" fill="none" stroke="#CB3C33" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="106" y1="44" x2="174" y2="44" stroke="#4063D8" stroke-width="2.5" opacity=".9"/>
+<line x1="174" y1="58" x2="164" y2="58" stroke="#CB3C33" stroke-width="3.5" stroke-linecap="round"/><line x1="174" y1="80" x2="168" y2="80" stroke="#CB3C33" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M102,150 v14 a38,12 0 0 0 76,0 v-14" fill="#10142a" stroke="#389826" stroke-width="5" stroke-linejoin="round"/>
+<ellipse cx="140" cy="150" rx="38" ry="12" fill="#10142a" stroke="#389826" stroke-width="5"/><path d="M102,128 v14 a38,12 0 0 0 76,0 v-14" fill="#10142a" stroke="#9558B2" stroke-width="5" stroke-linejoin="round"/>
+<ellipse cx="140" cy="128" rx="38" ry="12" fill="#10142a" stroke="#9558B2" stroke-width="5"/><line x1="150" y1="143.5" x2="150" y2="148.5" stroke="#CB3C33" stroke-width="3" stroke-linecap="butt"/><line x1="156" y1="143.5" x2="156" y2="148.5" stroke="#CB3C33" stroke-width="3" stroke-linecap="butt"/><line x1="162" y1="143.5" x2="162" y2="148.5" stroke="#CB3C33" stroke-width="3" stroke-linecap="butt"/></g>
+<g transform="translate(131 38) scale(1.45)"><path d="M33,44 A13,13 0 0 1 59,44 V131.8 A24,24 0 1 1 33,131.8 Z" fill="#10142a" stroke="#4063D8" stroke-width="5" stroke-linejoin="round"/>
+<rect x="41" y="75" width="10" height="77" rx="5" fill="#CB3C33"/><circle cx="46" cy="152" r="14" fill="#CB3C33"/><line x1="66" y1="52" x2="78" y2="52" stroke="#389826" stroke-width="4" stroke-linecap="round"/><line x1="66" y1="74" x2="73" y2="74" stroke="#389826" stroke-width="4" stroke-linecap="round"/><line x1="66" y1="96" x2="78" y2="96" stroke="#389826" stroke-width="4" stroke-linecap="round"/><line x1="66" y1="118" x2="73" y2="118" stroke="#389826" stroke-width="4" stroke-linecap="round"/>
+<path d="M106,44 H174 V92 Q174,102 164,102 H116 Q106,102 106,92 Z" fill="#4063D8" fill-opacity=".30"/>
+<line x1="140" y1="68" x2="123.5" y2="87.5" stroke="#e8ecff" stroke-width="3.375" opacity=".55" stroke-linecap="round"/><line x1="140" y1="68" x2="156.5" y2="87.5" stroke="#e8ecff" stroke-width="3.375" opacity=".55" stroke-linecap="round"/>
+<circle cx="140" cy="68" r="9.75" fill="#9558B2"/><circle cx="123.5" cy="87.5" r="6.0" fill="#389826"/><circle cx="156.5" cy="87.5" r="6.0" fill="#389826"/>
+<path d="M98,31 L106,36 V92 Q106,102 116,102 H164 Q174,102 174,92 V36 L182,31" fill="none" stroke="#CB3C33" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="106" y1="44" x2="174" y2="44" stroke="#4063D8" stroke-width="2.5" opacity=".9"/>
+<line x1="174" y1="58" x2="164" y2="58" stroke="#CB3C33" stroke-width="3.5" stroke-linecap="round"/><line x1="174" y1="80" x2="168" y2="80" stroke="#CB3C33" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M102,150 v14 a38,12 0 0 0 76,0 v-14" fill="#10142a" stroke="#389826" stroke-width="5" stroke-linejoin="round"/>
+<ellipse cx="140" cy="150" rx="38" ry="12" fill="#10142a" stroke="#389826" stroke-width="5"/><path d="M102,128 v14 a38,12 0 0 0 76,0 v-14" fill="#10142a" stroke="#9558B2" stroke-width="5" stroke-linejoin="round"/>
+<ellipse cx="140" cy="128" rx="38" ry="12" fill="#10142a" stroke="#9558B2" stroke-width="5"/><line x1="150" y1="143.5" x2="150" y2="148.5" stroke="#CB3C33" stroke-width="3" stroke-linecap="butt"/><line x1="156" y1="143.5" x2="156" y2="148.5" stroke="#CB3C33" stroke-width="3" stroke-linecap="butt"/><line x1="162" y1="143.5" x2="162" y2="148.5" stroke="#CB3C33" stroke-width="3" stroke-linecap="butt"/></g>
+<text x="260" y="372" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="14" letter-spacing="1.2" fill="#9aa3c7">122 481 systems · 11 923 articles</text>
+</svg>
