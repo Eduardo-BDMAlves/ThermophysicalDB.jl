@@ -8,6 +8,23 @@ https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/var
   max-width: 600px;
 }
 
+/* The hero heading is a flex column, so the name span stretches to the container width and
+   the gradient would be spread over empty space; shrink it to the text so that the whole
+   gradient (blue to orange) is visible on the name. */
+.VPHero .name.clip {
+  width: fit-content;
+}
+
+.VPHero:not(.has-image) .name.clip {
+  margin-inline: auto;
+}
+
+@media (max-width: 959px) {
+  .VPHero .name.clip {
+    margin-inline: auto;
+  }
+}
+
 /* Fonts */
 @font-face {
   font-family: JuliaMono-Regular;
@@ -348,7 +365,7 @@ mjx-container svg path {
 
 :root {
   /* light mode: deep neon, readable on white */
-  --tdb-cyan: #0094b0;
+  --tdb-cyan: var(--tdb-blue);   /* the light blue accent is now the mercury blue */
   --tdb-magenta: #c4009b;
   --tdb-lime: #5f8f00;
   --tdb-yellow: #a87400;
@@ -357,10 +374,10 @@ mjx-container svg path {
   --tdb-green: #00963a;
   --tdb-pink: #d4166a;
   --tdb-red: #d12a00;
-  --tdb-blue: #2a58e0;
+  --tdb-blue: #3350e0;
 
   /* fills and glows are always full brightness */
-  --neon-cyan: #2fe0ff;
+  --neon-cyan: var(--neon-blue); /* kept as a name: the former light blue is now Hg blue */
   --neon-magenta: #ff4fd0;
   --neon-lime: #c8ff4d;
   --neon-yellow: #ffd36b;
@@ -369,56 +386,88 @@ mjx-container svg path {
   --neon-green: #58ff7a;
   --neon-pink: #ff6fae;
   --neon-red: #ff4a1c;
-  --neon-blue: #5c8dff;
+  /* Blue: the mercury line Hg 435.83 nm, the strong blue of argon-and-mercury "blue neon"
+     tubes. Its spectral colour is about rgb(18, 0, 255); the screen colour is lighter. */
+  --neon-blue: #4f6bff;
+
+  /* Accent colour: the orange glow of a neon (Ne) discharge tube.
+     Neon emits a forest of lines between about 585 nm and 640 nm (the brightest at
+     585.25 nm and 640.22 nm); the middle of the orange band is Ne I 614.31 nm, whose
+     spectral colour is about rgb(255, 120, 0) (wavelength-to-sRGB conversion of Bruton,
+     approximate). The screen colour is a little lighter, #ff7a1a, because a glowing tube
+     is not monochromatic. Sodium (589.0 and 589.6 nm) is the yellower neighbour and stays
+     as --neon-orange (amber). */
+  --neon-ne: #ff7a1a;
 
   --tdb-panel: #090b17;
+
+  /* Red: hydrogen H-alpha 656.28 nm, the vivid red of a hydrogen discharge tube (spectral
+     colour about rgb(255, 0, 0)). */
+  --neon-h-red: #ff2f3f;
+
+  /* Deep blue: helium He I 447.15 nm (spectral colour about rgb(0, 36, 255)), the closest
+     discharge-tube blue to the navy of the laboratory logo (hue 235 degrees). */
+  --neon-he: #3347ff;
+
+  /* Title gradients run through the colours of discharge tubes: mercury blue (Hg 435.83 nm),
+     helium blue (He I 447.15 nm), hydrogen red (H-alpha 656.28 nm), neon orange
+     (Ne I 614.31 nm). Orange keeps the end of the gradient, blue the start. */
+  --neon-stops: var(--neon-blue) 0%, var(--neon-he) 30%, var(--neon-h-red) 52%,
+    var(--neon-ne) 72%, var(--neon-ne) 100%;
+  /* Short elements (buttons) need the four colours spread over the whole length. */
+  --neon-stops-short: var(--neon-blue) 0%, var(--neon-he) 28%, var(--neon-h-red) 58%,
+    var(--neon-ne) 92%;
+}
+
+:root {
+  /* light mode: a deeper tone of the same orange, 5.5:1 on white */
+  --tdb-ne: #b34700;
+  --tdb-h-red: #d1112b;
+  --tdb-he: #2434c8;
+  --tdb-stops: var(--tdb-blue) 0%, var(--tdb-he) 30%, var(--tdb-h-red) 52%,
+    var(--tdb-ne) 72%, var(--tdb-ne) 100%;
+  --tdb-stops-short: var(--tdb-blue) 0%, var(--tdb-he) 28%, var(--tdb-h-red) 58%,
+    var(--tdb-ne) 92%;
 }
 
 :root.dark {
-  --tdb-cyan: var(--neon-cyan);
+  --tdb-cyan: var(--neon-blue);
   --tdb-magenta: var(--neon-magenta);
   --tdb-lime: var(--neon-lime);
   --tdb-yellow: var(--neon-yellow);
   --tdb-orange: var(--neon-orange);
   --tdb-violet: var(--neon-violet);
+  --tdb-h-red: var(--neon-h-red);
+  --tdb-he: var(--neon-he);
   --tdb-green: var(--neon-green);
   --tdb-pink: var(--neon-pink);
   --tdb-red: var(--neon-red);
   --tdb-blue: var(--neon-blue);
+  --tdb-ne: var(--neon-ne);
 }
 
 :root:root {
   /* the template's brand colours are called "dark-green"; point them at the palette */
-  --vp-dark-green: #00a6c0;
-  --vp-dark-green-dark: #009db8;
-  --vp-dark-green-light: #2fe0ff;
-  --vp-dark-green-lighter: #7df3ff;
+  --vp-dark-green: #e56a10;
+  --vp-dark-green-dark: #d9620a;
+  --vp-dark-green-light: #ff7a1a;
+  --vp-dark-green-lighter: #ffa05c;
 
-  --vp-c-brand-1: #008ba3;
-  --vp-c-brand-2: #00a6c0;
-  --vp-c-brand-3: #00c2e0;
-  --vp-c-brand-soft: rgba(0, 194, 224, 0.14);
+  --vp-c-brand-1: #b34700;
+  --vp-c-brand-2: #c95200;
+  --vp-c-brand-3: #e56a10;
+  --vp-c-brand-soft: rgba(255, 122, 26, 0.14);
 
   --vp-button-brand-border: transparent;
   --vp-button-brand-text: #04060d;
-  --vp-button-brand-bg: #00d0ec;
+  --vp-button-brand-bg: #ff7a1a;
   --vp-button-brand-hover-border: transparent;
-  --vp-button-brand-hover-bg: #43e6ff;
-  --vp-button-brand-active-bg: #00b4cf;
+  --vp-button-brand-hover-bg: #ff9a4d;
+  --vp-button-brand-active-bg: #e56a10;
 
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(
-    115deg,
-    var(--tdb-cyan) 0%,
-    var(--tdb-orange) 55%,
-    var(--tdb-red) 100%
-  );
-  --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    var(--neon-cyan) 15%,
-    var(--neon-orange) 55%,
-    var(--neon-red) 90%
-  );
+  --vp-home-hero-name-background: linear-gradient(115deg, var(--tdb-stops-short));
+  --vp-home-hero-image-background-image: linear-gradient(-45deg, var(--neon-stops));
   --vp-home-hero-image-filter: blur(70px);
 
   --vp-custom-block-tip-border: rgba(88, 255, 122, 0.55);
@@ -432,20 +481,20 @@ mjx-container svg path {
   --vp-c-bg-alt: #090b15;
   --vp-c-bg-elv: #0f1226;
   --vp-c-bg-soft: #0c0f20;
-  --vp-c-divider: rgba(47, 224, 255, 0.16);
+  --vp-c-divider: rgba(79, 107, 255, 0.2);
   --vp-c-gutter: #04050a;
   --vp-c-text-1: #e8ecff;
   --vp-c-text-2: #a7b0d6;
   --vp-c-text-3: #7b84ad;
 
-  --vp-c-brand-1: #2fe0ff;
-  --vp-c-brand-2: #6df0ff;
-  --vp-c-brand-3: #00b8d4;
-  --vp-c-brand-soft: rgba(47, 224, 255, 0.16);
+  --vp-c-brand-1: #ff7a1a;
+  --vp-c-brand-2: #ffa05c;
+  --vp-c-brand-3: #e05a00;
+  --vp-c-brand-soft: rgba(255, 122, 26, 0.16);
 
-  --vp-button-brand-bg: #2fe0ff;
-  --vp-button-brand-hover-bg: #6df0ff;
-  --vp-button-brand-active-bg: #00c4dd;
+  --vp-button-brand-bg: #ff7a1a;
+  --vp-button-brand-hover-bg: #ff9a4d;
+  --vp-button-brand-active-bg: #e56a10;
   --vp-button-brand-text: #04060d;
 
   --vp-home-hero-image-filter: blur(80px);
@@ -462,7 +511,9 @@ mjx-container svg path {
 }
 
 .vp-doc h1 {
-  background: linear-gradient(115deg, var(--tdb-cyan), var(--tdb-orange) 55%, var(--tdb-red));
+  background: linear-gradient(115deg, var(--tdb-stops-short));
+  width: fit-content;
+  max-width: 100%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -488,16 +539,16 @@ mjx-container svg path {
   height: 4px;
   margin-bottom: 12px;
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-orange) 60%, var(--neon-red));
+  background: linear-gradient(90deg, var(--neon-stops-short));
   box-shadow: 0 0 12px rgba(255, 120, 30, 0.55);
 }
 
 .vp-doc h3 {
-  color: var(--tdb-cyan);
+  color: var(--tdb-ne);
 }
 
 .dark .vp-doc h3 {
-  text-shadow: 0 0 14px rgba(47, 224, 255, 0.35);
+  text-shadow: 0 0 14px rgba(255, 122, 26, 0.35);
 }
 
 /* ---- Home page ---------------------------------------------------------------------- */
@@ -511,10 +562,10 @@ mjx-container svg path {
 }
 
 .VPHero .VPButton.brand {
-  background-image: linear-gradient(120deg, var(--neon-cyan), var(--neon-orange));
+  background-image: linear-gradient(120deg, var(--neon-stops-short));
   border: none;
   color: #04060d;
-  box-shadow: 0 0 22px -4px rgba(47, 224, 255, 0.75);
+  box-shadow: 0 0 22px -4px rgba(255, 122, 26, 0.75);
 }
 
 .VPHero .VPButton.brand:hover {
@@ -571,7 +622,7 @@ mjx-container svg path {
 .VPFeatures .item:nth-child(6n + 3) { --tdb-accent: var(--neon-lime); }
 .VPFeatures .item:nth-child(6n + 4) { --tdb-accent: var(--neon-yellow); }
 .VPFeatures .item:nth-child(6n + 5) { --tdb-accent: var(--neon-orange); }
-.VPFeatures .item:nth-child(6n + 6) { --tdb-accent: var(--neon-blue); }
+.VPFeatures .item:nth-child(6n + 6) { --tdb-accent: var(--neon-violet); }
 
 /* Gallery of pages on the home page (plain HTML in index.md) */
 .tdb-gallery {
@@ -626,14 +677,14 @@ mjx-container svg path {
 .VPSidebarItem.level-0:nth-of-type(6n + 3) > .item > .text { color: var(--tdb-lime); }
 .VPSidebarItem.level-0:nth-of-type(6n + 4) > .item > .text { color: var(--tdb-yellow); }
 .VPSidebarItem.level-0:nth-of-type(6n + 5) > .item > .text { color: var(--tdb-orange); }
-.VPSidebarItem.level-0:nth-of-type(6n + 6) > .item > .text { color: var(--tdb-blue); }
+.VPSidebarItem.level-0:nth-of-type(6n + 6) > .item > .text { color: var(--tdb-violet); }
 
 .VPSidebarItem.is-active > .item > .text {
   color: var(--vp-c-brand-1) !important;
 }
 
 .dark .VPSidebarItem.is-active > .item > .text {
-  text-shadow: 0 0 12px rgba(47, 224, 255, 0.6);
+  text-shadow: 0 0 12px rgba(255, 122, 26, 0.6);
 }
 
 .VPNavBar .title {
@@ -649,13 +700,13 @@ mjx-container svg path {
   height: auto;
   margin: 16px auto;
   padding: 10px;
-  border: 1px solid rgba(47, 224, 255, 0.35);
+  border: 1px solid rgba(255, 122, 26, 0.4);
   border-radius: 16px;
   background: var(--tdb-panel);
-  box-shadow: 0 0 26px -10px rgba(47, 224, 255, 0.6);
+  box-shadow: 0 0 26px -10px rgba(255, 122, 26, 0.6);
 }
 
-/* Code in blue-cyan, results in orange */
+/* Code in mercury blue, results in orange */
 .language- {
   border-left: 4px solid var(--neon-orange);
   border-radius: 8px;
@@ -679,7 +730,7 @@ mjx-container svg path {
 .vp-doc th {
   background: var(--vp-c-brand-soft);
   color: var(--vp-c-text-1);
-  border-bottom: 2px solid var(--neon-cyan);
+  border-bottom: 2px solid var(--neon-ne);
 }
 
 .vp-doc tr:nth-child(2n) {
@@ -691,8 +742,8 @@ mjx-container svg path {
 }
 
 .vp-doc .custom-block.info {
-  border-color: rgba(47, 224, 255, 0.55);
-  background: rgba(47, 224, 255, 0.08);
+  border-color: rgba(79, 107, 255, 0.6);
+  background: rgba(79, 107, 255, 0.1);
 }
 
 .vp-doc .custom-block.warning {
@@ -741,4 +792,86 @@ mjx-container svg path {
   height: 31px;
   margin-right: 10px;
   background: url("/logo-tdb.svg") center / contain no-repeat;
+}
+
+/* ---- Neon glow (dark mode only: a glow on a white page only blurs the text) ------------- */
+
+/* Group titles of the sidebar glow in their own colour */
+.dark .VPSidebarItem.level-0 > .item > .text {
+  text-shadow:
+    0 0 6px color-mix(in srgb, currentColor 75%, transparent),
+    0 0 18px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+/* Links in the text glow in the orange accent, more on hover */
+.dark .vp-doc a:not(.header-anchor) {
+  text-shadow: 0 0 6px rgba(255, 122, 26, 0.7), 0 0 18px rgba(255, 122, 26, 0.5);
+  transition: text-shadow 0.2s ease;
+}
+
+.dark .vp-doc a:not(.header-anchor):hover {
+  text-shadow: 0 0 8px rgba(255, 150, 50, 0.95), 0 0 24px rgba(255, 122, 26, 0.75);
+}
+
+/* Navigation bar links and the table of contents of the page */
+.dark .VPNavBarMenuLink.active,
+.dark .VPNavBarMenuLink:hover,
+.dark .VPDocAsideOutline .outline-link.active,
+.dark .VPDocAsideOutline .outline-link:hover {
+  text-shadow: 0 0 12px rgba(255, 122, 26, 0.7);
+}
+
+/* Code blocks: the blue border of the code and the orange border of the results glow */
+.dark .vp-doc div[class*="language-julia"] {
+  box-shadow: -4px 0 18px -6px var(--neon-blue);
+}
+
+.dark .language- {
+  box-shadow: -4px 0 18px -6px var(--neon-orange);
+}
+
+/* Admonitions glow in the colour of their border */
+.dark .vp-doc .custom-block.info {
+  box-shadow: 0 0 22px -10px rgba(79, 107, 255, 0.9);
+}
+
+.dark .vp-doc .custom-block.warning {
+  box-shadow: 0 0 22px -10px rgba(255, 211, 107, 0.8);
+}
+
+.dark .vp-doc .custom-block.danger {
+  box-shadow: 0 0 22px -10px rgba(255, 79, 208, 0.8);
+}
+
+/* Inline code gets a faint blue halo */
+.dark .vp-doc :not(pre) > code {
+  text-shadow: 0 0 8px rgba(79, 107, 255, 0.55);
+}
+
+/* ---- Navigation bar: keep the colour-mode switch and the page settings on screen ------- */
+
+/* The menu may shrink and never wraps; the controls on its right keep their size */
+.VPNavBar .VPNavBarMenu {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.VPNavBar .VPNavBarAppearance,
+.VPNavBar .VPNavBarExtra,
+.VPNavBar .VPNavBarSocialLinks,
+.VPNavBar .VPNavBarTranslations {
+  flex-shrink: 0;
+}
+
+/* On medium widths the entries get a smaller font and less padding */
+@media (min-width: 960px) and (max-width: 1400px) {
+  .VPNavBarMenuLink,
+  .VPNavBarMenuGroup .button {
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .VPNavBar .VPNavBarSearch {
+    margin-left: 8px;
+  }
 }

@@ -42,8 +42,17 @@ const DRAFT = get(ENV, "THERMOPHYSICALDB_DOCS_DRAFT", "false") == "true"
 const titles = Dict(
     "20-tutorials" => "Tutorials",
     "30-manual" => "Manual",
+    "40-about-data.md" => "Data",
+    "90-contributing.md" => "Contributing",
     "91-developer.md" => "Developer docs",
 )
+
+# Pages that share one drop-down menu of the navigation bar, in the order of the menu. Without
+# the groups the bar has too many entries and pushes the colour-mode switch off the screen.
+const NAV_GROUPS = [
+    "Project" => ["90-contributing.md", "91-developer.md", "92-roadmap.md"],
+    "Reference" => ["95-reference.md", "99-bibliography.md"],
+]
 
 function recursively_list_pages(folder; path_prefix = "")
     pages_list = Any[]
@@ -87,9 +96,40 @@ function recursively_list_pages(folder; path_prefix = "")
     return pages_list
 end
 
+# Path of a page entry (`"path"` or `"title" => "path"`); `nothing` for a section
+entry_path(entry::AbstractString) = String(entry)
+entry_path(entry::Pair) = entry.second isa AbstractString ? String(entry.second) : nothing
+
+# Replace the pages listed in `NAV_GROUPS` by one `group title => [pages]` entry, placed where
+# the first page of the group was.
+function group_pages(pages_list)
+    entries = Dict{String,Any}()
+    for entry in pages_list
+        path = entry_path(entry)
+        path === nothing || (entries[path] = entry)
+    end
+    grouped = Any[]
+    emitted = Set{String}()
+    for entry in pages_list
+        path = entry_path(entry)
+        index = path === nothing ? nothing : findfirst(g -> path in g.second, NAV_GROUPS)
+        if index === nothing
+            push!(grouped, entry)
+        elseif !(NAV_GROUPS[index].first in emitted)
+            group_title, members = NAV_GROUPS[index]
+            push!(emitted, group_title)
+            push!(
+                grouped,
+                group_title => Any[entries[m] for m in members if haskey(entries, m)],
+            )
+        end
+    end
+    return grouped
+end
+
 function list_pages()
     root_dir = joinpath(@__DIR__, "src")
-    pages_list = recursively_list_pages(root_dir)
+    pages_list = group_pages(recursively_list_pages(root_dir))
 
     return ["index.md"; pages_list]
 end

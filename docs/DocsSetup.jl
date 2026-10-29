@@ -10,15 +10,18 @@ using CairoMakie
 
 # Neon palette. The colours are those of gas-discharge tubes: the emission of the noble
 # gases (neon, helium, krypton, argon, xenon) and of a few contrasting gases (mercury
-# vapour, hydrogen, nitrogen, oxygen, sodium vapour). The figures sit on a dark panel in
-# both the light and the dark mode of the site (see style.css), where these colours read
-# best.
+# vapour, hydrogen, nitrogen, oxygen, sodium vapour). They follow the colours of the site
+# and of the laboratory logo (navy blue and orange): mercury blue (Hg 435.83 nm), helium
+# blue (He I 447.15 nm), neon orange (Ne I 614.31 nm) and hydrogen red (H-alpha 656.28 nm).
+# The figures sit on a dark panel in both the light and the dark mode of the site (see
+# style.css), where these colours read best.
 const COLORS = (
-    mercury = "#2fe0ff",
-    neon = "#ff4a1c",
+    mercury = "#4f6bff",
+    helium_blue = "#3347ff",
+    neon = "#ff7a1a",
     krypton = "#c8ff4d",
-    hydrogen = "#ff4fd0",
-    xenon = "#5c8dff",
+    hydrogen = "#ff2f3f",
+    xenon = "#2fe0ff",
     sodium = "#ffb000",
     oxygen = "#58ff7a",
     argon = "#a98bff",
@@ -26,25 +29,28 @@ const COLORS = (
     nitrogen = "#ff6fae",
 )
 
-# Order of the colour cycle: neighbouring colours differ in hue and brightness.
-# Warm colours (neon, helium, sodium) come early, since this is thermodynamics; mercury
-# and xenon keep the cold side.
+# Order of the colour cycle: neighbouring colours differ in hue and brightness, and the
+# yellow and the green, which are hard to tell apart in red-green colour blindness, are far
+# apart. Blue and orange (the safest pair for colour blindness) come first.
 const CYCLE = [
     COLORS.mercury,
     COLORS.neon,
-    COLORS.helium,
     COLORS.xenon,
-    COLORS.sodium,
-    COLORS.krypton,
+    COLORS.helium,
     COLORS.hydrogen,
+    COLORS.krypton,
+    COLORS.argon,
     COLORS.oxygen,
 ]
 
 # Colormap for continuous colours (scatter points coloured by temperature, deviation maps,
-# fields): cold to hot, from blue through cyan and a white midpoint to amber and red. The
-# bright midpoint marks zero in diverging data (no deviation) and reads well on the dark
-# panel. Temperature-like and signed quantities use it; positive means hotter or larger.
-const FIELD = cgrad(["#3b6bff", "#2fe0ff", "#f2f5ff", "#ffb000", "#ff3a14"])
+# fields): cold to hot, from helium blue and mercury blue through a white midpoint to neon
+# orange and hydrogen red. Blue against orange stays distinguishable in the usual forms of
+# colour blindness. The bright midpoint marks zero in diverging data (no deviation) and
+# reads well on the dark panel. Temperature-like and signed quantities use it; positive
+# means hotter or larger.
+const FIELD =
+    cgrad([COLORS.helium_blue, "#6f8cff", "#f2f5ff", COLORS.neon, COLORS.hydrogen])
 
 # Light grey-blue for text, ticks and spines: legible on the dark panel.
 const NEUTRAL = "#9aa3c7"

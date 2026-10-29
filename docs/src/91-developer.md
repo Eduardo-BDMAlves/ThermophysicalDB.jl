@@ -151,7 +151,10 @@ THERMOPHYSICALDB_DOCS_DRAFT=true julia --project=docs docs/make.jl
 
 To keep the data somewhere else than the default location, set `THERMOPHYSICALDB_DATA_DIR` before starting Julia (see [Downloads, updates and cache](@ref updates)).
 
-The look of the site lives in `docs/src/.vitepress/theme/style.css` (colours, cards, figures), the logo and the hero picture in `docs/src/assets`, and the shared plot theme of the examples in `docs/DocsSetup.jl`. To preview the generated Markdown with live reload, build once and then call `DocumenterVitepress.dev_docs("docs/build")` from a second Julia session, as explained in the DocumenterVitepress manual.
+The look of the site lives in `docs/src/.vitepress/theme/style.css` (colours, cards, figures), the logo and the hero picture in `docs/src/assets`, and the shared plot theme of the examples in `docs/DocsSetup.jl`.
+The accent colour is the orange of a neon (Ne) discharge tube: the neon lines span about 585 nm to 640 nm, and the middle of the band, Ne I 614.31 nm (spectral colour near `rgb(255, 120, 0)`), is rendered as `#ff7a1a` (`--neon-ne`); in light mode a deeper `#b34700` keeps the text legible.
+Title gradients run through the colours of discharge tubes: the mercury line Hg 435.83 nm (`#4f6bff`, `--neon-blue`), the helium line He I 447.15 nm (`#3347ff`, `--neon-he`, the closest tube colour to the navy of the laboratory logo), hydrogen H-alpha 656.28 nm (red, `#ff2f3f`) and the neon orange as the dominant end.
+To preview the generated Markdown with live reload, build once and then call `DocumenterVitepress.dev_docs("docs/build")` from a second Julia session, as explained in the DocumenterVitepress manual.
 
 ### Conventions for pages and figures
 
