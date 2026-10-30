@@ -38,7 +38,7 @@ U = t.unc_k2    # expanded uncertainty restated at k = 2
 
 ## Conductivity against temperature
 
-Colour shows the pressure of each point and the bars are the expanded uncertainty at ``k = 2``. Points without a stated pressure or uncertainty are simply not drawn in that layer.
+Colour shows the pressure of each point on a logarithmic-like scale (most points are at low pressure, so a linear scale would hide the high-pressure ones) and the bars are the expanded uncertainty at ``k = 2``. Points without a stated pressure or uncertainty are simply not drawn in that layer.
 
 ```@example hex
 has_p = isfinite.(p)
@@ -51,8 +51,13 @@ errorbars!(
     ax, ustrip.(u"K", T[shown]), ustrip.(u"W/m/K", λ[shown]), ustrip.(u"W/m/K", U[shown]);
     color = (:gray, 0.45), whiskerwidth = 4,
 )
-sc = scatter!(ax, ustrip.(u"K", T[shown]), ustrip.(u"W/m/K", λ[shown]); color = ustrip.(u"MPa", p[shown]), markersize = 8)
-Colorbar(fig[1, 2], sc; label = "p [MPa]")
+order = findall(shown)
+order = order[sortperm(p[order])]    # high pressures are drawn last, on top of the crowd at low pressure
+sc = scatter!(
+    ax, ustrip.(u"K", T[order]), ustrip.(u"W/m/K", λ[order]);
+    color = ustrip.(u"MPa", p[order]), colorscale = Makie.pseudolog10, marker = :diamond, markersize = 9,
+)
+Colorbar(fig[1, 2], sc; label = "p [MPa]", ticks = [0, 1, 10, 50])
 fig
 ```
 

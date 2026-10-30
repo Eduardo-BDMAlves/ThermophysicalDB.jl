@@ -28,7 +28,7 @@ The archive is published as a dataset with the DOI [10.18434/mds2-2422](https://
 | Parsing | Every property value, with its conditions, composition and uncertainty, becomes one row of a table. Values are stored exactly as published. |
 | Units | Conversions to SI or to Unitful are done on request, with exact factors. They are never applied silently. |
 | Uncertainty | The published uncertainty is kept untouched; a second column restates it at ``k = 2`` using a documented rule. See [Uncertainty](@ref uncertainty). |
-| Filtering | Only the filters that you give are applied. There is no outlier removal, no averaging and no selection of "recommended" values. |
+| Filtering | Only the filters that you give are applied. Outlier detection is an optional, separate step, implemented in this package and not endorsed by TRC/NIST; nothing is removed from the data unless you ask for it. |
 
 !!! warning "Experimental data, as published"
     The archive is a collection of *published* experimental results. It is not a critically evaluated database: points from different articles can disagree, some are wrong, and the same measurement may appear in more than one article. Judging the quality of a point is your task, and the tutorials show ways to do it (for instance, [comparing water densities with a reference equation](@ref tutorial_water)).
