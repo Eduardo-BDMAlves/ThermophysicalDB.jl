@@ -27,10 +27,10 @@ db = database(progress = false)
 
 fluid = ["carbon dioxide"]
 models = (
-    PR = PR(fluid),
     SRK = SRK(fluid),
+    PR = PR(fluid),
+    tcPR = tcPR(fluid),
     PCSAFT = PCSAFT(fluid),
-    SAFTVRMie = SAFTVRMie(fluid),
     GERG2008 = GERG2008(fluid),
 )
 
@@ -38,7 +38,7 @@ M = 44.0095u"g/mol"    # molar mass of carbon dioxide
 
 # One fixed colour per model, used in every figure of this page. The reference
 # equation is drawn in white, the experimental points in grey-blue.
-palette = (PR = "#ffb000", SRK = "#ff4a1c", PCSAFT = "#2fe0ff", SAFTVRMie = "#5c8dff", GERG2008 = "#e8ecff")
+palette = (SRK = "#ff4a1c", PR = "#ffb000", tcPR = "#b17bff", PCSAFT = "#2fe0ff", GERG2008 = "#e8ecff")
 keys(models)
 ```
 

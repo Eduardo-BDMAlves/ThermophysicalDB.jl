@@ -109,7 +109,7 @@ The articles of the whole documentation, with a download of the BibTeX file, are
   <a class="tdb-card" href="20-tutorials/20-water-density"><strong>Water density</strong><span>Hundreds of laboratories compared with the IAPWS-95 equation of Clapeyron.jl, filtered in °C and atm.</span></a>
   <a class="tdb-card" href="20-tutorials/30-vapor-pressure"><strong>Vapor pressure</strong><span>Clausius–Clapeyron and the enthalpy of vaporization of ethanol.</span></a>
   <a class="tdb-card" href="20-tutorials/40-mixtures"><strong>Binary mixtures</strong><span>The viscosity of ethanol + water against composition.</span></a>
-  <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against PR, SRK, PC-SAFT and SAFT-VR Mie from Clapeyron.jl.</span></a>
+  <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against SRK, PR, tcPR and PC-SAFT from Clapeyron.jl.</span></a>
   <a class="tdb-card" href="20-tutorials/60-co2-critical-point"><strong>Carbon dioxide</strong><span>Data and equations of state around the critical point.</span></a>
   <a class="tdb-card" href="30-manual/30-uncertainty"><strong>Uncertainty</strong><span>What k = 2 means here and how each point is rescaled.</span></a>
   <a class="tdb-card" href="30-manual/40-data-management"><strong>Updates and cache</strong><span>Where the data live and what to do when the download fails.</span></a>

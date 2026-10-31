@@ -98,7 +98,18 @@ source_entries(data::AbstractDict = CFF) =
 
 # Every reference of the file, for the bibliography of the documentation.
 documentation_entries(data::AbstractDict = CFF) =
-    BibEntry[cff_bibentry(r; accessed = true) for r in cff_references(data)]
+    BibEntry[doi_link_only!(cff_bibentry(r; accessed = true)) for r in cff_references(data)]
+
+# DocumenterCitations links the title of a `@misc` to its first URL and has no other place
+# for a link, so an entry with both a URL and a DOI makes it warn that the DOI could not be
+# linked. The DOI leads to the same record, so the entry of the documentation keeps the DOI
+# and drops the URL; the entries of the exported files are not touched.
+function doi_link_only!(entry::BibEntry)
+    if entry.type == "misc" && any(p -> p.first == "doi", entry.fields)
+        filter!(p -> p.first != "url", entry.fields)
+    end
+    return entry
+end
 
 # Used when the CFF file given cannot be read.
 fallback_package_entries() = BibEntry[BibEntry(

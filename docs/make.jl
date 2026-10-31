@@ -15,6 +15,7 @@ using ThermophysicalDB
 
 include("DocsSetup.jl")
 include("DocsCredits.jl")
+include("DocsTiming.jl")
 include("SchemaDiagrams.jl")
 
 DocMeta.setdocmeta!(
@@ -38,6 +39,10 @@ if Sys.which("node") === nothing
 end
 
 const DRAFT = get(ENV, "THERMOPHYSICALDB_DOCS_DRAFT", "false") == "true"
+
+# The phases and the pages of the build are timed and a table of where the time went is logged
+# at the end; THERMOPHYSICALDB_DOCS_TIMING=false turns it off.
+const TIMING = get(ENV, "THERMOPHYSICALDB_DOCS_TIMING", "true") != "false"
 
 # Add titles of sections and overrides page titles
 const titles = Dict(
@@ -159,24 +164,26 @@ ThermophysicalDB.write_documentation_bibliography(
 )
 const BIB = CitationBibliography(BIB_FILE; style = :authoryear)
 
-makedocs(;
-    modules = [ThermophysicalDB],
-    authors = "Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>",
-    repo = Documenter.Remotes.GitHub("Eduardo-BDMAlves", "ThermophysicalDB.jl"),
-    sitename = "ThermophysicalDB.jl",
-    format = DocumenterVitepress.MarkdownVitepress(;
-        repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl",
-        devbranch = "main",
-        devurl = "dev",
-        description = "Experimental thermophysical property data from the NIST/TRC ThermoML Archive, ready to filter, plot and analyse in Julia.",
-    ),
-    pages = NAVIGATION,
-    expandfirst = EXPAND_FIRST,
-    plugins = [BIB],
-    draft = DRAFT,
-    checkdocs = :exports,
-    warnonly = [:missing_docs, :cross_references, :autodocs_block],
-)
+DocsTiming.timed(; enabled = TIMING) do
+    makedocs(;
+        modules = [ThermophysicalDB],
+        authors = "Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>",
+        repo = Documenter.Remotes.GitHub("Eduardo-BDMAlves", "ThermophysicalDB.jl"),
+        sitename = "ThermophysicalDB.jl",
+        format = DocumenterVitepress.MarkdownVitepress(;
+            repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl",
+            devbranch = "main",
+            devurl = "dev",
+            description = "Experimental thermophysical property data from the NIST/TRC ThermoML Archive, ready to filter, plot and analyse in Julia.",
+        ),
+        pages = NAVIGATION,
+        expandfirst = EXPAND_FIRST,
+        plugins = [BIB],
+        draft = DRAFT,
+        checkdocs = :exports,
+        warnonly = [:missing_docs, :cross_references, :autodocs_block],
+    )
+end
 
 DocumenterVitepress.deploydocs(;
     repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl",

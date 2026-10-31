@@ -24,6 +24,12 @@ using ThermophysicalDB: DataView, Dataset
 const BIB_FILE = "data-credits.bib"
 const VERSIONS_FILE = "versions.toml"
 
+# The DOI resolver is not contacted while the documentation is built, which takes minutes for
+# hundreds of articles: the entries it delivered in an earlier run are read from the cache of
+# the data directory and the archive fills in the rest. `THERMOPHYSICALDB_DOCS_ONLINE=true`
+# asks the resolver for the entries that are not in the cache (for a release).
+docs_online() = lowercase(get(ENV, "THERMOPHYSICALDB_DOCS_ONLINE", "false")) == "true"
+
 # Packages that build the site, not the examples: listed in the file for download but not
 # in the table of the front page.
 const TOOLING = ("Documenter", "DocumenterCitations", "DocumenterVitepress", "LiveServer")
@@ -187,16 +193,18 @@ end
 # ----------------------------------------------------------------------------------
 
 """
-    credits_page(; path = joinpath("public", BIB_FILE), online = true, cache = true) -> HTML
+    credits_page(; path = joinpath("public", BIB_FILE), online = docs_online(), cache = true) -> HTML
 
-Every article behind the points registered by `credits`: how many came from the DOI
-resolver and how many only from the archive, the table of all of them, and the `.bib`
-written to `path` with the entries of `ThermophysicalDB.bibtex`. `online = false` uses the
-archive alone, and `cache = false` does not keep the entries of the resolver.
+Every article behind the points registered by `credits`: how many entries are the ones the
+DOI resolver delivered and how many come only from the archive, the table of all of them,
+and the `.bib` written to `path` with the entries of `ThermophysicalDB.bibtex`. With
+`online = false` (the default) the resolver is not contacted: the entries it delivered
+earlier are read from the cache and the archive fills in the rest. `cache = false` ignores
+the cache.
 """
 function credits_page(;
     path::AbstractString = joinpath("public", BIB_FILE),
-    online::Bool = true,
+    online::Bool = docs_online(),
     cache::Bool = true,
 )
     view = registered_view()
@@ -222,17 +230,31 @@ function credits_page(;
         plural(length(order), "article"),
         "</strong>. ",
     )
-    if online
-        print(
-            io,
-            plural(report.resolved, "entry"),
-            " of the file come from the DOI resolver and ",
-            length(report.archive_only),
-            " only from the metadata of the archive (an article whose DOI cannot be resolved is written from the archive alone).",
-        )
-    else
-        print(io, "The entries come from the metadata of the archive.")
-    end
+    print(
+        io,
+        plural(report.resolved, "entry"),
+        " of the file ",
+        report.resolved == 1 ? "is" : "are",
+        " the ",
+        report.resolved == 1 ? "one" : "ones",
+        " delivered by the DOI resolver",
+        online ? "" :
+        " (read from the cache, as the resolver is not contacted while the documentation is built)",
+        " and ",
+        length(report.archive_only),
+        " come only from the metadata of the archive.",
+    )
+    @info string(
+        "Data credits: ",
+        plural(length(order), "article"),
+        ", ",
+        report.resolved,
+        " entries from the DOI resolver (online = ",
+        online,
+        "), ",
+        length(report.archive_only),
+        " from the archive alone",
+    )
     print(io, "</p>")
     print(io, articles_table(rows, order; keys = true))
     return HTML(String(take!(io)))

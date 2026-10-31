@@ -431,6 +431,14 @@ end
     @test length(everything) == length(T.cff_references(T.CFF)) &&
           allunique(e.key for e in everything)
     @test occursin("accessed 2026-", T.field_value(everything[1], "note"))
+    # a `@misc` with a DOI links through the DOI alone (DocumenterCitations has one link slot)
+    for e in everything
+        e.type == "misc" &&
+            T.field_value(e, "doi") !== nothing &&
+            @test T.field_value(e, "url") === nothing
+    end
+    # the exported entry of the same dataset keeps its URL
+    @test T.field_value(T.source_entries()[1], "url") !== nothing
     mktempdir() do tmp
         file = T.write_documentation_bibliography(joinpath(tmp, "refs.bib"))
         text = read(file, String)

@@ -8,10 +8,12 @@ An equation of state (EoS) is a model: it represents the thermodynamics of a flu
 
 | Model | Family | What it brings |
 |:--|:--|:--|
+| `SRK` | cubic (Soave–Redlich–Kwong [Soave1972](@cite)) | the same family as PR, a different attractive term |
 | `PR` | cubic (Peng–Robinson [Peng1976](@cite)) | three parameters per fluid, fast |
-| `SRK` | cubic (Soave–Redlich–Kwong [Soave1972](@cite)) | the same family, a different attractive term |
+| `tcPR` | cubic (Peng–Robinson with volume translation and a revised attractive term) | the PR equation with the liquid volume corrected by a shift |
 | `PCSAFT` | SAFT (perturbed chain [Gross2001](@cite)) | molecular model with chain length, accurate for liquids |
-| `SAFTVRMie` | SAFT (variable range, Mie potential [Lafitte2013](@cite)) | flexible repulsion and attraction, also predicts derivative properties |
+
+The three cubic equations are cheap to evaluate and the SAFT one is the molecular reference for the liquid. `tcPR` shows what a *volume translation* does: the volume of the cubic equation is shifted by a constant, ``v = v_\mathrm{EoS} - c``. A constant shift leaves the equality of the chemical potentials of the two phases unchanged, so the translation alone does not touch the vapor pressure, while the liquid density, where the volume is small and the shift is a large fraction of it, can be corrected by several percent. `tcPR` also changes the temperature dependence of the attractive term, so its vapor pressure differs somewhat from that of `PR`; the comparison below shows both effects separately.
 
 Cubic equations are built from the van der Waals idea: a repulsive volume term plus an attraction that grows with density. They are tuned to reproduce the critical point and the vapor pressure, and pay for it in the liquid volume, which is typically off by several percent. SAFT models treat the molecule as a chain of segments and account for its connectivity, which is why they can do much better in the liquid. The comparison below makes that difference visible.
 
@@ -29,10 +31,10 @@ using Clapeyron
 
 fluid = ["hexane"]
 models = (
-    PR = PR(fluid),
     SRK = SRK(fluid),
+    PR = PR(fluid),
+    tcPR = tcPR(fluid),
     PCSAFT = PCSAFT(fluid),
-    SAFTVRMie = SAFTVRMie(fluid),
 )
 keys(models)
 ```
@@ -189,6 +191,7 @@ The structure of the map shows *where* the problem lives: whether it grows with 
 
 ## Going further
 
+- Add a model: `SAFTVRMie(fluid)`, for instance, goes into the `models` tuple and every cell of the page follows, at the cost of one more solution per state point (and of its compilation, which is the larger part for the SAFT models).
 - Replace `"hexane"` with another fluid. Clapeyron looks the name up in its own parameter database, which may spell it differently from ThermoML; if the model constructor fails, try the common name or the CAS-style name it suggests in the error.
 - Compare derived properties with `Clapeyron.speed_of_sound(model, p, T; phase = :liquid)` or `Clapeyron.isobaric_heat_capacity(model, p, T)`, selecting the matching property in [`points`](@ref).
 - For mixtures, Clapeyron needs binary interaction parameters; models built from several names use the ones in its database when they exist.

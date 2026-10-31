@@ -1,9 +1,11 @@
 @testitem "documentation credits: registry, page block and files" setup = [Toy] tags =
     [:unit, :fast] begin
-    using TOML
+    using Logging, TOML
     T = ThermophysicalDB
     include(joinpath(pkgdir(T), "docs", "DocsCredits.jl"))
     C = DocsCredits
+    # the page logs one line about its sources; the tests do not need to show it
+    quiet(f) = Logging.with_logger(f, Logging.NullLogger())
 
     ds = Toy.build()
     all_rows = T.DataView(ds).rows
@@ -52,11 +54,11 @@
 
     @testset "page of credits and the file for download" begin
         C.reset!()
-        @test occursin("No page", html(C.credits_page()))
+        @test occursin("No page", html(quiet(() -> C.credits_page())))
         C.credits(T.DataView(ds))
         dir = mktempdir()
         path = joinpath(dir, "public", "data-credits.bib")
-        text = html(C.credits_page(; path, online = false, cache = false))
+        text = html(quiet(() -> C.credits_page(; path, online = false, cache = false)))
         @test isfile(path)
         bib = read(path, String)
         s = T.reference_summary(
@@ -72,6 +74,22 @@
         end
         @test occursin("<th>Key</th>", text)
         @test !occursin("\n\n", text)
+    end
+
+    @testset "the resolver is contacted only when the build asks for it" begin
+        name = "THERMOPHYSICALDB_DOCS_ONLINE"
+        withenv(name => nothing) do
+            @test !C.docs_online()
+        end
+        withenv(name => "true") do
+            @test C.docs_online()
+        end
+        withenv(name => "TRUE") do
+            @test C.docs_online()
+        end
+        withenv(name => "false") do
+            @test !C.docs_online()
+        end
     end
 
     @testset "versions" begin

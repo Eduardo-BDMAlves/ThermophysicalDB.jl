@@ -12,7 +12,7 @@ The terms of use of the data, and how to cite the dataset itself, are in [About 
 <p><a class="tdb-download" href="data-credits.bib" download>Download the BibTeX file (data-credits.bib)</a></p>
 ```
 
-The file is the one [`bibtex`](@ref) writes for these selections: the entry that the DOI resolver delivers for each article, completed with what only the archive has, followed by the entries that credit the archive and the ThermoML standard, and the notice of the data as a comment. An article whose DOI cannot be resolved is written from the metadata of the archive alone.
+The file is the one [`bibtex`](@ref) writes for these selections: the entry that the DOI resolver delivered for each article, completed with what only the archive has, followed by the entries that credit the archive and the ThermoML standard, and the notice of the data as a comment. An article whose entry is not in the cache of the resolver is written from the metadata of the archive alone. The build does not contact the resolver by default (hundreds of requests take minutes); a release build sets `THERMOPHYSICALDB_DOCS_ONLINE=true` to ask for the missing entries.
 
 ```@example credits
 Main.DocsCredits.credits_page()
