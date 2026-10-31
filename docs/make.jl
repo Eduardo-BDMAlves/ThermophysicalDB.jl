@@ -14,6 +14,7 @@ using DocumenterVitepress
 using ThermophysicalDB
 
 include("DocsSetup.jl")
+include("DocsCredits.jl")
 include("SchemaDiagrams.jl")
 
 DocMeta.setdocmeta!(
@@ -51,7 +52,7 @@ const titles = Dict(
 # the groups the bar has too many entries and pushes the colour-mode switch off the screen.
 const NAV_GROUPS = [
     "Project" => ["90-contributing.md", "91-developer.md", "92-roadmap.md"],
-    "Reference" => ["95-reference.md", "99-bibliography.md"],
+    "Reference" => ["95-reference.md", "96-data-credits.md", "99-bibliography.md"],
 ]
 
 function recursively_list_pages(folder; path_prefix = "")
@@ -134,6 +135,20 @@ function list_pages()
     return ["index.md"; pages_list]
 end
 
+# Every page of the navigation, as the path it is listed with.
+page_paths(entry::AbstractString) = [String(entry)]
+page_paths(entry::Pair) = page_paths(entry.second)
+page_paths(entries::AbstractVector) = reduce(vcat, page_paths.(entries); init = String[])
+
+# The pages show data and register it with `DocsCredits.credits`, in the order in which their
+# examples run. The page of credits lists everything that was registered, so it has to be
+# expanded last: Documenter expands the `expandfirst` pages in the order given and the others
+# afterwards, and the other pages are all the ones that are not the page of credits.
+const CREDITS_PAGE = "96-data-credits.md"
+const NAVIGATION = list_pages()
+CREDITS_PAGE in page_paths(NAVIGATION) || error("$CREDITS_PAGE is not in the navigation")
+const EXPAND_FIRST = filter(!=(CREDITS_PAGE), page_paths(NAVIGATION))
+
 # Bibliography, cited from any page as [key](@cite). The sources of the data and the articles
 # about them are written once, in CITATION.cff; docs/src/refs.bib (not in git) is generated
 # from it, followed by the literature of docs/src/refs-literature.bib.
@@ -155,7 +170,8 @@ makedocs(;
         devurl = "dev",
         description = "Experimental thermophysical property data from the NIST/TRC ThermoML Archive, ready to filter, plot and analyse in Julia.",
     ),
-    pages = list_pages(),
+    pages = NAVIGATION,
+    expandfirst = EXPAND_FIRST,
     plugins = [BIB],
     draft = DRAFT,
     checkdocs = :exports,

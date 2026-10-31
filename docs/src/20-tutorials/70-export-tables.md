@@ -122,3 +122,19 @@ The notice belongs to the database, not to the package: it is the one of the The
 - [`write_references`](@ref) writes the `.bib`, `.tex`, `.md` and `.csv` of the references in one call.
 - Excel (`using XLSX` adds the workbook to the default formats), JSON, JLD2 and a ThermoML subset (`formats = :thermoml`) are in [Exporting points](@ref exporting_points); the options of the references are in [Exporting the references](@ref exporting_references).
 - Remove suspect points before exporting with [`find_outliers`](@ref): its `kept` view goes straight into `export_points`.
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example export
+Main.DocsCredits.credits(selection)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

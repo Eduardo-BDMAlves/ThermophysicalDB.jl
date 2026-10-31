@@ -84,6 +84,22 @@ Colorbar(fig[1, 2], sc; label = "p [MPa]");
 fig # hide
 ```
 
+### Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example home
+Main.DocsCredits.credits(v)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```
+
 ## Where to go next
 
 ```@raw html
@@ -99,6 +115,18 @@ fig # hide
   <a class="tdb-card" href="30-manual/40-data-management"><strong>Updates and cache</strong><span>Where the data live and what to do when the download fails.</span></a>
   <a class="tdb-card" href="95-reference"><strong>API reference</strong><span>Every exported function, with its docstring.</span></a>
 </div>
+```
+
+## Versions
+
+The examples of this documentation were run with the versions below, read from the environment that built the site. The file has the same information, and the commands install the packages at those versions, so a result can be checked against the one on the page.
+
+```@raw html
+<p><a class="tdb-download" href="versions.toml" download>Download the versions (versions.toml)</a></p>
+```
+
+```@example home
+Main.DocsCredits.environment()
 ```
 
 ## Data source

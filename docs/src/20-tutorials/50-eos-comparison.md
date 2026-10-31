@@ -193,3 +193,19 @@ The structure of the map shows *where* the problem lives: whether it grows with 
 - Compare derived properties with `Clapeyron.speed_of_sound(model, p, T; phase = :liquid)` or `Clapeyron.isobaric_heat_capacity(model, p, T)`, selecting the matching property in [`points`](@ref).
 - For mixtures, Clapeyron needs binary interaction parameters; models built from several names use the ones in its database when they exist.
 - The `uncertainty` columns of [`table`](@ref) allow a weighted statistic: a deviation smaller than the stated expanded uncertainty is not a disagreement at all. See [Uncertainty](@ref uncertainty).
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example eos
+Main.DocsCredits.credits(v, vd)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

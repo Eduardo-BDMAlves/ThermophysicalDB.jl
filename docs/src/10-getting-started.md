@@ -114,3 +114,19 @@ fig
     - The [tutorials](20-tutorials/10-hexane-conductivity.md) walk through complete analyses with real data.
     - The [manual](30-manual/10-selecting.md) documents every function and the reasoning behind its behaviour.
     - If the download does not work on your network, see [Downloads, updates and cache](@ref updates).
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example gs
+Main.DocsCredits.credits(v)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

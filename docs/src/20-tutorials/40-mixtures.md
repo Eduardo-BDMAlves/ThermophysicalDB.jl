@@ -140,3 +140,23 @@ The excess volume is negative: the mixture is *denser* than the ideal mixture. T
 - Change the temperature window to see how both excess properties move with temperature.
 - Replace the pair: `["methanol", "water"]` or `["propan-2-ol", "water"]` are well covered in the archive.
 - Colour the points by article (`tv.doi`) to spot laboratories whose mixture data are systematically offset.
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example mix
+Main.DocsCredits.credits(
+    mixture("Viscosity"), mixture("Mass density"),
+    pure("ethanol", "Viscosity"), pure("water", "Viscosity"),
+    pure("ethanol", "Mass density"), pure("water", "Mass density"),
+)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```
