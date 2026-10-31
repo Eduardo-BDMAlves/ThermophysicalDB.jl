@@ -161,7 +161,12 @@ To preview the generated Markdown with live reload, build once and then call `Do
 - **Page names** follow the template: numbered prefixes (`10-`, `20-`, ...) that set the order, hyphens between words, and numbered folders for sections. A folder needs a title in the `titles` dictionary of `docs/make.jl`.
 - **Units in labels** go in square brackets, never after a slash: `T [K]`, `p [MPa]`, `λ [W m⁻¹ K⁻¹]`. A quantity that is a ratio carries the unit of its scale in brackets, for example `(ρ − ρ_ref)/ρ_ref [%]`. A slash divides quantities; it does not mark a unit.
 - **Pictures** use the shared theme (`Main.DocsSetup.activate!()` in a hidden `@setup` block). Colour continuous data with the default colormap (cold to hot: blue, cyan, white, amber, red; blue is low or negative and red is high or positive) and do not add emoji or icons to the text.
-- **References** are entries of `docs/src/refs.bib` (BibTeX) cited with `[Key](@cite)` and listed automatically on the [Bibliography](@ref bibliography) page. Add the entry to the `.bib` file first, with its DOI, and check the volume and pages against the publisher.
+- **References.** The works the package credits (the ThermoML Archive and standard, the articles about them, the work of the group) are written once, in the `references:` of `CITATION.cff`, and everything else is generated from it: the notice, the `.bib` of every export and `docs/src/refs.bib` (not in git; `docs/make.jl` writes it).
+Each reference needs an `abbreviation`, its citation key in the pattern of the reference manager (surname of the first author, year and first word of the title, all lower case: `riccardi2022towards`), and `keywords`: `data-source` (credited in every export from that database), `group` (work of the research group) or `background`.
+Run `ThermophysicalDB.check_references()` after editing: it verifies the fields and the keys and compares each article with the record of its DOI.
+Literature that is not about the data goes in `docs/src/refs-literature.bib`.
+Cite from any page with `[key](@cite)`; the entries are listed on the [Bibliography](@ref bibliography) page.
+Check the volume and pages against the publisher.
 - **Data credit.** Every page that shows archive data should make clear that the data come from the NIST/TRC ThermoML Archive and the original articles, not from this package. See [About the data](@ref 40-about-data).
 
 ## Making a new release
@@ -169,7 +174,8 @@ To preview the generated Markdown with live reload, build once and then call `Do
 To create a new release, you can follow these simple steps:
 
 - Create a branch `release-x.y.z`
-- Update `version` in `Project.toml`
+- Update `version` in `Project.toml` and, in `CITATION.cff`, `version`, `date-released` and (once Zenodo has issued it) the `doi` of the release; when the article of the package is published, add it as `preferred-citation`
+- Run `ThermophysicalDB.check_references()`
 - Update the `CHANGELOG.md`:
   - Rename the section "Unreleased" to "[x.y.z] - yyyy-mm-dd" (i.e., version under brackets, dash, and date in ISO format)
   - Add a new section on top of it named "Unreleased"

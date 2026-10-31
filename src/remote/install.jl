@@ -44,7 +44,8 @@ Download `release` into `dir`, verify its SHA-256 digest and record it in the ma
 The archive is first written to a `.part` file and only moved into place after the digest
 matches, and the manifest is written last, so an interrupted or corrupted download never
 looks like a valid installation. Archives of other versions are deleted afterwards unless
-`keep_old = true`.
+`keep_old = true`. The first installation also logs a short notice on the origin and
+conditions of use of the data.
 
 `download(url, dest)` can be replaced, e.g. in tests.
 """
@@ -58,6 +59,7 @@ function install_release(
     expected = resolve_sha256(release, download)
     final = joinpath(dir, release.archive_name)
     part = final * ".part"
+    previous = read_manifest(dir)
     @info "Downloading ThermoML archive $(release.version) from NIST"
     try
         download(release.archive_url, part)
@@ -66,7 +68,6 @@ function install_release(
     finally
         rm(part; force = true)
     end
-    previous = read_manifest(dir)
     manifest = Manifest(
         MANIFEST_FORMAT,
         release.version,
@@ -77,6 +78,9 @@ function install_release(
         Int(filesize(final)),
     )
     write_manifest(dir, manifest)
+    # The first download is when the person meets the data: say where they come from and
+    # under which conditions they may be used (the same wording as in every export).
+    previous === nothing && @info first_download_message()
     if !keep_old && previous !== nothing && previous.archive_name != manifest.archive_name
         rm(joinpath(dir, previous.archive_name); force = true)
     end
@@ -106,8 +110,11 @@ Result of [`check_update`](@ref).
     remote could not be queried and nothing newer is known).
   - `installed`: the local [`Manifest`](@ref), or `nothing`.
   - `latest`: the most recent [`Release`](@ref) known.
-  - `source`: `:remote` if `latest` came from NIST, `:builtin` if NIST was unreachable.
+  - `source`: `:remote` if `latest` came from NIST, `:builtin` if NIST was unreachable,
+    `:unrecognized` if NIST answered but its record held no archive link we recognise.
   - `reason`: why NIST could not be queried (empty when `source == :remote`).
+  - `republished`: `true` when the version is the installed one but the checksum published
+    by NIST differs from the one recorded at installation (same name, new content).
 """
 struct UpdateStatus
     state::Symbol
@@ -115,6 +122,46 @@ struct UpdateStatus
     latest::Release
     source::Symbol
     reason::String
+    republished::Bool
+end
+
+# Set once the person has been told that the NIST record is not recognised.
+const UNRECOGNIZED_WARNED = Ref(false)
+
+function warn_unrecognized(reason::AbstractString)
+    UNRECOGNIZED_WARNED[] && return nothing
+    UNRECOGNIZED_WARNED[] = true
+    @warn(
+        "NIST answered, but its dataset record holds no ThermoML archive link this " *
+        "version of the package recognises, so newer archives cannot be detected. The " *
+        "local (or built-in) archive is used. Check $ARCHIVE_URL for a newer archive and " *
+        "install it with `install_archive!(path)`; please report this at $ISSUES_URL.",
+        reason,
+    )
+    return nothing
+end
+
+# The check for updates must never stall: one short attempt, no progress report.
+quick_download(url, dest) =
+    download_file(url, dest; progress = false, timeout = 10, attempts = 1)
+
+# The downloader used by the check; the default one is replaced by the quick one.
+check_downloader(download) = download === download_file ? quick_download : download
+
+# Digest NIST publishes for `release` now, or `nothing` if it cannot be read.
+function published_sha256(release::Release, download)::Union{Nothing,String}
+    tmp = tempname()
+    try
+        download(release.sha256_url, tmp)
+        return parse_sha256(read(tmp, String))
+    catch err
+        err isa InterruptException && rethrow()
+        @debug "Could not read the published SHA-256" url = release.sha256_url exception =
+            err
+        return nothing
+    finally
+        rm(tmp; force = true)
+    end
 end
 
 """
@@ -122,26 +169,42 @@ end
 
 Compare the local archive with the latest one published by NIST. Never throws because of
 network problems: when NIST cannot be reached the built-in release list is used and
-`source` is `:builtin`.
+`source` is `:builtin`. When NIST answers but its record holds no archive link we
+recognise, `source` is `:unrecognized` and a warning is logged, once per session.
+
+An archive republished under the same name counts as an update: when the version is the
+installed one but the `.sha256` published by NIST differs from the digest recorded at
+installation, the state is `:update_available` and `republished` is `true`.
 """
-function check_update(; dir::AbstractString = thermoml_dir(), fetch = fetch_latest_release)
+function check_update(;
+    dir::AbstractString = thermoml_dir(),
+    fetch = fetch_latest_release,
+    download = quick_download,
+)
     installed = installed_manifest(dir)
     latest, source, reason = try
         fetch(), :remote, ""
     catch err
         err isa InterruptException && rethrow()
-        builtin_latest(), :builtin, sprint(showerror, err)
+        kind = err isa NoReleaseError && err.reached ? :unrecognized : :builtin
+        builtin_latest(), kind, sprint(showerror, err)
     end
+    source === :unrecognized && warn_unrecognized(reason)
+    republished = false
     state = if installed === nothing
         :not_installed
     elseif latest.version > installed.version
         :update_available
     elseif source === :remote
-        :up_to_date
+        if latest.version == installed.version
+            published = published_sha256(latest, download)
+            republished = published !== nothing && published != installed.sha256
+        end
+        republished ? :update_available : :up_to_date
     else
         :unknown
     end
-    return UpdateStatus(state, installed, latest, source, reason)
+    return UpdateStatus(state, installed, latest, source, reason, republished)
 end
 
 """
@@ -165,18 +228,18 @@ function ensure_archive(;
         throw(ArgumentError("`update` must be :notify, :install or :never, got :$update"))
     installed = installed_manifest(dir)
     update === :never && installed !== nothing && return installed
-    status = check_update(; dir, fetch)
+    status = check_update(; dir, fetch, download = check_downloader(download))
     if status.state === :not_installed
         return install_release(status.latest; dir, download)
     elseif status.state === :update_available
         update === :install && return install_release(status.latest; dir, download)
         installed_version = status.installed.version
         latest_version = status.latest.version
-        @warn(
-            "Newer ThermoML archive available; run `update_database!()`",
-            installed_version,
-            latest_version,
-        )
+        message =
+            status.republished ?
+            "NIST republished the ThermoML archive $installed_version with different content; run `update_database!()`" :
+            "Newer ThermoML archive available; run `update_database!()`"
+        @warn(message, installed_version, latest_version)
     elseif status.state === :unknown
         @debug "Could not check for ThermoML updates" reason = status.reason
     end
@@ -194,7 +257,7 @@ function update_database!(;
     fetch = fetch_latest_release,
     download = download_file,
 )::Manifest
-    status = check_update(; dir, fetch)
+    status = check_update(; dir, fetch, download = check_downloader(download))
     if status.state === :not_installed || status.state === :update_available
         manifest = install_release(status.latest; dir, download)
         forget_database!()
@@ -202,6 +265,8 @@ function update_database!(;
     end
     if status.state === :up_to_date
         @info "ThermoML archive is up to date" version = status.installed.version
+    elseif status.source === :unrecognized
+        @info "NIST record not recognised; keeping the local archive" reason = status.reason
     else
         @info "Could not reach NIST; keeping the local archive" reason = status.reason
     end

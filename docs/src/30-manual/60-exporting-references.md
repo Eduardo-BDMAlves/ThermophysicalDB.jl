@@ -34,7 +34,15 @@ report.archive_only     # DOIs (or titles) that could not be resolved
 
 ## Keys
 
-The key of an entry is the surname of its first author, without accents, followed by the year: `Chirico2003`, and `Muller2013` for Müller. When two entries share a surname and a year, both get the suffixes `a`, `b`, `c`, ... in the order of their DOI, so the keys do not depend on the order of the points: `Chirico2003a`, `Chirico2003b`. An entry without a year uses the surname alone. Two entries for the ThermoML Archive (`ThermoMLArchive`) and for the standard (`ThermoMLStandard`) are always added, so the data are credited wherever the file goes; pass `include_source = false` to leave them out.
+The key of an entry has the form that the reference manager gives: the surname of the first author, the year and the first word of the title, all in lower case and without accents, as in `chirico2003thermoml` or `myers1999surfaces`.
+A surname with a particle is written together (`da Costa` gives `dacosta`), hyphens and spaces disappear, and `The` or `A` count as the first word like any other.
+When there is no year the key has `sd` in its place (no date), and `anonymous` stands for a missing author.
+If a library you keep in a reference manager generates the same pattern, the keys of an exported `.bib` agree with those of your library and a text can cite both without renaming anything.
+When two entries give the same key, both get the suffixes `a`, `b`, `c`, ... in the order of their DOI, so the keys do not depend on the order of the points.
+The entries for the ThermoML Archive (with the authors and the version of the dataset) and for the standard are always added, so the data are credited wherever the file goes; pass `include_source = false` to leave them out.
+They are written once, in the `CITATION.cff` of the package, together with the entry of the package itself.
+
+The entry of this package (`ThermophysicalDB`) follows them, after a comment asking you to cite the package if it was useful to your work. It is built from the `CITATION.cff` of the installed version, so it never drifts from the citation the repository announces: the version is that of the installation, and when the file holds the DOI of the release (Zenodo) the entry carries it. If the file also has a `preferred-citation`, the article of the package, it becomes a second entry (`ThermophysicalDBArticle`). The package is credited in the `.bib` only; no table cites it. Pass `include_package = false` to leave it out.
 
 ## The cache and the network
 
@@ -46,6 +54,8 @@ The entries delivered by the DOI resolver are kept in the `bibtex` folder of [`d
 | `cache` | `true` | keep and reuse the entries in the data directory |
 | `refresh` | `false` | ignore the cache and request every DOI again |
 | `include_source` | `true` | add the entries for the ThermoML Archive and the standard |
+| `include_package` | `true` | add the entry of this package, after a comment that asks you to cite it |
+| `package_cff` | the `CITATION.cff` of the package | the file the package entry is built from |
 | `progress` | `true` | print the number of DOIs fetched |
 
 ## A table of the articles
@@ -93,6 +103,19 @@ latex_table(articles; columns = [:reference, :method, :points, :temperature, :pr
 write_references("water", v; pressure_unit = u"kPa", statistic = :mean)
 # water.bib  water.tex  water.md  water.csv   (choose with formats = (:bib, :tex))
 ```
+
+## The notice
+
+References of data from the ThermoML Archive carry the same notice as the exported points (see [Exporting points](@ref exporting_points)): the origin of the data, the full citation of the dataset, that the data are modified and not endorsed by NIST/TRC, a reminder to credit the original articles, and the address of the terms.
+
+| File | Where |
+|---|---|
+| `.bib` | a `@comment{...}` before the first entry, which BibTeX and biber ignore; it stays even with `include_source = false` |
+| `.tex` ([`latex_table`](@ref)) | comment lines starting with `%` |
+| `.md` ([`markdown_table`](@ref)) | an HTML comment at the top |
+| `.csv` ([`csv_table`](@ref)) | the first line, starting with `#`; read it with `header = 2` or `comment = "#"` |
+
+`notice = false` leaves the notice out of the three table functions, for a table that goes onto a slide; the conditions of use still apply to the data. A selection that holds none of the archive's points (your own data) has no notice. The tutorial [Tables for a paper](@ref tutorial_export) shows all of this with a complete `.bib`.
 
 !!! note "Credit"
     The metadata come from the DOI resolver and from the ThermoML Archive. Check an entry against the article before relying on a volume, a page number or a journal abbreviation in a publication.

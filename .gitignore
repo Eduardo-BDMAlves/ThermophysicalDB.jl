@@ -16,3 +16,5 @@ dev/
 *.tgz.sha256
 ThermoML.xsd
 *.jld2
+# generated from CITATION.cff by docs/make.jl
+docs/src/refs.bib

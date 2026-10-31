@@ -1,30 +1,24 @@
-# Export of the points of a selection: one dispatcher (`export_points`) that picks the
-# writer from the extension of the path, and one internal writer per format. Every writer
+# Export of the points of a selection: one function (`export_points`) that writes a directory
+# holding the formats that were asked for, and one internal writer per format. Every writer
 # starts from the same `ExportData`, so the files of one export agree with each other: same
 # columns, same units, same reference keys.
 #
-#   .csv      one table with the unit of every column in its header
-#   .xlsx     one sheet per system, plus `references` and `origin` (needs the XLSX package)
-#   .json     one record per point, or (json_layout = :thermoml) a subset of the ThermoML schema
-#   .jld2     columns, units and references as Julia data
-#   (no extension) a directory holding all of the above
+#   .csv           one table with the unit of every column in its header
+#   .md            the same table as a Markdown (pipe) table
+#   .tex           the same table as a LaTeX `longtable`
+#   .json          one record per point
+#   .jld2          columns, units and references as Julia data
+#   .xlsx          one sheet per system, plus `references` and `origin` (needs the XLSX package)
+#   .thermoml.json a subset of the ThermoML schema
 #
 # Tables hold only points. What describes an article lives in the references table, which
 # is linked to the points by the `reference` column (BibTeX key, written-out citation or DOI).
 
-const POINT_FORMATS = (:csv, :xlsx, :json, :jld2, :tex, :thermoml)
-const DIRECTORY_FORMATS = (:csv, :xlsx, :json, :jld2, :tex)
+const POINT_FORMATS = (:csv, :md, :tex, :json, :jld2, :xlsx, :thermoml)
+# What is written when `formats` is not given; `:xlsx` is added when the XLSX package is loaded.
+const DEFAULT_FORMATS = (:csv, :md, :tex, :json, :jld2)
 const REFERENCE_STYLES = (:key, :text, :doi)
 const SHEET_LAYOUTS = (:system, :single)
-const JSON_LAYOUTS = (:records, :thermoml)
-
-const FORMAT_EXTENSIONS = Dict(
-    ".csv" => :csv,
-    ".xlsx" => :xlsx,
-    ".json" => :json,
-    ".jld2" => :jld2,
-    ".tex" => :tex,
-)
 
 # Excel allows 1,048,576 rows per sheet, one of them the header.
 const EXCEL_MAX_ROWS = 1_048_575
@@ -47,9 +41,10 @@ xlsx_available() = hasmethod(write_xlsx, Tuple{String,Vector{SheetSpec}})
     DataOrigin
 
 The note that travels with exported data from the ThermoML Archive: where the data come
-from, which archive version they were read from, and that they were modified. It is the
-first line of a `.csv` (after `#`), the `origin` sheet of a `.xlsx`, and the first entry
-of a `.json`.
+from, which archive version they were read from, the citation of the dataset and the
+conditions of use (see `notice.jl`, the one place that holds the wording). It is the first
+line of a `.csv` (after `#`), the `origin` sheet of a `.xlsx`, the `origin` group of a
+`.jld2`, a comment in a `.md` and a `.tex`, and the first entry of a `.json`.
 """
 struct DataOrigin
     entries::Vector{Pair{String,String}}
@@ -77,33 +72,14 @@ end
 The origin note of `view`, or `nothing` when no point comes from the ThermoML Archive.
 """
 function origin_note(view::DataView)::Union{Nothing,DataOrigin}
-    ds = view.dataset
-    source = get(ds.sources.index, "thermoml", NO_ID)
-    source == NO_ID && return nothing
-    m, ex, rf = ds.measurements, ds.experiments, ds.references
-    found = false
-    for r in view.rows
-        ref = ex.reference[m.experiment[r]]
-        if ref != NO_ID && rf.source[ref] == source
-            found = true
-            break
-        end
-    end
-    found || return nothing
-    entries = Pair{String,String}[
-        "data origin"=>"NIST/TRC ThermoML Archive",
-        "archive url"=>"https://trc.nist.gov/ThermoML/",
-        "dataset doi"=>"10.18434/mds2-2422",
-    ]
+    from_archive(view) || return nothing
+    entries = Pair{String,String}[ORIGIN_HEAD...]
     manifest = archive_manifest()
     if manifest !== nothing
         push!(entries, "archive version" => manifest.version)
         push!(entries, "archive retrieved" => manifest.retrieved_at)
     end
-    push!(
-        entries,
-        "notice" => "modified data (reformatted by ThermophysicalDB.jl, possibly converted to other units, not evaluated by NIST/TRC). Cite the articles of the points and the archive",
-    )
+    append!(entries, NOTICE_TAIL)
     push!(entries, "exported by" => string("ThermophysicalDB.jl ", package_version_text()))
     push!(entries, "exported at" => utc_timestamp())
     return DataOrigin(entries)
@@ -169,6 +145,7 @@ function build_export_data(
     reference::Symbol = :key,
     units::Symbol = :native,
     policy::Symbol = :nominal,
+    details::Bool = false,
     kwargs...,
 )
     reference in REFERENCE_STYLES || throw(
@@ -208,14 +185,23 @@ function build_export_data(
     pressure_unit = units === :si ? "Pa" : "kPa"
     x_units = composition_units(view)
 
+    # What the references table already tells (method, phase), and what is the same for the
+    # whole selection (the system when there is one, the property when there is one), is not
+    # repeated in every row: a blank column is left out of every format. `details` keeps it.
+    blank = fill("", n)
+    omitted = Symbol[]
+    if !details
+        allequal(t.components) && push!(omitted, :components)
+        allequal(t.property) && push!(omitted, :property)
+    end
     # (internal name, header text, unit or nothing, column)
     candidates = Tuple{Symbol,String,Union{Nothing,String},Any}[
         (:reference, "reference", nothing, reference_column),
-        (:components, "components", nothing, t.components),
+        (:components, "components", nothing, :components in omitted ? blank : t.components),
         (:xkind, "xkind", nothing, t.xkind),
-        (:property, "property", nothing, t.property),
-        (:method, "method", nothing, t.method),
-        (:phase, "phase", nothing, t.phase),
+        (:property, "property", nothing, :property in omitted ? blank : t.property),
+        (:method, "method", nothing, details ? t.method : blank),
+        (:phase, "phase", nothing, details ? t.phase : blank),
         (:temperature, "temperature", "K", t.temperature),
         (:pressure, "pressure", pressure_unit, t.pressure),
         (:x1, "x1", x_units[1], t.x1),
@@ -236,6 +222,7 @@ function build_export_data(
     unit_pairs = Pair{String,String}[]
     for (name, text, unit, column) in candidates
         name === :unit && !mixed && continue
+        name in omitted && continue
         name in REQUIRED_COLUMNS || !empty_column(column) || continue
         push!(written, name)
         push!(headers, unit === nothing ? text : string(text, " [", unit, "]"))
@@ -338,6 +325,54 @@ function write_points_tex(path::AbstractString, data::ExportData)
             write(io, " \\\\\n")
         end
         write(io, "\\end{longtable}\n")
+    end
+    return nothing
+end
+
+# ----------------------------------------------------------------------------------
+# Markdown
+# ----------------------------------------------------------------------------------
+
+md_cell(io::IO, x::AbstractString) = write(io, replace(x, "|" => "\\|"))
+md_cell(io::IO, x::Real) = isfinite(x) && print(io, x)
+
+# Same recursion over the tuple of columns as `csv_row`: one dispatched method per column.
+@inline md_row(::IO, ::Tuple{}, ::Int) = nothing
+@inline function md_row(io::IO, columns::Tuple, i::Int)
+    write(io, ' ')
+    md_cell(io, columns[1][i])
+    write(io, " |")
+    return md_row(io, Base.tail(columns), i)
+end
+
+# The points as a Markdown (pipe) table: text columns on the left, numbers on the right.
+# The notice is an HTML comment, which renderers do not show.
+function write_points_md(path::AbstractString, data::ExportData)
+    columns = written_columns(data)
+    align = join(
+        (c isa AbstractVector{<:AbstractString} ? " :--- " : " ---: " for c in columns),
+        "|",
+    )
+    open(path, "w") do io
+        if data.origin !== nothing
+            write(io, "<!--\n")
+            for (k, v) in data.origin.entries
+                write(io, k, ": ", v, '\n')
+            end
+            write(io, "-->\n\n")
+        end
+        write(
+            io,
+            "| ",
+            join((replace(h, "|" => "\\|") for h in data.headers), " | "),
+            " |\n",
+        )
+        write(io, "|", align, "|\n")
+        for i in eachindex(data.system)
+            write(io, '|')
+            md_row(io, columns, i)
+            write(io, '\n')
+        end
     end
     return nothing
 end
@@ -919,14 +954,13 @@ end
     ExportReport
 
 What [`export_points`](@ref) did: the `files` it wrote, the number of `points` and
-`articles`, the formats it `skipped` (with the reason), and the `bibtex` report of the
-references (`nothing` when only a ThermoML JSON was written, which needs no references).
+`articles`, and the `bibtex` report of the references (`nothing` when only a ThermoML JSON
+was written, which needs no references).
 """
 struct ExportReport
     files::Vector{String}
     points::Int
     articles::Int
-    skipped::Vector{Pair{Symbol,String}}
     bibtex::Union{Nothing,BibtexReport}
 end
 
@@ -934,9 +968,6 @@ function Base.show(io::IO, ::MIME"text/plain", r::ExportReport)
     println(io, "ExportReport: ", r.points, " points from ", r.articles, " articles")
     for file in r.files
         println(io, "  wrote ", file)
-    end
-    for (format, reason) in r.skipped
-        println(io, "  skipped :", format, " (", reason, ")")
     end
     return nothing
 end
@@ -954,35 +985,47 @@ function article_count(view::DataView)
 end
 
 # ----------------------------------------------------------------------------------
-# The dispatcher
+# The export
 # ----------------------------------------------------------------------------------
 
-# (kind, format, path): a file with a known extension, or a directory (no extension, or a
-# path that ends with a separator).
-function export_target(path::AbstractString)
+# The directory to write. A name with an extension is almost surely a file name, which
+# this function no longer writes; a trailing separator says it is a directory anyway.
+function export_directory(path::AbstractString)
     text = String(path)
     as_directory = endswith(text, '/') || endswith(text, '\\')
     text = String(rstrip(text, ['/', '\\']))
     isempty(text) && throw(ArgumentError("the destination path is empty"))
-    if !as_directory
-        endswith(lowercase(text), ".thermoml.json") && return (:file, :thermoml, text)
-        _, extension = splitext(text)
-        format = get(FORMAT_EXTENSIONS, lowercase(extension), nothing)
-        format === nothing || return (:file, format, text)
-        isempty(extension) ||
-            isdir(text) ||
-            throw(
-                ArgumentError(
-                    "unknown extension \"$extension\"; use .csv, .xlsx, .json, .jld2 or " *
-                    ".thermoml.json, or end the path with a slash to name a directory",
-                ),
-            )
+    extension = splitext(text)[2]
+    if !as_directory && !isempty(extension) && !isdir(text)
+        throw(
+            ArgumentError(
+                "export_points writes a directory of tables, so the path is a directory " *
+                "name, not a file name: got \"$text\" with the extension \"$extension\". " *
+                "Pass \"$(first(splitext(text)))\" and choose the files with `formats`, or end " *
+                "the path with a slash to keep the dot in the name of the directory.",
+            ),
+        )
     end
-    return (:directory, :all, text)
+    return text
 end
 
 file_extension(format::Symbol) =
     format === :thermoml ? ".thermoml.json" : string('.', format)
+
+# The formats to write: the ones asked for, or the defaults plus Excel when it is available.
+function export_formats(formats)
+    if formats === nothing
+        return xlsx_available() ? (DEFAULT_FORMATS..., :xlsx) : DEFAULT_FORMATS
+    end
+    chosen = Tuple(unique(Symbol.(formats isa Symbol ? (formats,) : formats)))
+    isempty(chosen) && throw(ArgumentError("formats is empty"))
+    for f in chosen
+        f in POINT_FORMATS ||
+            throw(ArgumentError("unknown format :$f; choose from $(POINT_FORMATS)"))
+    end
+    :xlsx in chosen && !xlsx_available() && throw(ArgumentError(XLSX_MESSAGE))
+    return chosen
+end
 
 function write_points_xlsx(path::AbstractString, data::ExportData; sheets::Symbol)
     xlsx_available() || throw(ArgumentError(XLSX_MESSAGE))
@@ -996,14 +1039,14 @@ function write_point_file(
     data::Union{Nothing,ExportData},
     view::DataView;
     sheets::Symbol,
-    json_layout::Symbol,
 )
-    mkpath(dirname(abspath(path)))
-    if format === :thermoml || (format === :json && json_layout === :thermoml)
+    if format === :thermoml
         origin = data === nothing ? origin_note(view) : data.origin
         write_points_thermoml(path, view; origin)
     elseif format === :csv
         write_points_csv(path, data)
+    elseif format === :md
+        write_points_md(path, data)
     elseif format === :json
         write_points_json(path, data)
     elseif format === :jld2
@@ -1018,70 +1061,92 @@ function write_point_file(
     return nothing
 end
 
-function write_reference_files(stem::AbstractString, data::ExportData)
-    files = String[
-        string(stem, "_references.csv"),
-        string(stem, ".bib"),
-        string(stem, "_references.tex"),
-    ]
-    write(files[1], csv_table(data.summary))
-    write(files[2], bibtex(data.summary))
-    write(
-        files[3],
-        latex_table(data.summary; reference = data.reference === :key ? :cite : :text),
-    )
+# The references that go with the points: the table of the articles in each of the table
+# formats that were chosen (`.csv`, `.md`, `.tex`) and the `.bib` the keys refer to.
+function write_reference_files(stem::AbstractString, data::ExportData, formats)
+    files = String[]
+    summary = data.summary
+    keyed = data.reference === :key
+    for format in (:csv, :md, :tex)
+        format in formats || continue
+        file = string(stem, "_references", file_extension(format))
+        text =
+            format === :csv ? csv_table(summary) :
+            format === :md ? markdown_table(summary; reference = keyed ? :key : :text) :
+            latex_table(summary; reference = keyed ? :cite : :text)
+        write(file, text)
+        push!(files, file)
+    end
+    bib = string(stem, ".bib")
+    write(bib, bibtex(summary))
+    push!(files, bib)
     return files
 end
 
 """
-    export_points(path, view; formats = nothing, reference = :key, units = :native,
-                  policy = :nominal, sheets = :system, json_layout = :records,
-                  references = true, online = true, cache = true, refresh = false,
+    export_points(directory, view; formats = nothing, reference = :key, units = :native,
+                  policy = :nominal, details = false, sheets = :system, references = true,
+                  include_package = true, online = true, cache = true, refresh = false,
                   progress = true) -> ExportReport
 
 Write the points of `view` (a [`DataView`](@ref), or a [`Dataset`](@ref) for all of them)
-to `path`. The extension of `path` chooses the format:
+to the directory `directory`, which is created if it does not exist, with one file per
+format: for `export_points("data/water", v)`, `data/water/water.csv`, `water.md` and so on.
+`formats` is a tuple of symbols; the default is `(:csv, :md, :tex, :json, :jld2)`, plus
+`:xlsx` when the XLSX package is loaded (`using XLSX`).
 
-- `.csv`: one table. Every header carries the unit of its column in brackets
-  (`temperature [K]`, `value [kg/m3]`). The first line is a comment on the origin of the data
-  when they come from the ThermoML Archive; skip it when reading (`header = 2`).
-- `.xlsx`: one sheet per system (`sheets = :system`, or all points in one sheet with
-  `:single`), a `references` sheet and, for ThermoML data, an `origin` sheet. It needs the
-  XLSX package: `using XLSX` first.
-- `.json`: one record per point, with the origin as its first entry. With
-  `json_layout = :thermoml`, or when the path ends with `.thermoml.json`, the file holds
-  a subset of the ThermoML schema instead (see below).
-- `.jld2`: the columns, units and references as Julia data.
-- `.tex`: the same table as a `longtable`, with `\\cite{key}` in the reference column when
-  `reference = :key`. The references written with it (`name_references.tex`, a table of the ranges
-  of each article, and `name.bib`) use the same keys.
-- no extension (or a path ending with `/`): a directory with that name holding
-  `name.csv`, `name.xlsx`, `name.json`, `name.jld2` and `name.tex` (`formats` chooses; `:thermoml`
-  is also accepted), plus `name_references.csv`, `name_references.tex` and `name.bib`.
+| Format | File | Content |
+|---|---|---|
+| `:csv` | `name.csv` | one table; every header carries the unit of its column in brackets |
+| `:md` | `name.md` | the same table as a Markdown table |
+| `:tex` | `name.tex` | the same table as a LaTeX `longtable` with `booktabs` rules |
+| `:json` | `name.json` | one record per point, with the origin as its first entry |
+| `:jld2` | `name.jld2` | the columns, units and references as Julia data |
+| `:xlsx` | `name.xlsx` | one sheet per system (`sheets = :system`, or `:single`), a `references` sheet and an `origin` sheet |
+| `:thermoml` | `name.thermoml.json` | a subset of the ThermoML schema (see below) |
+
+The path is a directory name, not a file name: `"data/water.csv"` is an error, so a
+leftover extension never silently creates a directory with a dot in its name. End the path
+with a slash to keep a dot in the name (`"data/water.v2/"`).
 
 The tables hold points only. The articles are described in the references table, linked
 through the `reference` column: `reference = :key` writes the BibTeX key (the same keys as
-[`bibtex`](@ref)), `:text` a written-out citation (`Chirico et al. (2003)`) and `:doi` the
-DOI. A `.csv` or `.tex` has no room for the references table, so `references = true` writes it
-next to the file as `name_references.csv`, with `name.bib`; the other formats hold it.
-Columns that are empty for the whole selection are left out.
+[`bibtex`](@ref); in the `.tex` it is `\\cite{key}`), `:text` a written-out citation
+(`Chirico et al. (2003)`) and `:doi` the DOI. With `references = true` the references are
+written next to the points: `name_references.csv`, `name_references.md` and
+`name_references.tex` for each of those formats that was chosen, and `name.bib`. The
+`.json`, `.jld2` and `.xlsx` hold the references table inside the file. The `.bib` also
+holds the entry of this package (see [`bibtex`](@ref); `include_package = false` leaves it
+out).
+
+Columns that are empty for the whole selection are left out. So are the ones that repeat
+what the references table says or what is the same in every row: the `method` and the
+`phase` of each point, the `components` when the selection has a single system and the
+`property` when it has a single property. `details = true` writes them all.
+
+Data from the ThermoML Archive carry a notice in every format (the first line of a `.csv`,
+a comment in a `.md` and a `.tex`, the `origin` entry of a `.json`, an `origin` sheet in a
+`.xlsx`, the `origin` group of a `.jld2`, and an `@comment` in the `.bib`): where the data
+come from, the citation of the dataset, that they are modified and not endorsed by NIST/TRC,
+and that the articles must be credited. With `references = false` and `reference = :key` a
+table keeps no way back to the DOIs, and a warning says so.
 
 `units = :si` converts values, uncertainties and pressure to SI (see [`table`](@ref)); the
-ThermoML layout always keeps the units of the archive. The uncertainty columns are `unc`
+ThermoML subset always keeps the units of the archive. The uncertainty columns are `unc`
 (as reported) and `unc_k2` (at ``k = 2``, see `policy` in [`table`](@ref)). `online`,
 `cache`, `refresh` and `progress` act as in [`bibtex`](@ref).
 
-The ThermoML layout holds, for every article of the selection, its `Citation`, the
+The ThermoML subset holds, for every article of the selection, its `Citation`, the
 `Compound`s and the `PureOrMixtureData` with the selected points only, in the structure
 the archive uses, and so can be read back with the same code. It is a subset: fields
-the package does not keep (such as the apparatus or the evaluator) are absent.
+the package does not keep (such as the apparatus or the evaluator) are absent. A
+directory with only `formats = (:thermoml,)` needs neither references nor network.
 
 # Examples
 ```julia
 v = points(db; component = "water", exact = true, property = "Mass density")
-export_points("data/water.csv", v)
-export_points("data/water", v)               # data/water/water.csv, .json, .jld2, ...
-export_points("data/water.thermoml.json", v)
+export_points("data/water", v)                                # csv, md, tex, json, jld2
+export_points("data/water", v; formats = (:csv, :thermoml))
 ```
 """
 function export_points(
@@ -1089,7 +1154,6 @@ function export_points(
     view::DataView;
     formats = nothing,
     sheets::Symbol = :system,
-    json_layout::Symbol = :records,
     references::Bool = true,
     reference::Symbol = :key,
     units::Symbol = :native,
@@ -1098,64 +1162,39 @@ function export_points(
 )
     sheets in SHEET_LAYOUTS ||
         throw(ArgumentError("sheets must be one of $(SHEET_LAYOUTS), got :$sheets"))
-    json_layout in JSON_LAYOUTS || throw(
-        ArgumentError("json_layout must be one of $(JSON_LAYOUTS), got :$json_layout"),
-    )
     isempty(view.rows) && throw(ArgumentError("the selection has no points to export"))
-    kind, format, target = export_target(path)
+    directory = export_directory(path)
+    chosen = export_formats(formats)
 
-    chosen = if kind === :directory
-        formats === nothing ? DIRECTORY_FORMATS : Tuple(Symbol.(formats))
-    else
-        formats === nothing || throw(
-            ArgumentError(
-                "formats applies to directories; the extension of $path already chooses",
-            ),
+    # A table holds the BibTeX key only; without the `.bib` written next to it the DOI of
+    # the article, which credits its authors, cannot be recovered from the files.
+    if !references && reference === :key && any(f -> f in (:csv, :md, :tex), chosen)
+        @warn(
+            "references = false with reference = :key: the files hold BibTeX keys but no " *
+            "`.bib` is written, so the DOI of each article cannot be recovered from them. " *
+            "Use `reference = :doi` or keep `references = true`."
         )
-        (format,)
     end
-    for f in chosen
-        f in POINT_FORMATS ||
-            throw(ArgumentError("unknown format :$f; choose from $(POINT_FORMATS)"))
-    end
-    thermoml_only =
-        all(f -> f === :thermoml || (f === :json && json_layout === :thermoml), chosen)
     # A ThermoML-only export reads nothing but the dataset: no references, no network.
     data =
-        thermoml_only ? nothing :
+        chosen == (:thermoml,) ? nothing :
         build_export_data(view; reference, units, policy, kwargs...)
 
+    mkpath(directory)
+    name = basename(directory)
     files = String[]
-    skipped = Pair{Symbol,String}[]
-    if kind === :file
-        write_point_file(format, target, data, view; sheets, json_layout)
-        push!(files, target)
-        if format in (:csv, :tex) && references
-            append!(files, write_reference_files(first(splitext(target)), data))
-        end
-    else
-        name = basename(target)
-        mkpath(target)
-        for f in chosen
-            if f === :xlsx && !xlsx_available()
-                formats === nothing || throw(ArgumentError(XLSX_MESSAGE))
-                @warn "Skipping the .xlsx file: $XLSX_MESSAGE"
-                push!(skipped, :xlsx => XLSX_MESSAGE)
-                continue
-            end
-            file = joinpath(target, name * file_extension(f))
-            write_point_file(f, file, data, view; sheets, json_layout)
-            push!(files, file)
-        end
-        if references && data !== nothing
-            append!(files, write_reference_files(joinpath(target, name), data))
-        end
+    for format in chosen
+        file = joinpath(directory, name * file_extension(format))
+        write_point_file(format, file, data, view; sheets)
+        push!(files, file)
+    end
+    if references && data !== nothing
+        append!(files, write_reference_files(joinpath(directory, name), data, chosen))
     end
     return ExportReport(
         files,
         length(view.rows),
         article_count(view),
-        skipped,
         data === nothing ? nothing : getfield(data.summary, :bibliography).report,
     )
 end

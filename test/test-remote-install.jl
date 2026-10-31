@@ -52,12 +52,14 @@ end
             endswith(url, ".sha256") && error("digest endpoint is down")
             return served(url, dest)
         end
-        manifest =
-            @test_logs (:warn, r"built-in") (:info, r"Downloading") ThermophysicalDB.install_release(
-                release;
-                dir = joinpath(tmp, "cache"),
-                download,
-            )
+        manifest = @test_logs (:warn, r"built-in") (:info, r"Downloading") (
+            :info,
+            r"Data from the",
+        ) ThermophysicalDB.install_release(
+            release;
+            dir = joinpath(tmp, "cache"),
+            download,
+        )
         @test manifest.sha256 == digest
 
         # without a built-in digest the failure must surface
@@ -173,7 +175,7 @@ end
 
         Fixtures.install(old, dir, download)
 
-        status = ThermophysicalDB.check_update(; dir, fetch = () -> old)
+        status = ThermophysicalDB.check_update(; dir, fetch = () -> old, download)
         @test status.state === :up_to_date
         status = ThermophysicalDB.check_update(; dir, fetch = () -> new)
         @test status.state === :update_available
@@ -201,11 +203,12 @@ end
         )
 
         # missing: downloaded regardless of the policy
-        manifest = @test_logs (:info, r"Downloading") ThermophysicalDB.ensure_archive(;
-            dir,
-            fetch = () -> old,
-            download,
-        )
+        manifest =
+            @test_logs (:info, r"Downloading") (:info, r"Data from the") ThermophysicalDB.ensure_archive(;
+                dir,
+                fetch = () -> old,
+                download,
+            )
         @test manifest.version == "2024-01-01"
 
         # :notify keeps the local copy and warns
@@ -249,11 +252,12 @@ end
         new = Fixtures.make_release("2025-06-01")
         dir = joinpath(tmp, "cache")
 
-        manifest = @test_logs (:info, r"Downloading") ThermophysicalDB.update_database!(;
-            dir,
-            fetch = () -> old,
-            download,
-        )
+        manifest =
+            @test_logs (:info, r"Downloading") (:info, r"Data from the") ThermophysicalDB.update_database!(;
+                dir,
+                fetch = () -> old,
+                download,
+            )
         @test manifest.version == "2024-01-01"
 
         manifest = @test_logs (:info, r"up to date") ThermophysicalDB.update_database!(;
@@ -277,5 +281,130 @@ end
             download,
         )
         @test manifest.version == "2025-06-01"
+    end
+end
+
+@testitem "an unrecognised NIST record is reported once per session, and is not an outage" setup =
+    [Fixtures] tags = [:unit] begin
+    T = ThermophysicalDB
+    mktempdir() do tmp
+        tgz = Fixtures.make_tgz(joinpath(tmp, "payload.tgz"), Dict("a.json" => "{}"))
+        download = Fixtures.fake_download(tgz, T.file_sha256(tgz))
+        old = Fixtures.make_release("2024-01-01")
+        dir = joinpath(tmp, "cache")
+        # NIST answers, but the record has no archive link we recognise
+        unrecognised =
+            () ->
+                throw(T.NoReleaseError(["https://a.invalid: no archive link found"], true))
+        offline = () -> throw(T.NoReleaseError(["https://a.invalid: timeout"], false))
+        Fixtures.install(old, dir, download)
+
+        T.UNRECOGNIZED_WARNED[] = false
+        status =
+            @test_logs (:warn, r"no ThermoML archive link.*recognises.*install_archive!") T.check_update(;
+                dir,
+                fetch = unrecognised,
+                download,
+            )
+        @test status.state === :unknown
+        @test status.source === :unrecognized
+        @test status.latest === T.builtin_latest()
+        @test occursin("no archive link found", status.reason)
+
+        # the second time in the same session: silent
+        status = @test_logs T.check_update(; dir, fetch = unrecognised, download)
+        @test status.source === :unrecognized
+
+        # an outage is a different thing and is never a warning
+        T.UNRECOGNIZED_WARNED[] = false
+        status = @test_logs T.check_update(; dir, fetch = offline, download)
+        @test status.source === :builtin && status.state === :unknown
+        @test !T.UNRECOGNIZED_WARNED[]
+
+        # nothing installed: the built-in release is the target and the warning is shown
+        status = @test_logs (:warn, r"no ThermoML archive link") T.check_update(;
+            dir = joinpath(tmp, "empty"),
+            fetch = unrecognised,
+            download,
+        )
+        @test status.state === :not_installed && status.source === :unrecognized
+
+        # through ensure_archive and update_database!
+        T.UNRECOGNIZED_WARNED[] = false
+        manifest = @test_logs (:warn, r"no ThermoML archive link") T.ensure_archive(;
+            dir,
+            fetch = unrecognised,
+            download,
+        )
+        @test manifest.version == "2024-01-01"
+        manifest = @test_logs (:info, r"not recognised") T.update_database!(;
+            dir,
+            fetch = unrecognised,
+            download,
+        )
+        @test manifest.version == "2024-01-01"
+    end
+end
+
+@testitem "a republished archive with the same name counts as an update" setup = [Fixtures] tags =
+    [:unit] begin
+    T = ThermophysicalDB
+    mktempdir() do tmp
+        tgz = Fixtures.make_tgz(joinpath(tmp, "payload.tgz"), Dict("a.json" => "{}"))
+        digest = T.file_sha256(tgz)
+        download = Fixtures.fake_download(tgz, digest)
+        release = Fixtures.make_release("2024-01-01")
+        dir = joinpath(tmp, "cache")
+        Fixtures.install(release, dir, download)
+
+        # the same digest is published: up to date
+        status = T.check_update(; dir, fetch = () -> release, download)
+        @test status.state === :up_to_date && !status.republished
+
+        # NIST replaces the file: the published digest is another one
+        other = Fixtures.make_tgz(joinpath(tmp, "other.tgz"), Dict("b.json" => "{}"))
+        republished = Fixtures.fake_download(other, T.file_sha256(other))
+        status = T.check_update(; dir, fetch = () -> release, download = republished)
+        @test status.state === :update_available
+        @test status.republished
+        @test status.latest.version == status.installed.version == "2024-01-01"
+
+        # ensure_archive warns, with a message about the republication
+        manifest =
+            @test_logs (:warn, r"republished the ThermoML archive 2024-01-01") T.ensure_archive(;
+                dir,
+                fetch = () -> release,
+                download = republished,
+            )
+        @test manifest.sha256 == digest         # :notify keeps the local copy
+
+        # the digest file cannot be read: no false alarm
+        broken = (url, dest) -> error("digest endpoint is down")
+        status = T.check_update(; dir, fetch = () -> release, download = broken)
+        @test status.state === :up_to_date && !status.republished
+
+        # a digest that cannot be read does not matter when the version is different
+        status = T.check_update(;
+            dir,
+            fetch = () -> Fixtures.make_release("2025-01-01"),
+            download = broken,
+        )
+        @test status.state === :update_available && !status.republished
+
+        # offline checks make no request for the digest
+        offline = () -> error("network is down")
+        status = T.check_update(; dir, fetch = offline, download = broken)
+        @test status.state === :unknown && !status.republished
+
+        # update_database! installs the new content and records its digest
+        manifest = @test_logs (:info, r"Downloading") T.update_database!(;
+            dir,
+            fetch = () -> release,
+            download = republished,
+        )
+        @test manifest.sha256 == T.file_sha256(other)
+        @test manifest.version == "2024-01-01"
+        status = T.check_update(; dir, fetch = () -> release, download = republished)
+        @test status.state === :up_to_date
     end
 end

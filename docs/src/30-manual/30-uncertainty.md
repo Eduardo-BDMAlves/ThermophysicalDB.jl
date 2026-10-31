@@ -6,7 +6,7 @@ CurrentModule = ThermophysicalDB
 
 An experimental value is only useful together with how well it is known. This page explains what the archive records, how ThermophysicalDB.jl restates it on a common basis, and how to use that basis to weight data from different laboratories.
 
-The terms used here (standard and expanded uncertainty, coverage factor ``k``, level of confidence) follow the Guide to the expression of uncertainty in measurement [JCGM100](@cite); how ThermoML records them is described in [Chirico2003](@cite).
+The terms used here (standard and expanded uncertainty, coverage factor ``k``, level of confidence) follow the Guide to the expression of uncertainty in measurement [JCGM100](@cite); how ThermoML records them is described in [chirico2003thermoml](@cite).
 
 ```@setup unc
 Main.DocsSetup.activate!()

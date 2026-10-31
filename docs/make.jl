@@ -134,8 +134,15 @@ function list_pages()
     return ["index.md"; pages_list]
 end
 
-# Bibliography: entries in docs/src/refs.bib, cited from any page as [Key](@cite)
-const BIB = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :authoryear)
+# Bibliography, cited from any page as [key](@cite). The sources of the data and the articles
+# about them are written once, in CITATION.cff; docs/src/refs.bib (not in git) is generated
+# from it, followed by the literature of docs/src/refs-literature.bib.
+const BIB_FILE = joinpath(@__DIR__, "src", "refs.bib")
+ThermophysicalDB.write_documentation_bibliography(
+    BIB_FILE;
+    extra = joinpath(@__DIR__, "src", "refs-literature.bib"),
+)
+const BIB = CitationBibliography(BIB_FILE; style = :authoryear)
 
 makedocs(;
     modules = [ThermophysicalDB],
