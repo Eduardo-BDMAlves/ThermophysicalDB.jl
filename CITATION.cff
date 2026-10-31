@@ -169,3 +169,103 @@ references:
     start: 1344
     end: 1359
     doi: 10.1021/je034088i
+  - type: article
+    abbreviation: frenkel2004thermoml
+    keywords: [background]
+    title: "ThermoML—An XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 3. Critically Evaluated Data, Predicted Data, and Equation Representation"
+    authors:
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Diky
+        given-names: Vladimir V.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Dymond
+        given-names: John H.
+      - family-names: Wakeham
+        given-names: William A.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2004
+    volume: 49
+    issue: 3
+    start: 381
+    end: 393
+    doi: 10.1021/je049890e
+  - type: article
+    abbreviation: chirico2009thermoml
+    keywords: [background]
+    title: "ThermoML—An XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 4. Biomaterials"
+    authors:
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Diky
+        given-names: Vladimir
+      - family-names: Goldberg
+        given-names: Robert N.
+      - family-names: Heerklotz
+        given-names: Heiko
+      - family-names: Ladbury
+        given-names: John E.
+      - family-names: Remeta
+        given-names: David P.
+      - family-names: Dymond
+        given-names: John H.
+      - family-names: Goodwin
+        given-names: Anthony R. H.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Wakeham
+        given-names: William A.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2009
+    volume: 55
+    issue: 4
+    start: 1564
+    end: 1572
+    doi: 10.1021/je900685d
+  - type: article
+    abbreviation: frenkel2011thermoml
+    keywords: [background]
+    title: "ThermoML: an XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 5. Speciation and Complex Equilibria"
+    authors:
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Diky
+        given-names: Vladimir
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Goldberg
+        given-names: Robert N.
+      - family-names: Heerklotz
+        given-names: Heiko
+      - family-names: Ladbury
+        given-names: John E.
+      - family-names: Remeta
+        given-names: David P.
+      - family-names: Dymond
+        given-names: John H.
+      - family-names: Goodwin
+        given-names: Anthony R. H.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Wakeham
+        given-names: William A.
+      - family-names: Stein
+        given-names: Stephen E.
+      - family-names: Brown
+        given-names: Paul L.
+      - family-names: Königsberger
+        given-names: Erich
+      - family-names: Williams
+        given-names: Peter A.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2011
+    volume: 56
+    issue: 2
+    start: 307
+    end: 316
+    doi: 10.1021/je100999j
