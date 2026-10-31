@@ -106,7 +106,7 @@ fig # hide
 The data, for now, comes only from the **ThermoML Archive**, created and maintained by the Thermodynamics Research Center (TRC) of the U.S. National Institute of Standards and Technology (NIST) and based on the IUPAC ThermoML standard. ThermophysicalDB.jl is an independent project that downloads, reads and filters that archive; it does not own or redistribute the data, and it never changes the published values: conversions and restated uncertainties are produced on request, apart from them. The goal of the package is to bring several experimental databases under one interface, and the ThermoML Archive is the first one supported.
 
 - Dataset: [doi:10.18434/mds2-2422](https://doi.org/10.18434/mds2-2422)
-- Standard: [frenkel2006xml](@cite); background in [frenkel2003thermoml](@cite) and [chirico2003thermoml](@cite)
+- Standard: [frenkel2006xml](@cite); background in the series of [frenkel2003thermoml](@cite), [chirico2003thermoml](@cite), [frenkel2004thermoml](@cite), [chirico2009thermoml](@cite) and [frenkel2011thermoml](@cite)
 - More details, the terms of use and how to cite: [About the data](@ref 40-about-data)
 
 ## Contributors

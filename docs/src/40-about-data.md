@@ -49,13 +49,22 @@ The data are provided by NIST/TRC and come from published articles. Read the ter
 !!! info "Statement requested by TRC"
     TRC asks that works which use ThermoML Archive data include a statement of the form *Data distributed through the [journal(s)] ThermoML Archive(s)*, naming the journals of the articles whose points were used, together with the citations listed below.
 
-!!! info "NIST disclaimer and liability statement"
-    <!-- Text collected on 2026-10-30 with a summarising tool. Replace it by the exact wording of the section "Fair Use of Other NIST Data/Works" of https://www.nist.gov/open/copyright-fair-use-and-licensing-statements-srd-data-software-and-technical-series-publications before the repository is made public. -->
-    The data are provided by NIST as a public service and are expressly provided "AS IS".
-    NIST MAKES NO WARRANTY OF ANY KIND, EXPRESS, IMPLIED OR STATUTORY, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT AND DATA ACCURACY.
-    NIST does not warrant or make any representations regarding the use of the data or the results thereof.
-    NIST SHALL NOT BE LIABLE AND YOU HEREBY RELEASE NIST FROM LIABILITY FOR ANY INDIRECT, CONSEQUENTIAL, SPECIAL, OR INCIDENTAL DAMAGES (INCLUDING DAMAGES FOR LOSS OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, AND THE LIKE), WHETHER ARISING IN TORT, CONTRACT, OR OTHERWISE, ARISING FROM OR RELATING TO THE DATA (OR THE USE OF OR INABILITY TO USE THIS DATA), EVEN IF NIST HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-    Source: [NIST statement on copyright, fair use and licensing](https://www.nist.gov/open/copyright-fair-use-and-licensing-statements-srd-data-software-and-technical-series-publications).
+### NIST statement on the data
+
+> This data/work was created by employees of the National Institute of Standards and Technology (NIST), an agency of the Federal Government. Pursuant to title 17 United States Code Section 105, works of NIST employees are not subject to copyright protection in the United States.  This data/work may be subject to foreign copyright.
+>
+> The data/work is provided by NIST as a public service and is expressly provided “AS IS.”
+> NIST MAKES NO WARRANTY OF ANY KIND, EXPRESS, IMPLIED OR STATUTORY, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT AND DATA ACCURACY.
+> NIST does not warrant or make any representations regarding the use of the data or the results thereof, including but not limited to the correctness, accuracy, reliability or usefulness of the data.
+> NIST SHALL NOT BE LIABLE AND YOU HEREBY RELEASE NIST FROM LIABILITY FOR ANY INDIRECT, CONSEQUENTIAL, SPECIAL, OR INCIDENTAL DAMAGES (INCLUDING DAMAGES FOR LOSS OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, AND THE LIKE), WHETHER ARISING IN TORT, CONTRACT, OR OTHERWISE, ARISING FROM OR RELATING TO THE DATA (OR THE USE OF OR INABILITY TO USE THIS DATA), EVEN IF NIST HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+>
+> To the extent that NIST may hold copyright in countries other than the United States, you are hereby granted the non-exclusive irrevocable and unconditional right to print, publish, prepare derivative works and distribute the NIST data, in any medium, or authorize others to do so on your behalf, on a royalty-free basis throughout the world.
+>
+> You may improve, modify, and create derivative works of the data or any portion of the data, and you may copy and distribute such modifications or works. Modified works should carry a notice stating that you changed the data and should note the date and nature of any such change. Please explicitly acknowledge the National Institute of Standards and Technology as the source of the data:  Data citation recommendations are provided at <https://www.nist.gov/open/license>.
+>
+> Permission to use this data is contingent upon your acceptance of the terms of this agreement and upon your providing appropriate acknowledgments of NIST’s creation of the data/work.
+
+Text of the statement for NIST data and works, as supplied by NIST/TRC for the ThermoML Archive and published in the section “Fair Use of Other NIST Data/Works” of the page [Copyright, Fair Use, and Licensing Statements](https://www.nist.gov/open/copyright-fair-use-and-licensing-statements-srd-data-software-and-technical-series-publications). Copied on 2026-10-31; reproduced without changes.
 
 !!! warning "Modified data and warranty"
     The tables produced by this package (values in SI units, uncertainties restated at ``k = 2``, selections and merges) are modified forms of the published data. When you share them, say that the data were modified, state the date and the nature of the changes, and acknowledge NIST as the source, as the NIST license asks for modified data. The package is provided under the MIT license without any warranty. NIST/TRC checked the values and metadata for completeness and accuracy of representation, but did not critically evaluate them, and this package does not either. You are responsible for checking the data before using them and for following the terms of NIST and of the publishers.
@@ -90,6 +99,9 @@ When you publish results obtained with this package, please cite:
 
 - [frenkel2003thermoml](@cite): the first part of the ThermoML description, on experimental data.
 - [chirico2003thermoml](@cite): the second part, on the way ThermoML records uncertainties.
+- [frenkel2004thermoml](@cite): the third part, on critically evaluated data, predicted data and equation representation.
+- [chirico2009thermoml](@cite): the fourth part, on biomaterials.
+- [frenkel2011thermoml](@cite): the fifth part, on speciation and complex equilibria.
 - The [ThermoML home page](https://trc.nist.gov/ThermoML/) of NIST/TRC, which describes the standard, the schema and the participating journals.
 
 The works cited on this page are listed in the [Bibliography](@ref bibliography).

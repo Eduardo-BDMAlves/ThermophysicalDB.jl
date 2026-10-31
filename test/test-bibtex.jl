@@ -428,7 +428,8 @@ end
     @test T.field_value(sources[1], "title") == "{ThermoML}/Data Archive"
     # the documentation lists every reference, with the access date of the dataset
     everything = T.documentation_entries()
-    @test length(everything) == 5 && allunique(e.key for e in everything)
+    @test length(everything) == length(T.cff_references(T.CFF)) &&
+          allunique(e.key for e in everything)
     @test occursin("accessed 2026-", T.field_value(everything[1], "note"))
     mktempdir() do tmp
         file = T.write_documentation_bibliography(joinpath(tmp, "refs.bib"))
@@ -444,11 +445,12 @@ end
     check = T.check_references(; online = false, cache = false)
     @test isempty(check.problems) && isempty(check)
     @test check.skipped == ["riccardi2021thermoml"]
-    @test length(check.unresolved) == 4 && check.compared == 0
+    articles = length(T.cff_references(T.CFF)) - 1   # all but the dataset
+    @test length(check.unresolved) == articles && check.compared == 0
     @test all(u -> occursin("online = false", u.reason), check.unresolved)
     # asking the resolver and getting nothing is a failure, with the reason
     down = T.check_references(; cache = false, fetcher = doi -> error("no route to host"))
-    @test !isempty(down) && length(down.unresolved) == 4
+    @test !isempty(down) && length(down.unresolved) == articles
     @test all(u -> occursin("no route to host", u.reason), down.unresolved)
     @test occursin("unresolved: ", sprint(show, down))
     # a reply that is not text, or not BibTeX, says what it was
@@ -553,7 +555,7 @@ end
     # the pages of the resolver are written with the BibTeX range
     @test occursin("pages    = {541--612}", out)
     check = T.check_references(; cache = false, fetcher = doi -> reply)
-    @test check.compared == 4
+    @test check.compared == length(T.cff_references(T.CFF)) - 1
 end
 
 @testitem "a year that differs by one with the same issue is a note, not a conflict" tags =
