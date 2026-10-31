@@ -96,3 +96,19 @@ using CSV
 CSV.write("water_vapor_pressure.csv", v)          # a selection is a table
 CSV.write("water_si.csv", table(v; units = :si))  # so is the NamedTuple
 ```
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example tab
+Main.DocsCredits.credits(v, mixed)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

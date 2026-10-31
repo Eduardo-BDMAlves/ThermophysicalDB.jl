@@ -14,6 +14,8 @@ using DocumenterVitepress
 using ThermophysicalDB
 
 include("DocsSetup.jl")
+include("DocsCredits.jl")
+include("DocsTiming.jl")
 include("SchemaDiagrams.jl")
 
 DocMeta.setdocmeta!(
@@ -38,6 +40,10 @@ end
 
 const DRAFT = get(ENV, "THERMOPHYSICALDB_DOCS_DRAFT", "false") == "true"
 
+# The phases and the pages of the build are timed and a table of where the time went is logged
+# at the end; THERMOPHYSICALDB_DOCS_TIMING=false turns it off.
+const TIMING = get(ENV, "THERMOPHYSICALDB_DOCS_TIMING", "true") != "false"
+
 # Add titles of sections and overrides page titles
 const titles = Dict(
     "20-tutorials" => "Tutorials",
@@ -51,7 +57,7 @@ const titles = Dict(
 # the groups the bar has too many entries and pushes the colour-mode switch off the screen.
 const NAV_GROUPS = [
     "Project" => ["90-contributing.md", "91-developer.md", "92-roadmap.md"],
-    "Reference" => ["95-reference.md", "99-bibliography.md"],
+    "Reference" => ["95-reference.md", "96-data-credits.md", "99-bibliography.md"],
 ]
 
 function recursively_list_pages(folder; path_prefix = "")
@@ -134,26 +140,50 @@ function list_pages()
     return ["index.md"; pages_list]
 end
 
-# Bibliography: entries in docs/src/refs.bib, cited from any page as [Key](@cite)
-const BIB = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :authoryear)
+# Every page of the navigation, as the path it is listed with.
+page_paths(entry::AbstractString) = [String(entry)]
+page_paths(entry::Pair) = page_paths(entry.second)
+page_paths(entries::AbstractVector) = reduce(vcat, page_paths.(entries); init = String[])
 
-makedocs(;
-    modules = [ThermophysicalDB],
-    authors = "Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>",
-    repo = Documenter.Remotes.GitHub("Eduardo-BDMAlves", "ThermophysicalDB.jl"),
-    sitename = "ThermophysicalDB.jl",
-    format = DocumenterVitepress.MarkdownVitepress(;
-        repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl",
-        devbranch = "main",
-        devurl = "dev",
-        description = "Experimental thermophysical property data from the NIST/TRC ThermoML Archive, ready to filter, plot and analyse in Julia.",
-    ),
-    pages = list_pages(),
-    plugins = [BIB],
-    draft = DRAFT,
-    checkdocs = :exports,
-    warnonly = [:missing_docs, :cross_references, :autodocs_block],
+# The pages show data and register it with `DocsCredits.credits`, in the order in which their
+# examples run. The page of credits lists everything that was registered, so it has to be
+# expanded last: Documenter expands the `expandfirst` pages in the order given and the others
+# afterwards, and the other pages are all the ones that are not the page of credits.
+const CREDITS_PAGE = "96-data-credits.md"
+const NAVIGATION = list_pages()
+CREDITS_PAGE in page_paths(NAVIGATION) || error("$CREDITS_PAGE is not in the navigation")
+const EXPAND_FIRST = filter(!=(CREDITS_PAGE), page_paths(NAVIGATION))
+
+# Bibliography, cited from any page as [key](@cite). The sources of the data and the articles
+# about them are written once, in CITATION.cff; docs/src/refs.bib (not in git) is generated
+# from it, followed by the literature of docs/src/refs-literature.bib.
+const BIB_FILE = joinpath(@__DIR__, "src", "refs.bib")
+ThermophysicalDB.write_documentation_bibliography(
+    BIB_FILE;
+    extra = joinpath(@__DIR__, "src", "refs-literature.bib"),
 )
+const BIB = CitationBibliography(BIB_FILE; style = :authoryear)
+
+DocsTiming.timed(; enabled = TIMING) do
+    makedocs(;
+        modules = [ThermophysicalDB],
+        authors = "Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>",
+        repo = Documenter.Remotes.GitHub("Eduardo-BDMAlves", "ThermophysicalDB.jl"),
+        sitename = "ThermophysicalDB.jl",
+        format = DocumenterVitepress.MarkdownVitepress(;
+            repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl",
+            devbranch = "main",
+            devurl = "dev",
+            description = "Experimental thermophysical property data from the NIST/TRC ThermoML Archive, ready to filter, plot and analyse in Julia.",
+        ),
+        pages = NAVIGATION,
+        expandfirst = EXPAND_FIRST,
+        plugins = [BIB],
+        draft = DRAFT,
+        checkdocs = :exports,
+        warnonly = [:missing_docs, :cross_references, :autodocs_block],
+    )
+end
 
 DocumenterVitepress.deploydocs(;
     repo = "github.com/Eduardo-BDMAlves/ThermophysicalDB.jl",

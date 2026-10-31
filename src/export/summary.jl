@@ -142,7 +142,7 @@ Tables.schema(s::ReferenceSummary) = Tables.schema(getfield(s, :columns))
     reference_summary(view; temperature_unit = u"K", pressure_unit = u"MPa",
                       statistic = :median, method_length = 24, policy = :nominal,
                       online = true, cache = true, refresh = false, include_source = true,
-                      progress = true) -> ReferenceSummary
+                      include_package = true, progress = true) -> ReferenceSummary
 
 Summarise the articles behind the points of `view` ([`DataView`](@ref) or
 [`Dataset`](@ref)), one row for every (article, property) pair, so an article that
@@ -157,7 +157,7 @@ absolute uncertainty in the unit of the property. A method name longer than
 
 The rows are ordered by year, then by month (when the DOI entry has it), then by the key
 of the entry. The keys are those of [`bibtex`](@ref); the keywords `online`, `cache`,
-`refresh`, `include_source` and `progress` act as there. `policy` is passed to the
+`refresh`, `include_source`, `include_package` and `progress` act as there. `policy` is passed to the
 conversion of uncertainties to ``k = 2`` (see [`table`](@ref)).
 """
 function reference_summary(
@@ -461,9 +461,13 @@ function default_caption(s::ReferenceSummary)
     )
 end
 
+# Whether the notice of the data is written with a summary: its points come from the archive.
+notice_wanted(s::ReferenceSummary, notice::Bool) =
+    notice && getfield(s, :bibliography).from_archive
+
 """
     latex_table(summary; columns, caption, label, reference = :cite, digits = 4,
-                uncertainty_digits = 2) -> String
+                uncertainty_digits = 2, notice = true) -> String
 
 The summary as a `longtable` with `booktabs` rules (load `longtable` and `booktabs`). The
 reference column holds `\\cite{key}` with the keys of the BibTeX export
@@ -473,6 +477,9 @@ methods are explained in a note at the end of the table. `columns` is a list tak
 :uncertainty, :uncertainty_abs`; by default the property and the system appear only when
 they vary. `digits` and `uncertainty_digits` are significant digits. The caption may use
 LaTeX; the rest of the text is escaped.
+
+Data from the ThermoML Archive come with a notice (origin, citation of the dataset and
+conditions of use) as comments at the top of the text; `notice = false` leaves it out.
 """
 function latex_table(
     s::ReferenceSummary;
@@ -482,6 +489,7 @@ function latex_table(
     reference::Symbol = :cite,
     digits::Integer = 4,
     uncertainty_digits::Integer = 2,
+    notice::Bool = true,
 )
     header, cells = summary_cells(
         s,
@@ -498,6 +506,11 @@ function latex_table(
         col === :system ? "p{3.2cm}" : col in (:reference, :property, :phase) ? "l" : "c" for col in columns
     ),)
     io = IOBuffer()
+    if notice_wanted(s, notice)
+        for line in notice_lines()
+            println(io, "% ", line)
+        end
+    end
     println(io, "% Requires: \\usepackage{booktabs} and \\usepackage{longtable}")
     println(io, "\\begin{longtable}{", align, "}")
     println(io, "\\caption{", caption, "}\\label{", label, "}\\\\")
@@ -531,10 +544,12 @@ function latex_table(
 end
 
 """
-    markdown_table(summary; columns, reference = :text, digits = 4, uncertainty_digits = 2) -> String
+    markdown_table(summary; columns, reference = :text, digits = 4, uncertainty_digits = 2,
+                   notice = true) -> String
 
 The summary as a Markdown (GitHub flavoured) table, with the explanation of abbreviated
-methods below it. The arguments are those of [`latex_table`](@ref).
+methods below it. The arguments are those of [`latex_table`](@ref); the notice is an HTML
+comment at the top.
 """
 function markdown_table(
     s::ReferenceSummary;
@@ -542,11 +557,17 @@ function markdown_table(
     reference::Symbol = :text,
     digits::Integer = 4,
     uncertainty_digits::Integer = 2,
+    notice::Bool = true,
 )
     header, cells =
         summary_cells(s, columns, 1:length(s), :text, reference, digits, uncertainty_digits)
     pipe(x) = replace(x, "|" => "\\|")
     io = IOBuffer()
+    if notice_wanted(s, notice)
+        println(io, "<!--")
+        foreach(line -> println(io, line), notice_lines())
+        println(io, "-->\n")
+    end
     println(io, "| ", join(pipe.(header), " | "), " |")
     println(io, "|", join(fill("---", length(columns)), "|"), "|")
     for row in cells
@@ -594,14 +615,17 @@ function summary_fields(s::ReferenceSummary)
 end
 
 """
-    csv_table(summary) -> String
+    csv_table(summary; notice = true) -> String
 
 All the columns of the summary as CSV, with full method names and the units in the
-headers (`T_min [K]`, `p_max [MPa]`, `unc_rel [%]`).
+headers (`T_min [K]`, `p_max [MPa]`, `unc_rel [%]`). For data from the ThermoML Archive the
+first line is the notice, a comment starting with `#`; skip it when reading
+(`header = 2`), or pass `notice = false`.
 """
-function csv_table(s::ReferenceSummary)
+function csv_table(s::ReferenceSummary; notice::Bool = true)
     fields = summary_fields(s)
     io = IOBuffer()
+    notice_wanted(s, notice) && println(io, "# ", notice_line())
     println(io, join((csv_field(first(f)) for f in fields), ","))
     for i = 1:length(s)
         println(io, join((csv_field(last(f)[i]) for f in fields), ","))

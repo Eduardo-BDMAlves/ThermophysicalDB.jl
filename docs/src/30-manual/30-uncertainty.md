@@ -6,7 +6,7 @@ CurrentModule = ThermophysicalDB
 
 An experimental value is only useful together with how well it is known. This page explains what the archive records, how ThermophysicalDB.jl restates it on a common basis, and how to use that basis to weight data from different laboratories.
 
-The terms used here (standard and expanded uncertainty, coverage factor ``k``, level of confidence) follow the Guide to the expression of uncertainty in measurement [JCGM100](@cite); how ThermoML records them is described in [Chirico2003](@cite).
+The terms used here (standard and expanded uncertainty, coverage factor ``k``, level of confidence) follow the Guide to the expression of uncertainty in measurement [JCGM100](@cite); how ThermoML records them is described in [chirico2003thermoml](@cite).
 
 ```@setup unc
 Main.DocsSetup.activate!()
@@ -202,3 +202,19 @@ extrema(filter(isfinite, normal ./ nominal))
 The output is the smallest and the largest ratio between the two versions of `unc_k2`, point by point. Both numbers are equal to ``2/1.95996 \approx 1.0204``, and this is the expected result, not a coincidence of the two policies. A source that states an expanded uncertainty at the 95 % level has to be restated at ``k = 2``. With `:nominal` the 95 % level is taken as ``k = 2`` already, so the value is kept. With `:normal` the coverage factor is 1.95996, and the value is multiplied by ``2/1.95996``, which makes it 2 % larger. Equal minimum and maximum mean that every point with a finite uncertainty in this selection was stated at the 95 % level, so all of them change by the same factor. A selection that mixed levels would show a minimum of 1 (sources that state ``k = 2`` directly, which no policy changes) and a maximum of 1.0204.
 
 Two conclusions follow. First, the choice is a uniform scale of 2 % on the affected points: the weights ``1/U_i^2`` of a weighted mean change by the same factor, so which points weigh more than others, and the weighted mean itself, do not change. Second, it matters only for the absolute size of the uncertainty of a derived quantity (the ``U`` of the weighted mean, or the share of points inside the band of the previous section), and the difference of 2 % is small next to the scatter between laboratories.
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example unc
+Main.DocsCredits.credits(v, vw)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

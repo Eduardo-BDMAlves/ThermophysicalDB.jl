@@ -106,3 +106,19 @@ fig
 
 - Fit a model with weights ``w_i = 1/U_i^2``: because `unc_k2` is on one common basis, the weights of different articles are comparable. See [Uncertainty](@ref uncertainty).
 - Restrict the selection to one article with `doi = "…"` or to one laboratory with `author = "…"`. See [Selecting points](@ref selecting).
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example hex
+Main.DocsCredits.credits(v)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

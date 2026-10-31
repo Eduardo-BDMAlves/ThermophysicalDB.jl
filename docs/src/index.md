@@ -84,6 +84,22 @@ Colorbar(fig[1, 2], sc; label = "p [MPa]");
 fig # hide
 ```
 
+### Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example home
+Main.DocsCredits.credits(v)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```
+
 ## Where to go next
 
 ```@raw html
@@ -93,7 +109,7 @@ fig # hide
   <a class="tdb-card" href="20-tutorials/20-water-density"><strong>Water density</strong><span>Hundreds of laboratories compared with the IAPWS-95 equation of Clapeyron.jl, filtered in °C and atm.</span></a>
   <a class="tdb-card" href="20-tutorials/30-vapor-pressure"><strong>Vapor pressure</strong><span>Clausius–Clapeyron and the enthalpy of vaporization of ethanol.</span></a>
   <a class="tdb-card" href="20-tutorials/40-mixtures"><strong>Binary mixtures</strong><span>The viscosity of ethanol + water against composition.</span></a>
-  <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against PR, SRK, PC-SAFT and SAFT-VR Mie from Clapeyron.jl.</span></a>
+  <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against SRK, PR, tcPR and PC-SAFT from Clapeyron.jl.</span></a>
   <a class="tdb-card" href="20-tutorials/60-co2-critical-point"><strong>Carbon dioxide</strong><span>Data and equations of state around the critical point.</span></a>
   <a class="tdb-card" href="30-manual/30-uncertainty"><strong>Uncertainty</strong><span>What k = 2 means here and how each point is rescaled.</span></a>
   <a class="tdb-card" href="30-manual/40-data-management"><strong>Updates and cache</strong><span>Where the data live and what to do when the download fails.</span></a>
@@ -101,12 +117,24 @@ fig # hide
 </div>
 ```
 
+## Versions
+
+The examples of this documentation were run with the versions below, read from the environment that built the site. The file has the same information, and the commands install the packages at those versions, so a result can be checked against the one on the page.
+
+```@raw html
+<p><a class="tdb-download" href="versions.toml" download>Download the versions (versions.toml)</a></p>
+```
+
+```@example home
+Main.DocsCredits.environment()
+```
+
 ## Data source
 
 The data, for now, comes only from the **ThermoML Archive**, created and maintained by the Thermodynamics Research Center (TRC) of the U.S. National Institute of Standards and Technology (NIST) and based on the IUPAC ThermoML standard. ThermophysicalDB.jl is an independent project that downloads, reads and filters that archive; it does not own or redistribute the data, and it never changes the published values: conversions and restated uncertainties are produced on request, apart from them. The goal of the package is to bring several experimental databases under one interface, and the ThermoML Archive is the first one supported.
 
 - Dataset: [doi:10.18434/mds2-2422](https://doi.org/10.18434/mds2-2422)
-- Standard: [Frenkel2006](@cite); background in [Frenkel2003](@cite) and [Chirico2003](@cite)
+- Standard: [frenkel2006xml](@cite); background in the series of [frenkel2003thermoml](@cite), [chirico2003thermoml](@cite), [frenkel2004thermoml](@cite), [chirico2009thermoml](@cite) and [frenkel2011thermoml](@cite)
 - More details, the terms of use and how to cite: [About the data](@ref 40-about-data)
 
 ## Contributors

@@ -21,6 +21,7 @@ using Tables: Tables
 using Tar: Tar
 using Unicode: Unicode
 using Unitful: Unitful, @u_str
+using YAML: YAML
 
 include("remote/datadir.jl")
 include("remote/checksum.jl")
@@ -46,7 +47,11 @@ include("query/table.jl")
 include("store/serialize.jl")
 include("store/cache.jl")
 include("store/database.jl")
+include("references.jl")
+include("notice.jl")
 include("export/bibtex.jl")
+include("export/citation.jl")
+include("export/check.jl")
 include("export/summary.jl")
 include("export/points.jl")
 include("outliers/stats.jl")
@@ -58,6 +63,7 @@ include("outliers/trend.jl")
 include("outliers/surface.jl")
 include("outliers/detect.jl")
 include("outliers/pipeline.jl")
+include("precompile.jl")
 
 export DataView,
     bibtex,

@@ -1,4 +1,3 @@
-# Go to https://citation-file-format.github.io/cff-initializer-javascript/#/ to finish this
 cff-version: 1.2.0
 title: ThermophysicalDB.jl
 message: >-
@@ -16,36 +15,99 @@ abstract: >-
   A Julia package that downloads, caches and queries experimental thermophysical
   property data from public databases, starting with the NIST/TRC ThermoML Archive.
   The package does not contain or redistribute any data.
+# The works this package credits. Every entry has an `abbreviation`, its citation key in the
+# form of the reference manager (surname of the first author, year, first word of the title,
+# all lower case), and `keywords`:
+#   data-source  credited in every file exported from the data of the database
+#   group        work of the research group, for the documentation
+#   background   other reading about the data, for the documentation
+# `ThermophysicalDB.check_references()` verifies the keys and compares the articles with the
+# DOI resolver. The notice, the exported `.bib` files and the bibliography of the
+# documentation are all generated from this list.
 references:
   - type: data
+    abbreviation: riccardi2021thermoml
+    keywords: [data-source]
     title: "ThermoML/Data Archive"
     authors:
-      - name: "NIST Thermodynamics Research Center (TRC)"
+      - family-names: Riccardi
+        given-names: Demian
+      - family-names: Bazyleva
+        given-names: Ala
+      - family-names: Paulechka
+        given-names: Eugene
+      - family-names: Diky
+        given-names: Vladimir
+      - family-names: Magee
+        given-names: Joseph W.
+      - family-names: Kazakov
+        given-names: Andrei F.
+      - family-names: Townsend
+        given-names: Scott A.
+      - family-names: Muzny
+        given-names: Chris D.
+    publisher:
+      name: "National Institute of Standards and Technology"
+    year: 2021
+    version: "1.2"
+    date-accessed: 2026-10-30
     doi: 10.18434/mds2-2422
     url: "https://data.nist.gov/od/id/mds2-2422"
   - type: article
+    abbreviation: riccardi2022towards
+    keywords: [background]
+    title: "Towards improved FAIRness of the ThermoML Archive"
+    authors:
+      - family-names: Riccardi
+        given-names: Demian
+      - family-names: Trautt
+        given-names: Zachary
+      - family-names: Bazyleva
+        given-names: Ala
+      - family-names: Paulechka
+        given-names: Eugene
+      - family-names: Diky
+        given-names: Vladimir
+      - family-names: Magee
+        given-names: Joseph W.
+      - family-names: Kazakov
+        given-names: Andrei F.
+      - family-names: Townsend
+        given-names: Scott A.
+      - family-names: Muzny
+        given-names: Chris D.
+    journal: "Journal of Computational Chemistry"
+    year: 2022
+    volume: 43
+    issue: 12
+    start: 879
+    end: 887
+    doi: 10.1002/jcc.26842
+  - type: article
+    abbreviation: frenkel2006xml
+    keywords: [data-source]
     title: "XML-based IUPAC standard for experimental, predicted, and critically evaluated thermodynamic property data storage and capture (ThermoML) (IUPAC Recommendations 2006)"
     authors:
       - family-names: Frenkel
-        given-names: M.
+        given-names: Michael
       - family-names: Chirico
-        given-names: R. D.
+        given-names: Robert D.
       - family-names: Diky
-        given-names: V.
+        given-names: Vladimir
       - family-names: Dong
-        given-names: Q.
+        given-names: Qian
       - family-names: Marsh
-        given-names: K. N.
+        given-names: Kenneth N.
       - family-names: Dymond
-        given-names: J. H.
+        given-names: John H.
       - family-names: Wakeham
-        given-names: W. A.
+        given-names: William A.
       - family-names: Stein
-        given-names: S. E.
+        given-names: Stephen E.
       - family-names: Königsberger
-        given-names: E.
+        given-names: Erich
       - family-names: Goodwin
-        given-names: A. R. H.
+        given-names: Anthony R. H.
     journal: "Pure and Applied Chemistry"
     year: 2006
     volume: 78
@@ -53,3 +115,157 @@ references:
     start: 541
     end: 612
     doi: 10.1351/pac200678030541
+  - type: article
+    abbreviation: frenkel2003thermoml
+    keywords: [background]
+    title: "ThermoML an XML-based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 1. Experimental Data"
+    authors:
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Diky
+        given-names: Vladimir V.
+      - family-names: Dong
+        given-names: Qian
+      - family-names: Frenkel
+        given-names: Svetlana
+      - family-names: Franchois
+        given-names: Paul R.
+      - family-names: Embry
+        given-names: Dale L.
+      - family-names: Teague
+        given-names: Thomas L.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Wilhoit
+        given-names: Randolph C.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2003
+    volume: 48
+    issue: 1
+    start: 2
+    end: 13
+    doi: 10.1021/je025645o
+  - type: article
+    abbreviation: chirico2003thermoml
+    keywords: [background]
+    title: "ThermoML─An XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 2. Uncertainties"
+    authors:
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Diky
+        given-names: Vladimir V.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Wilhoit
+        given-names: Randolph C.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2003
+    volume: 48
+    issue: 5
+    start: 1344
+    end: 1359
+    doi: 10.1021/je034088i
+  - type: article
+    abbreviation: frenkel2004thermoml
+    keywords: [background]
+    title: "ThermoML—An XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 3. Critically Evaluated Data, Predicted Data, and Equation Representation"
+    authors:
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Diky
+        given-names: Vladimir V.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Dymond
+        given-names: John H.
+      - family-names: Wakeham
+        given-names: William A.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2004
+    volume: 49
+    issue: 3
+    start: 381
+    end: 393
+    doi: 10.1021/je049890e
+  - type: article
+    abbreviation: chirico2009thermoml
+    keywords: [background]
+    title: "ThermoML—An XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 4. Biomaterials"
+    authors:
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Diky
+        given-names: Vladimir
+      - family-names: Goldberg
+        given-names: Robert N.
+      - family-names: Heerklotz
+        given-names: Heiko
+      - family-names: Ladbury
+        given-names: John E.
+      - family-names: Remeta
+        given-names: David P.
+      - family-names: Dymond
+        given-names: John H.
+      - family-names: Goodwin
+        given-names: Anthony R. H.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Wakeham
+        given-names: William A.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2009
+    volume: 55
+    issue: 4
+    start: 1564
+    end: 1572
+    doi: 10.1021/je900685d
+  - type: article
+    abbreviation: frenkel2011thermoml
+    keywords: [background]
+    title: "ThermoML: an XML-Based Approach for Storage and Exchange of Experimental and Critically Evaluated Thermophysical and Thermochemical Property Data. 5. Speciation and Complex Equilibria"
+    authors:
+      - family-names: Frenkel
+        given-names: Michael
+      - family-names: Diky
+        given-names: Vladimir
+      - family-names: Chirico
+        given-names: Robert D.
+      - family-names: Goldberg
+        given-names: Robert N.
+      - family-names: Heerklotz
+        given-names: Heiko
+      - family-names: Ladbury
+        given-names: John E.
+      - family-names: Remeta
+        given-names: David P.
+      - family-names: Dymond
+        given-names: John H.
+      - family-names: Goodwin
+        given-names: Anthony R. H.
+      - family-names: Marsh
+        given-names: Kenneth N.
+      - family-names: Wakeham
+        given-names: William A.
+      - family-names: Stein
+        given-names: Stephen E.
+      - family-names: Brown
+        given-names: Paul L.
+      - family-names: Königsberger
+        given-names: Erich
+      - family-names: Williams
+        given-names: Peter A.
+    journal: "Journal of Chemical & Engineering Data"
+    year: 2011
+    volume: 56
+    issue: 2
+    start: 307
+    end: 316
+    doi: 10.1021/je100999j

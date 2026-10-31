@@ -27,10 +27,10 @@ db = database(progress = false)
 
 fluid = ["carbon dioxide"]
 models = (
-    PR = PR(fluid),
     SRK = SRK(fluid),
+    PR = PR(fluid),
+    tcPR = tcPR(fluid),
     PCSAFT = PCSAFT(fluid),
-    SAFTVRMie = SAFTVRMie(fluid),
     GERG2008 = GERG2008(fluid),
 )
 
@@ -38,7 +38,7 @@ M = 44.0095u"g/mol"    # molar mass of carbon dioxide
 
 # One fixed colour per model, used in every figure of this page. The reference
 # equation is drawn in white, the experimental points in grey-blue.
-palette = (PR = "#ffb000", SRK = "#ff4a1c", PCSAFT = "#2fe0ff", SAFTVRMie = "#5c8dff", GERG2008 = "#e8ecff")
+palette = (SRK = "#ff4a1c", PR = "#ffb000", tcPR = "#b17bff", PCSAFT = "#2fe0ff", GERG2008 = "#e8ecff")
 keys(models)
 ```
 
@@ -320,13 +320,13 @@ for (j, (property, label, unit)) in enumerate((
     ("Speed of sound", "w [m s⁻¹]", u"m/s"),
 ))
     ax = Axis(fig[1, j]; xlabel = "p [MPa]", ylabel = label, title = property)
-    v = try
+    selection = try
         points(db; component = "carbon dioxide", exact = true, property, temperature = (270u"K", 340u"K"), pressure = (1u"MPa", 25u"MPa"))
     catch
         nothing
     end
-    isnothing(v) && continue
-    t = table(v; unitful = true)
+    isnothing(selection) && continue
+    t = table(selection; unitful = true)
     isempty(t.value) && continue
     push!(scatters, scatter!(
         ax, ustrip.(u"MPa", t.pressure), ustrip.(unit, t.value);
@@ -356,3 +356,33 @@ The pressure is on the horizontal axis and the temperature is the colour, so iso
 ## References
 
 The equations of state and the reference equation are cited in the text; the full entries are in the [Bibliography](@ref bibliography). The experimental data come from the ThermoML Archive of NIST/TRC and the articles it indexes; see [About the data](@ref 40-about-data).
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example co2
+critical = filter(!isnothing, map(["Critical temperature", "Critical pressure", "Critical density"]) do property
+    try
+        points(db; component = "carbon dioxide", exact = true, property)
+    catch
+        nothing
+    end
+end)
+panels = filter(!isnothing, map(["Thermal conductivity", "Speed of sound"]) do property
+    try
+        points(db; component = "carbon dioxide", exact = true, property, temperature = (270u"K", 340u"K"), pressure = (1u"MPa", 25u"MPa"))
+    catch
+        nothing
+    end
+end)
+Main.DocsCredits.credits(v, vd, critical..., panels...)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

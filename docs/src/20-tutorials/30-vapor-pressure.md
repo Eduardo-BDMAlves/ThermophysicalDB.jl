@@ -125,3 +125,19 @@ fig
 ```
 
 Windows with fewer than eight points are skipped, so the curve may have gaps where the literature is thin. Those gaps are precisely what a coverage analysis of the archive would flag.
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example vap
+Main.DocsCredits.credits(v)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

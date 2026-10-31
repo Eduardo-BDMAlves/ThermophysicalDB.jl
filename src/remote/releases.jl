@@ -20,13 +20,19 @@ struct Release
 end
 
 """
-    NoReleaseError(attempts)
+    NoReleaseError(attempts, reached = false)
 
-Thrown when none of the metadata endpoints yields a ThermoML archive release.
+Thrown when none of the metadata endpoints yields a ThermoML archive release. `reached` is
+`true` when at least one endpoint answered but its record held no archive link we recognise
+(the record, or the naming of the archive, may have changed), and `false` when nothing
+could be read at all (offline, server down).
 """
 struct NoReleaseError <: Exception
     attempts::Vector{String}
+    reached::Bool
 end
+
+NoReleaseError(attempts::Vector{String}) = NoReleaseError(attempts, false)
 
 function Base.showerror(io::IO, err::NoReleaseError)
     print(io, "could not determine the latest ThermoML archive release:")
@@ -59,9 +65,11 @@ const BUILTIN_RELEASES = (
 builtin_latest() = last(BUILTIN_RELEASES)
 
 # Matches archive links such as https://.../ThermoML.v2020-09-30.tgz but not the
-# neighbouring ".tgz.sha256" links (the digest URL is derived from the archive URL).
+# neighbouring ".tgz.sha256" links (the digest URL is derived from the archive URL). Small
+# variations of the name are accepted (case, `-` or `_` instead of `.`, no `v`, `.tar.gz`).
+# The first capture is the file name, the second the version.
 const RELEASE_URL_REGEX =
-    r"https://[^\s\"'<>\\]*?/ThermoML\.v(\d{4}-\d{2}-\d{2})\.tgz(?![\w.])"
+    r"https://[^\s\"'<>\\]*?/(ThermoML[._-]?v?(\d{4}-\d{2}-\d{2})\.(?:tgz|tar\.gz))(?![\w.])"i
 
 """
     parse_releases(text) -> Vector{Release}
@@ -74,10 +82,9 @@ function parse_releases(text::AbstractString)::Vector{Release}
     normalized = replace(text, "\\/" => "/")
     found = Dict{String,Release}()
     for m in eachmatch(RELEASE_URL_REGEX, normalized)
-        version = String(m.captures[1])
+        name, version = String(m.captures[1]), String(m.captures[2])
         url = String(m.match)
-        found[version] =
-            Release(version, "ThermoML.v$(version).tgz", url, url * ".sha256", nothing)
+        found[version] = Release(version, name, url, url * ".sha256", nothing)
     end
     return sort!(collect(values(found)); by = release -> release.version)
 end
@@ -92,7 +99,8 @@ end
     fetch_latest_release(; urls = METADATA_URLS, timeout = 10) -> Release
 
 Ask NIST which ThermoML archive is the most recent. Every endpoint in `urls` is tried in
-turn; throws [`NoReleaseError`](@ref) listing the failures if none works. The short
+turn; throws [`NoReleaseError`](@ref) listing the failures if none works (its `reached` field
+tells an unreadable endpoint from a record without a recognisable archive link). The short
 `timeout` (seconds) keeps the check from stalling when the machine is offline.
 """
 function fetch_latest_release(;
@@ -101,15 +109,17 @@ function fetch_latest_release(;
     get_text = http_get_text,
 )::Release
     attempts = String[]
+    reached = false
     for url in urls
         try
             releases = parse_releases(get_text(url; timeout))
             isempty(releases) || return last(releases)
+            reached = true
             push!(attempts, "$url: no archive link found in the response")
         catch err
             err isa InterruptException && rethrow()
             push!(attempts, "$url: " * sprint(showerror, err))
         end
     end
-    throw(NoReleaseError(attempts))
+    throw(NoReleaseError(attempts, reached))
 end

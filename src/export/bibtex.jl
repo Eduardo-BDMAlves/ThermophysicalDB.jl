@@ -4,8 +4,9 @@
 # DOI resolver delivers (through DOI2BibTeX.jl) and the fields stored in the archive.
 # They are compared field by field. The resolver wins wherever both have a field, a field
 # that only the archive has is added, and every disagreement is reported. Citation keys
-# are the surname of the first author and the year, with the suffixes a, b, c, ... when
-# both repeat.
+# have the form of the reference manager's: surname of the first author, year and first
+# word of the title, in lower case (`myers1999surfaces`), with the suffixes a, b, c, ...
+# when all three repeat.
 
 # ----------------------------------------------------------------------------------
 # Entries
@@ -117,7 +118,8 @@ end
 
 function clean_resolver_entry!(entry::BibEntry)
     for (idx, (name, value)) in enumerate(entry.fields)
-        entry.fields[idx] = name => clean_resolver_value(value)
+        value = clean_resolver_value(value)
+        entry.fields[idx] = name => (name == "pages" ? normalize_pages(value) : value)
     end
     return entry
 end
@@ -226,14 +228,77 @@ end
 # Citation keys
 # ----------------------------------------------------------------------------------
 
-"Surname of the first author as an ASCII citation-key stem; `Anonymous` when unknown."
+# Letters that do not decompose into a letter and a mark.
+const FOLDED_LETTERS = Dict(
+    'ß' => "ss",
+    'ø' => "o",
+    'Ø' => "O",
+    'æ' => "ae",
+    'Æ' => "AE",
+    'œ' => "oe",
+    'Œ' => "OE",
+    'ł' => "l",
+    'Ł' => "L",
+    'đ' => "d",
+    'Đ' => "D",
+    'ı' => "i",
+)
+
+# TeX accent commands (`{\"o}`, `\'e`) as the plain letter.
+const TEX_ACCENT = r"\\[`'^\"~=.uvHcdbkr]\s*\{?([A-Za-z])\}?"
+
+"ASCII text: accents are dropped and the letters that do not decompose are spelled out."
+function ascii_fold(s::AbstractString)
+    text = replace(String(s), TEX_ACCENT => s"\1", "\\ss" => "ss")
+    io = IOBuffer()
+    for c in Unicode.normalize(text; stripmark = true)
+        if haskey(FOLDED_LETTERS, c)
+            write(io, FOLDED_LETTERS[c])
+        elseif isascii(c)
+            write(io, c)
+        end
+    end
+    return String(take!(io))
+end
+
+# What stands for a missing year or author in a key.
+const NO_YEAR_KEY = "sd"
+const NO_AUTHOR_KEY = "anonymous"
+
+"""
+Surname of the first author as an ASCII, lower case stem: particles are joined to it
+(`da Costa` gives `dacosta`) and hyphens and spaces vanish; `anonymous` when unknown.
+"""
 function key_stem(entry::BibEntry)
     authors = field_value(entry, "author")
-    authors === nothing && return "Anonymous"
-    surname = Unicode.normalize(first_author_surname(authors); stripmark = true)
-    stem = filter(c -> isascii(c) && isletter(c), surname)
-    return isempty(stem) ? "Anonymous" : stem
+    authors === nothing && return NO_AUTHOR_KEY
+    stem = lowercase(filter(isletter, ascii_fold(first_author_surname(authors))))
+    return isempty(stem) ? NO_AUTHOR_KEY : stem
 end
+
+"The year of an entry for its key; `sd` (no date) when it has none."
+function key_year(entry::BibEntry)
+    year = something(tryparse(Int, strip(something(field_value(entry, "year"), ""))), 0)
+    return year > 0 ? string(year) : NO_YEAR_KEY
+end
+
+"""
+The first word of the title, lower case and ASCII: the first run of letters and digits, so
+`Particle-stabilized` gives `particle`, and `The` or `A` are words like any other.
+"""
+function key_word(entry::BibEntry)
+    title = ascii_fold(something(field_value(entry, "title"), ""))
+    m = match(r"[A-Za-z0-9]+", title)
+    return m === nothing ? "" : lowercase(m.match)
+end
+
+"""
+    mendeley_key(entry) -> String
+
+The key of the pattern of the reference manager: the surname of the first author, the year
+and the first word of the title, in lower case, as in `myers1999surfaces`.
+"""
+mendeley_key(entry::BibEntry) = string(key_stem(entry), key_year(entry), key_word(entry))
 
 "The `n`-th suffix of the sequence a, b, ..., z, aa, ab, ..."
 function letter_suffix(n::Integer)
@@ -249,18 +314,15 @@ end
 """
     assign_keys!(entries, reserved)
 
-Set the key of every entry to the surname of its first author followed by the year
-(`Chirico2003`; the surname alone when the year is unknown). When two or more entries
-share a surname and a year, all of them get a suffix (`Chirico2003a`, `Chirico2003b`, ...)
-in the order of their DOI, so the keys of one set do not depend on the order of the
-points. Keys in `reserved` are never used.
+Set the key of every entry to [`mendeley_key`](@ref) (`myers1999surfaces`: surname, year
+and first word of the title). When two or more entries give the same key, all of them get a
+suffix (`smith2001thermala`, `smith2001thermalb`, ...) in the order of their DOI, so the
+keys of one set do not depend on the order of the points. Keys in `reserved` are never used.
 """
 function assign_keys!(entries::Vector{BibEntry}, reserved = Set{String}())
     groups = Dict{String,Vector{Int}}()
     for (idx, entry) in enumerate(entries)
-        year = something(tryparse(Int, something(field_value(entry, "year"), "")), 0)
-        base = year > 0 ? string(key_stem(entry), year) : key_stem(entry)
-        push!(get!(Vector{Int}, groups, base), idx)
+        push!(get!(Vector{Int}, groups, mendeley_key(entry)), idx)
     end
     used = Set{String}(reserved)
     for base in sort!(collect(keys(groups)))
@@ -303,76 +365,68 @@ end
 
 bibtex_cache_dir(; create::Bool = false) = subdir("bibtex", create)
 
-default_fetcher(doi::AbstractString) = DOI2BibTeX.doi2bib(String(doi))
+# DOI2BibTeX returns a `Citation`, which is not a string: its text is what it displays.
+citation_text(reply::AbstractString) = String(reply)
+citation_text(reply) = sprint(show, MIME"text/plain"(), reply)
+
+default_fetcher(doi::AbstractString) = citation_text(DOI2BibTeX.doi2bib(String(doi)))
 
 """
-    fetch_entry_text(doi; online, cache, refresh, fetcher) -> Union{Nothing,String}
+    fetch_entry(doi; online, cache, refresh, fetcher) -> (text, reason)
 
 The BibTeX text for `doi`: from the cache if it is there (unless `refresh`), otherwise
 from the resolver (unless `online` is false). A reply that is not a BibTeX entry counts
-as a failure and is never cached.
+as a failure and is never cached. When there is no text, `reason` says why: that the
+cache does not hold it and the network is off, the error the resolver raised, or what its
+reply looked like.
 """
-function fetch_entry_text(
+function fetch_entry(
     doi::AbstractString;
     online::Bool,
     cache::Bool,
     refresh::Bool,
     fetcher,
-)::Union{Nothing,String}
+)::Tuple{Union{Nothing,String},String}
     file = joinpath(bibtex_cache_dir(), cache_name(doi))
     if cache && !refresh && isfile(file)
         text = read(file, String)
-        parse_bibtex(text) === nothing || return text
+        parse_bibtex(text) === nothing || return text, ""
     end
-    online || return nothing
+    online || return nothing, "not in the cache, and online = false"
+    reason = ""
     for attempt = 1:2
         try
-            text = String(fetcher(doi))
+            reply = fetcher(doi)
+            text = citation_text(reply)
             if parse_bibtex(text) !== nothing
                 if cache
                     mkpath(bibtex_cache_dir(; create = true))
                     write(file, text)
                 end
-                return text
+                return text, ""
             end
+            reason = string(
+                "the reply (a ",
+                typeof(reply),
+                ") is not a BibTeX entry: ",
+                repr(first(text, 80)),
+            )
         catch err
+            err isa InterruptException && rethrow()
+            reason = string("the resolver raised ", sprint(showerror, err))
             attempt == 2 && @debug "No BibTeX entry for DOI" doi exception = err
         end
         attempt == 1 && sleep(0.5)
     end
-    return nothing
+    return nothing, reason
 end
+
+"The text of [`fetch_entry`](@ref) alone: `nothing` when there is none."
+fetch_entry_text(doi::AbstractString; kwargs...) = first(fetch_entry(doi; kwargs...))
 
 # ----------------------------------------------------------------------------------
 # The source of the data, always credited
 # ----------------------------------------------------------------------------------
-
-const SOURCE_ENTRIES = (
-    """
-    @misc{ThermoMLArchive,
-      author = {{NIST Thermodynamics Research Center (TRC)}},
-      title  = {{ThermoML}/Data Archive},
-      year   = {2020},
-      note   = {Dataset, National Institute of Standards and Technology},
-      doi    = {10.18434/mds2-2422},
-      url    = {https://data.nist.gov/od/id/mds2-2422},
-    }
-    """,
-    """
-    @article{ThermoMLStandard,
-      author  = {Frenkel, Michael and Chirico, Robert D. and Diky, Vladimir and Dong, Qian and Marsh, Kenneth N. and Dymond, John H. and Wakeham, William A. and Stein, Stephen E. and K{\\"o}nigsberger, Erich and Goodwin, Anthony R. H.},
-      title   = {{XML}-based {IUPAC} standard for experimental, predicted, and critically evaluated thermodynamic property data storage and capture ({ThermoML}) ({IUPAC} Recommendations 2006)},
-      journal = {Pure and Applied Chemistry},
-      volume  = {78},
-      number  = {3},
-      pages   = {541--612},
-      year    = {2006},
-      doi     = {10.1351/pac200678030541},
-    }
-    """,
-)
-
-source_entries() = [parse_bibtex(text) for text in SOURCE_ENTRIES]
 
 # ----------------------------------------------------------------------------------
 # Writing
@@ -441,14 +495,18 @@ Base.show(io::IO, r::BibtexReport) =
 
 The entries behind a selection, ready to be written or summarised: `ids` are the numbers of
 the references in the dataset (ascending), `entries[k]` is the entry of `ids[k]` with its key
-assigned, `sources` are the entries that credit the ThermoML Archive and its standard, and
-`report` tells where each entry came from.
+assigned, `sources` are the entries that credit the ThermoML Archive and its standard,
+`package` the entries of this package, and
+`report` tells where each entry came from; `from_archive` tells whether the points come
+from the ThermoML Archive, in which case the file starts with its notice.
 """
 struct Bibliography
     ids::Vector{Int}
     entries::Vector{BibEntry}
     sources::Vector{BibEntry}
+    package::Vector{BibEntry}
     report::BibtexReport
+    from_archive::Bool
 end
 
 function collect_bibliography(
@@ -457,6 +515,8 @@ function collect_bibliography(
     cache::Bool = true,
     refresh::Bool = false,
     include_source::Bool = true,
+    include_package::Bool = true,
+    package_cff::Union{Nothing,AbstractString} = nothing,
     progress::Bool = true,
     fetcher = default_fetcher,
 )
@@ -508,15 +568,46 @@ function collect_bibliography(
     end
 
     sources = include_source ? source_entries() : BibEntry[]
-    assign_keys!(entries, Set{String}(e.key for e in sources))
+    package = include_package ? package_entries(package_cff) : BibEntry[]
+    assign_keys!(entries, Set{String}(e.key for e in Iterators.flatten((sources, package))))
     report = BibtexReport(length(ids), resolved, archive_only, conflicts)
-    return Bibliography(ids, entries, sources, report)
+    return Bibliography(ids, entries, sources, package, report, from_archive(view))
+end
+
+# The notice as a BibTeX `@comment`, which BibTeX and biber ignore.
+function render_notice(io::IO)
+    println(io, "@comment{")
+    for line in notice_lines()
+        println(io, "  ", line)
+    end
+    println(io, "}\n")
+    return nothing
+end
+
+# The request to cite this package, as a BibTeX `@comment`, in front of its entries.
+function render_package_request(io::IO, package::Vector{BibEntry})
+    keys = join((e.key for e in package), ", ")
+    println(io, "@comment{")
+    println(
+        io,
+        "  This file was written by ThermophysicalDB.jl. If the package was useful to your",
+    )
+    println(io, "  work, please consider citing it: the entries that follow (", keys, ").")
+    println(io, "}\n")
+    return nothing
 end
 
 function render_bibliography(b::Bibliography)
     io = IOBuffer()
+    b.from_archive && render_notice(io)
     for entry in b.sources
         render_entry(io, entry)
+    end
+    if !isempty(b.package)
+        render_package_request(io, b.package)
+        for entry in b.package
+            render_entry(io, entry)
+        end
     end
     for entry in sort(b.entries; by = e -> lowercase(e.key))
         render_entry(io, entry)
@@ -531,7 +622,7 @@ build_bibliography(ds::Dataset; kwargs...) = build_bibliography(DataView(ds); kw
 
 """
     bibtex(view; online = true, cache = true, refresh = false, include_source = true,
-           progress = true) -> String
+           include_package = true, progress = true) -> String
 
 BibTeX entries of every article behind the points of `view` (a [`DataView`](@ref), or a
 [`Dataset`](@ref) for all of them), one entry per article.
@@ -542,9 +633,10 @@ the archive has is added, and the fields on which they disagree are listed by
 [`write_bibtex`](@ref). An article whose DOI cannot be resolved is written from the
 archive alone.
 
-The key of an entry is the surname of its first author followed by the year, for example
-`Chirico2003`. When two entries share a surname and a year, both get the suffixes `a`,
-`b`, `c`, ... in the order of their DOI (`Chirico2003a`, `Chirico2003b`).
+The key of an entry has the form of the reference manager's: the surname of the first
+author, the year and the first word of the title, in lower case and without accents, for
+example `chirico2003thermoml`. When two entries give the same key, both get the suffixes
+`a`, `b`, `c`, ... in the order of their DOI.
 
 # Keywords
 - `online`: contact the resolver. With `false` only the cache and the archive are used.
@@ -553,6 +645,11 @@ The key of an entry is the surname of its first author followed by the year, for
 - `refresh`: ignore the cache and request every DOI again.
 - `include_source`: add the entries for the ThermoML Archive and for the ThermoML
   standard, which credit the origin of the data.
+- `include_package`: add the entry of this package, read from its `CITATION.cff` (the
+  version in use, its DOI when the file has one and the article of the package when the
+  file lists it), preceded by a comment asking you to cite it. Nothing in the tables refers
+  to it.
+- `package_cff`: another file to read it from; by default the `CITATION.cff` of the package.
 - `progress`: print the number of DOIs fetched.
 
 # Examples

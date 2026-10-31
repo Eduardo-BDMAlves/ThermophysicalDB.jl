@@ -1,4 +1,19 @@
 @testmodule Toy begin
+    # Export one format of `view` and return the report and the file written:
+    # `export1("dir/water.csv", v)` writes `dir/water/water.csv`.
+    function export1(path, view; kwargs...)
+        dir, file = splitdir(path)
+        name, extension = splitext(file)
+        format = Symbol(lstrip(extension, '.'))
+        report = ThermophysicalDB.export_points(
+            joinpath(dir, name),
+            view;
+            formats = (format,),
+            kwargs...,
+        )
+        return report, joinpath(dir, name, file)
+    end
+
     using ThermophysicalDB: ThermophysicalDB
     const T = ThermophysicalDB
 

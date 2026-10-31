@@ -57,7 +57,7 @@ end
     s = T.reference_summary(ds; online = false, cache = false, progress = false)
     @test length(s) == 4
     # a reference without a year comes first, then 1990 (two properties, by name), then 2005
-    @test s.key == ["Anonymous", "Moe1990", "Moe1990", "Doe2005"]
+    @test s.key == ["anonymoussdbench", "moe1990", "moe1990", "doe2005"]
     @test s.property == [
         "Thermal conductivity",
         "Mass density",
@@ -116,13 +116,13 @@ end
     @test occursin("\\toprule", tex) &&
           occursin("\\midrule", tex) &&
           occursin("\\bottomrule", tex)
-    @test occursin("\\cite{Doe2005}", tex) && occursin("\\cite{Moe1990}", tex)
+    @test occursin("\\cite{doe2005}", tex) && occursin("\\cite{moe1990}", tex)
     # more than one property and system: the columns appear
     @test occursin("Property", tex) && occursin("System", tex)
     @test occursin("\$T\$ [K]", tex) && occursin("\$p\$ [MPa]", tex)
     # the keys are the ones in the BibTeX of the same summary
     bib = T.bibtex(s)
-    @test occursin(r"@\w+\{Doe2005,", bib) && occursin(r"@\w+\{Moe1990,", bib)
+    @test occursin(r"@\w+\{doe2005,", bib) && occursin(r"@\w+\{moe1990,", bib)
     # columns can be chosen, and the reference can be written out
     tex2 = T.latex_table(s; columns = [:reference, :points], reference = :text)
     @test occursin("Doe and Roe (2005)", tex2) && !occursin("Property", tex2)
@@ -133,9 +133,11 @@ end
 
     csv = T.csv_table(s)
     lines = split(strip(csv), '\n')
-    @test length(lines) == 5
-    @test startswith(lines[1], "key,doi,year,month,citation")
-    @test occursin("T_min [K]", lines[1]) && occursin("p_max [MPa]", lines[1])
+    @test length(lines) == 6    # the notice, the header and four rows
+    @test startswith(lines[1], "# data origin: ")
+    @test startswith(lines[2], "key,doi,year,month,citation")
+    @test occursin("T_min [K]", lines[2]) && occursin("p_max [MPa]", lines[2])
+    @test split(strip(T.csv_table(s; notice = false)), '\n') == lines[2:end]
 
     text = sprint(show, MIME"text/plain"(), s)
     @test occursin("ReferenceSummary: 4 rows", text)
@@ -153,8 +155,8 @@ end
         for ext in ("bib", "tex", "md", "csv")
             @test isfile("$prefix.$ext")
         end
-        @test occursin("\\cite{Doe2005}", read("$prefix.tex", String))
-        @test occursin(r"@\w+\{Doe2005,", read("$prefix.bib", String))
+        @test occursin("\\cite{doe2005}", read("$prefix.tex", String))
+        @test occursin(r"@\w+\{doe2005,", read("$prefix.bib", String))
 
         only_bib = joinpath(tmp, "only")
         T.write_references(

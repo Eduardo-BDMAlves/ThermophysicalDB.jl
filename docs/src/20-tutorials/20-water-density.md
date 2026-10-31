@@ -180,3 +180,19 @@ The articles are ordered from the oldest to the newest year; within a year, by m
 - Use the pressure of each point instead of 1 atm: call `mass_density(model, p, T)` with the stated pressure (`t.pressure`), and widen the pressure window. The model then follows the compression of the liquid.
 - Move the upper limit to `99.9u"°C"` and then to `100u"°C"` and watch what happens to the residuals near the boiling point.
 - Replace `IAPWS95()` with a cubic model such as `PR(["water"])` and compare the residuals: a cubic equation is off by percent, not ppm, in the liquid density of water.
+
+## Sources of the data
+
+```@raw html
+<details class="details custom-block"><summary>The articles behind the data of this page</summary>
+```
+
+```@example water
+Main.DocsCredits.credits(v)
+```
+
+The articles of the whole documentation, with a download of the BibTeX file, are in [Data credits](@ref data_credits).
+
+```@raw html
+</details>
+```

@@ -665,6 +665,23 @@ mjx-container svg path {
 .tdb-gallery .tdb-card:nth-child(4n + 3) { --tdb-accent: var(--neon-lime); --tdb-accent-text: var(--tdb-lime); }
 .tdb-gallery .tdb-card:nth-child(4n + 4) { --tdb-accent: var(--neon-orange); --tdb-accent-text: var(--tdb-orange); }
 
+/* Download button (plain HTML in the pages that offer a generated file) */
+.tdb-download {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 1px solid var(--vp-c-brand-1);
+  border-radius: 8px;
+  color: var(--vp-c-brand-1) !important;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.tdb-download:hover {
+  background-color: var(--vp-c-brand-1);
+  color: var(--vp-c-bg) !important;
+}
+
 /* ---- Sidebar and navigation ----------------------------------------------------------- */
 
 .VPSidebarItem.level-0 > .item > .text {
