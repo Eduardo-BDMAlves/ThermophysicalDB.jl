@@ -39,6 +39,16 @@ DataView
 table
 sample_table
 purity_step_table
+condition_table
+```
+
+## Uncertainty terms of your data
+
+```@docs
+set_uncertainty!
+UncertaintyTerm
+uncertainty_table
+expanded_uncertainty
 ```
 
 ## Exporting points

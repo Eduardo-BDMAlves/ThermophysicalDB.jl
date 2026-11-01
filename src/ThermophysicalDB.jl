@@ -20,7 +20,6 @@ using TOML: TOML
 using Tables: Tables
 using Tar: Tar
 using Unicode: Unicode
-using Unitful: Unitful, @u_str
 using YAML: YAML
 
 include("remote/datadir.jl")
@@ -31,7 +30,9 @@ include("remote/archive.jl")
 include("remote/download.jl")
 include("remote/install.jl")
 include("remote/local.jl")
+include("units/exact.jl")
 include("units/catalog.jl")
+include("units/backend.jl")
 include("uncertainty/coverage.jl")
 include("schema/pool.jl")
 include("schema/tables.jl")
@@ -45,6 +46,7 @@ include("parse/article.jl")
 include("parse/ingest.jl")
 include("parse/build.jl")
 include("query/table.jl")
+include("uncertainty/budget.jl")
 include("store/serialize.jl")
 include("store/cache.jl")
 include("store/database.jl")
@@ -57,6 +59,7 @@ include("export/purity.jl")
 include("export/summary.jl")
 include("export/points.jl")
 include("export/thermoml.jl")
+include("export/conditions.jl")
 include("outliers/stats.jl")
 include("outliers/esd.jl")
 include("outliers/physical.jl")
@@ -69,14 +72,17 @@ include("outliers/pipeline.jl")
 include("precompile.jl")
 
 export DataView,
+    UncertaintyTerm,
     bibtex,
     check_update,
+    condition_table,
     csv_table,
     database_dir,
     database,
     diagnostics,
     ensure_archive,
     esd,
+    expanded_uncertainty,
     export_points,
     find_compounds,
     find_outliers,
@@ -91,7 +97,9 @@ export DataView,
     reset_database_dir!,
     sample_table,
     set_database_dir!,
+    set_uncertainty!,
     table,
+    uncertainty_table,
     update_database!,
     write_bibtex,
     write_references

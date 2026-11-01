@@ -60,7 +60,7 @@ v = points(
     temperature = (0u"°C", 100u"°C"), pressure = (0.9u"atm", 1.1u"atm"),
 )
 
-t = table(v; unitful = true)   # Tables.jl columns: temperature, pressure, value, unc_k2, doi, year, ...
+t = table(v; quantities = Unitful)   # Tables.jl columns: temperature, pressure, value, unc_k2, doi, year, ...
 ```
 
 The [documentation](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev) has a getting-started guide and tutorials that go from a plot of hexane conductivity to comparing the measured density of water with IAPWS-95, and hexane and CO₂ data with the equations of state of [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl).

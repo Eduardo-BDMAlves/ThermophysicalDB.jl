@@ -98,6 +98,62 @@ function ingest_sample!(
     return id
 end
 
+# The compounds of a solvent or of a phase, as the positions in the compound table.
+function ids_text(orgs::AbstractVector{Int}, compound_ids)
+    ids = Int32[get(compound_ids, o, NO_ID) for o in orgs]
+    filter!(!=(NO_ID), ids)
+    return join(ids, ",")
+end
+
+function property_extras_with_ids(p::ParsedProperty, compound_ids)
+    extras = copy(p.extras)
+    for (key, orgs) in (
+        "solvent_ids" => p.solvent_orgs,
+        "phase_ids" => p.phase_orgs,
+        "reference_phase_ids" => p.reference_phase_orgs,
+    )
+        text = ids_text(orgs, compound_ids)
+        isempty(text) || push!(extras, key => text)
+    end
+    return extras
+end
+
+function add_phase_condition!(ds::Dataset, experiment, phase::String, component)
+    add_condition!(
+        ds.conditions;
+        scope = :experiment,
+        row = experiment,
+        role = :phase,
+        label = intern!(ds.condition_labels, phase),
+        component,
+    )
+    return nothing
+end
+
+function add_parsed_condition!(
+    ds::Dataset,
+    scope::Symbol,
+    row,
+    role::Symbol,
+    c::ParsedCondition,
+    compound_ids,
+)
+    add_condition!(
+        ds.conditions;
+        scope,
+        row,
+        role,
+        group = intern!(ds.condition_groups, c.group),
+        label = intern!(ds.condition_labels, c.label),
+        value = c.value,
+        digits = c.digits,
+        phase = intern!(ds.phases, c.phase),
+        component = c.org == 0 ? NO_ID : get(compound_ids, c.org, NO_ID),
+        phase_component = c.phase_org == 0 ? NO_ID : get(compound_ids, c.phase_org, NO_ID),
+    )
+    return nothing
+end
+
 function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::BuildReport)
     report.articles += 1
     if !isempty(article.error)
@@ -163,7 +219,37 @@ function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::B
             purpose = intern!(ds.purposes, pe.purpose),
         )
         for (key, value) in pe.extras
-            add_extra!(ds, :experiment, experiment, key, value)
+            if startswith(key, "variable_phase_org:")
+                # stored as the compound of the dataset, not the number in the article
+                id = get(compound_ids, round(Int, value), NO_ID)
+                id == NO_ID || add_extra!(
+                    ds,
+                    :experiment,
+                    experiment,
+                    "variable_phase_component:" *
+                    key[(length("variable_phase_org:")+1):end],
+                    Float64(id),
+                )
+            else
+                add_extra!(ds, :experiment, experiment, key, value)
+            end
+        end
+        for ph in pe.phases
+            if isempty(ph.orgs)
+                add_phase_condition!(ds, experiment, ph.phase, NO_ID)
+            else
+                for o in ph.orgs
+                    add_phase_condition!(
+                        ds,
+                        experiment,
+                        ph.phase,
+                        get(compound_ids, o, NO_ID),
+                    )
+                end
+            end
+        end
+        for c in pe.constraints
+            add_parsed_condition!(ds, :experiment, experiment, :constraint, c, compound_ids)
         end
 
         property_ids = Int32[
@@ -180,7 +266,10 @@ function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::B
         end
         phase_ids = Int32[intern!(ds.phases, p.phase) for p in pe.properties]
         unc_method_ids = Int32[intern!(ds.unc_methods, p.unc_method) for p in pe.properties]
-        prepared = [prepare_extras(ds, p.extras) for p in pe.properties]
+        prepared = [
+            prepare_extras(ds, property_extras_with_ids(p, compound_ids)) for
+            p in pe.properties
+        ]
 
         for m in pe.measurements
             k = Int(m.property)
@@ -204,9 +293,9 @@ function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::B
                 composition = m.composition,
             )
             push_prepared!(ds.extras, MEASUREMENT_SCOPE, row, prepared[k])
-            if m.extras !== nothing
-                for (key, value) in m.extras
-                    add_extra!(ds, :measurement, row, key, value)
+            if m.conditions !== nothing
+                for c in m.conditions
+                    add_parsed_condition!(ds, :measurement, row, :variable, c, compound_ids)
                 end
             end
         end

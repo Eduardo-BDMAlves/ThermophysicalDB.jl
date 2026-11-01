@@ -27,6 +27,8 @@ const COLORS = Dict(
     :experiments => "#ff4a1c",
     :measurements => "#5c8dff",
     :extras => "#ffd36b",
+    :conditions => "#7cf0c8",
+    :uncertainties => "#ff9a5c",
 )
 const BADGE_COLORS =
     Dict("PK" => "#ffd36b", "UQ" => "#58ff7a", "FK" => "#ff8a4c", "FK*" => "#ff8a4c")
@@ -44,6 +46,8 @@ const NOTES = Dict(
     :experiments => "one row per system studied in a publication",
     :measurements => "one row per measured value",
     :extras => "one row per extra field",
+    :conditions => "one row per condition, phase or constraint",
+    :uncertainties => "one row per uncertainty term",
 )
 
 const ROW_HEIGHT = 22.0
@@ -355,7 +359,14 @@ function storage()
     end
     extras = box(:extras, px, 20 + pools_height + 30, pw)
     draw_box(io, extras)
-    height = draw_legend(io, max(measurements.y + measurements.h, extras.y + extras.h) + 30)
+    conditions = box(:conditions, px, extras.y + extras.h + 30, pw)
+    draw_box(io, conditions)
+    uncertainties = box(:uncertainties, px, conditions.y + conditions.h + 30, pw)
+    draw_box(io, uncertainties)
+    height = draw_legend(
+        io,
+        max(measurements.y + measurements.h, uncertainties.y + uncertainties.h) + 30,
+    )
     return wrap(width, height, String(take!(io)), "Columns of a table and the string pools")
 end
 

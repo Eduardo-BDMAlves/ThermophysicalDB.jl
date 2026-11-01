@@ -30,6 +30,7 @@ The goal is that data written by the package are valid ThermoML, and that the pa
 - Add experimental data of the user to the local database, kept apart from the archive, which is never modified.
 - Start from a fill-in template that contains every field needed for valid ThermoML, then add a reusable mapping so that tables from other sources can be imported once their columns are declared.
 - Write valid ThermoML from those data.
+- Declare the statistical and the device uncertainty of the property, the temperature, the pressure and the composition: the terms are stored with their coverage (available in [`set_uncertainty!`](@ref)).
 
 ### 4. Systems with many components
 
@@ -43,6 +44,22 @@ The experiment tables hold at most three components per system. This limit is me
 
 - Map the coverage of the data in temperature, pressure and composition for a given system.
 - Suggest the points that reduce the most the uncertainty of the parameters of a model, using the uncertainty of the data as weights.
+
+### 7. Uncertainty propagation through models
+
+Today the package keeps the uncertainty terms of the data that are supplied and combines the terms of one quantity. The planned step is to expand the uncertainty through the model that the user fits or supplies: the contribution of ``T``, ``P`` and composition to the property enters through sensitivity coefficients, ``u_c^2(y) = \sum_i (\partial y/\partial x_i)^2 u^2(x_i)``, and the correlations between the inputs enter through their covariance.
+
+- The model is any callable, and the combination is chosen by dispatch on a small set of types (the first-order propagation of the GUM, a Monte Carlo propagation as in the GUM Supplement 1, JCGM 101), so that new methods are added without touching the others.
+- The sensitivity coefficients come from automatic differentiation (ForwardDiff.jl for few inputs, reverse mode for many), with no finite-difference step to tune.
+- The result is stored in the same table as the other terms, as a derived `combined` and `expanded` term with the model and the method in its description, and read with the same functions.
+- References: the GUM (JCGM 100:2008) and its supplements, NIST Technical Note 1297, and the IUPAC recommendations on the evaluation and reporting of uncertainty of thermophysical property data.
+
+### 8. Units known at compile time
+
+The units of a selection are known when the table is built, and the quantities could carry them in the type instead of in each element. The planned step is to push as much of the unit information as possible to compile time, to reduce the memory of the columns and to give the compiler more to specialise on (a column with the unit in the type needs no per-element tag, and conversions fold into constants).
+
+- Measure first: memory and time of `table` and of the fits with each backend on the whole archive.
+- Carry the property unit as a type parameter of the selection and of the uncertainty terms where this does not multiply the compiled methods.
 
 ## In progress
 

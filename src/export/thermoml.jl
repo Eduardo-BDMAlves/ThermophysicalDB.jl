@@ -33,6 +33,8 @@ mutable struct ThermomlContext
     experiment_extras::Dict{Int32,ExtraPairs}
     row_extras::Dict{Int32,ExtraPairs}
     steps::Dict{Int32,Vector{Int32}}
+    experiment_conditions::Dict{Int32,Vector{Int32}}   # constraints and phases
+    row_conditions::Dict{Int32,Vector{Int32}}          # variables of the selected points
     derived_digits::Int
     levels_without_method::Int
 end
@@ -43,9 +45,11 @@ function ThermomlContext(view::DataView)
     wanted_reference = falses(length(ds.references))
     wanted_experiment = falses(length(ex))
     wanted_row = falses(length(m))
+    selected_row = falses(length(m))
     wanted_sample = falses(length(ds.samples))
     seen = Set{NTuple{4,Int32}}()
     for r in view.rows
+        selected_row[r] = true
         e = m.experiment[r]
         if !wanted_experiment[e]
             wanted_experiment[e] = true
@@ -65,9 +69,21 @@ function ThermomlContext(view::DataView)
         Dict{Int32,ExtraPairs}(),
         Dict{Int32,ExtraPairs}(),
         Dict{Int32,Vector{Int32}}(),
+        Dict{Int32,Vector{Int32}}(),
+        Dict{Int32,Vector{Int32}}(),
         0,
         0,
     )
+    cd = ds.conditions
+    for i in eachindex(cd.row)
+        row = cd.row[i]
+        if cd.scope[i] == 1
+            wanted_experiment[row] &&
+                push!(get!(Vector{Int32}, context.experiment_conditions, row), i)
+        else
+            selected_row[row] && push!(get!(Vector{Int32}, context.row_conditions, row), i)
+        end
+    end
     t = ds.extras
     for i in eachindex(t.row)
         code, row = t.scope[i], t.row[i]
@@ -147,6 +163,22 @@ function thermoml_citation(context::ThermomlContext, ref::Int32)
     extras = get(context.reference_extras, ref, nothing)
     text(tag) = extra_string(extras, "citation:" * tag)
     put!(name, value) = isempty(value) || add!(citation, name, value)
+    # the TRC reference id needs all four parts in the schema; an incomplete one is left out
+    trc_parts =
+        [text("TRCRefID:" * tag) for tag in ("yrYrPub", "sAuthor1", "sAuthor2", "nAuthorn")]
+    if all(!isempty, trc_parts)
+        year, author1, author2, count = trc_parts
+        add!(
+            citation,
+            "TRCRefID",
+            JObject(
+                "yrYrPub" => something(tryparse(Int, year), 0),
+                "sAuthor1" => author1,
+                "sAuthor2" => author2,
+                "nAuthorn" => something(tryparse(Int, count), 0),
+            ),
+        )
+    end
     put!("eType", text("eType"))
     put!("eSourceType", text("eSourceType"))
     put!("sDocumentOrigin", text("sDocumentOrigin"))
@@ -279,6 +311,25 @@ function property_component(ctx::ThermomlContext, e::Integer, local_number, extr
     return 0
 end
 
+# `RegNum` elements for compounds stored as the text "id,id" (positions in the compound table).
+function reg_nums(text::AbstractString, local_number)
+    list = Any[]
+    isempty(text) && return list
+    for part in split(text, ',')
+        n = get(local_number, parse(Int32, part), 0)
+        n == 0 || push!(list, JObject("nOrgNum" => n))
+    end
+    return list
+end
+
+# The schema allows one `RegNum` in a phase of a property: the first compound is kept.
+function phase_object(name, phase, text, local_number)
+    o = JObject(name => phase)
+    regnum = reg_nums(text, local_number)
+    isempty(regnum) || add!(o, "RegNum", first(regnum))
+    return o
+end
+
 function thermoml_property(
     context::ThermomlContext,
     e::Integer,
@@ -304,7 +355,11 @@ function thermoml_property(
     component == 0 || add!(method_id, "RegNum", JObject("nOrgNum" => component))
     p = JObject("nPropNumber" => variant.number, "Property-MethodID" => method_id)
     phase = pool_string(ds.phases, variant.phase)
-    isempty(phase) || add!(p, "PropPhaseID", JObject("ePropPhase" => phase))
+    isempty(phase) || add!(
+        p,
+        "PropPhaseID",
+        phase_object("ePropPhase", phase, extra_string(extras, "phase_ids"), local_number),
+    )
     presentation = extra_string(extras, "presentation")
     add!(p, "ePresentation", isempty(presentation) ? "Direct value, X" : presentation)
     reference_state = extra_string(extras, "reference_state")
@@ -320,8 +375,18 @@ function thermoml_property(
         end
     end
     reference_phase = extra_string(extras, "reference_phase")
-    isempty(reference_phase) ||
-        add!(p, "RefPhaseID", JObject("eRefPhase" => reference_phase))
+    isempty(reference_phase) || add!(
+        p,
+        "RefPhaseID",
+        phase_object(
+            "eRefPhase",
+            reference_phase,
+            extra_string(extras, "reference_phase_ids"),
+            local_number,
+        ),
+    )
+    solvent = reg_nums(extra_string(extras, "solvent_ids"), local_number)
+    isempty(solvent) || add!(p, "Solvent", JObject("RegNum" => solvent))
     standard_state = extra_string(extras, "standard_state")
     isempty(standard_state) || add!(p, "eStandardState", standard_state)
     unc_method = pool_string(ds.unc_methods, variant.unc_method)
@@ -352,10 +417,40 @@ end
 # One article
 # ----------------------------------------------------------------------------------
 
-function variable_object(number, type_name, type_value, component = 0)
+function variable_object(
+    number,
+    type_name,
+    type_value,
+    component = 0,
+    phase = "",
+    phase_component = 0,
+)
     id = JObject("VariableType" => JObject(type_name => type_value))
     component == 0 || add!(id, "RegNum", JObject("nOrgNum" => component))
-    return JObject("nVarNumber" => number, "VariableID" => id)
+    v = JObject("nVarNumber" => number, "VariableID" => id)
+    if !isempty(phase)
+        p = JObject("eVarPhase" => phase)
+        phase_component == 0 || add!(p, "RegNum", JObject("nOrgNum" => phase_component))
+        add!(v, "VarPhaseID", p)
+    end
+    return v
+end
+
+# The compound stored as the extra `key` of an experiment, as a local number, or 0.
+function extra_compound(extras, key, local_number)
+    id = extra_value(extras, key)
+    id isa Float64 || return 0
+    return get(local_number, Int32(round(id)), 0)
+end
+
+# `RegNum` elements for compounds of the dataset, numbered as in the article.
+function reg_nums(ids::AbstractVector{Int32}, local_number)
+    list = Any[]
+    for c in ids
+        n = get(local_number, c, 0)
+        n == 0 || push!(list, JObject("nOrgNum" => n))
+    end
+    return list
 end
 
 function thermoml_experiment(
@@ -449,33 +544,130 @@ function thermoml_experiment(
         Any[thermoml_property(context, e, variant, local_number) for variant in variants],
     )
 
-    phases = String[]
-    phase_text = extra_string(extras, "phases")
-    isempty(phase_text) || append!(phases, split(phase_text, "; "))
-    if isempty(phases)
-        for variant in variants
-            p = pool_string(ds.phases, variant.phase)
-            isempty(p) || p in phases || push!(phases, p)
-        end
+    # phases of the system (with the components they are stated for), from the conditions
+    cd = ds.conditions
+    conditions = get(context.experiment_conditions, Int32(e), Int32[])
+    phases = Tuple{String,Int32}[]
+    for i in conditions
+        cd.role[i] == 3 || continue
+        name = pool_string(ds.condition_labels, cd.label[i])
+        isempty(name) && continue
+        entry = (name, cd.component[i])
+        entry in phases || push!(phases, entry)
     end
-    isempty(phases) || add!(block, "PhaseID", Any[JObject("ePhase" => p) for p in phases])
+    if isempty(phases)
+        names = String[]
+        phase_text = extra_string(extras, "phases")
+        isempty(phase_text) || append!(names, split(phase_text, "; "))
+        if isempty(names)
+            for variant in variants
+                p = pool_string(ds.phases, variant.phase)
+                isempty(p) || p in names || push!(names, p)
+            end
+        end
+        append!(phases, (name, NO_ID) for name in names)
+    end
+    if !isempty(phases)
+        # one `PhaseID` per phase and component: the schema allows a single `RegNum` in each
+        objects = Any[]
+        for (name, component) in phases
+            o = JObject("ePhase" => name)
+            number = component == NO_ID ? 0 : get(local_number, component, 0)
+            number == 0 || add!(o, "RegNum", JObject("nOrgNum" => number))
+            push!(objects, o)
+        end
+        add!(block, "PhaseID", objects)
+    end
+
+    # constraints: held fixed for the whole experiment
+    constraints = Any[]
+    for i in conditions
+        (cd.role[i] == 1 && cd.group[i] != NO_ID) || continue
+        id = JObject(
+            "ConstraintType" => JObject(
+                pool_string(ds.condition_groups, cd.group[i]) =>
+                    pool_string(ds.condition_labels, cd.label[i]),
+            ),
+        )
+        component = cd.component[i] == NO_ID ? 0 : get(local_number, cd.component[i], 0)
+        component == 0 || add!(id, "RegNum", JObject("nOrgNum" => component))
+        c = JObject("nConstraintNumber" => length(constraints) + 1, "ConstraintID" => id)
+        phase = pool_string(ds.phases, cd.phase[i])
+        if !isempty(phase)
+            o = JObject("eConstraintPhase" => phase)
+            pc =
+                cd.phase_component[i] == NO_ID ? 0 :
+                get(local_number, cd.phase_component[i], 0)
+            pc == 0 || add!(o, "RegNum", JObject("nOrgNum" => pc))
+            add!(c, "ConstraintPhaseID", o)
+        end
+        add!(c, "nConstraintValue", cd.value[i])
+        add!(c, "nConstrDigits", digits_or_derived!(context, cd.digits[i], cd.value[i]))
+        push!(constraints, c)
+    end
+    isempty(constraints) || add!(block, "Constraint", constraints)
 
     # variables: only the conditions the points have
+    # (what a constraint states is not repeated as a variable of every point)
     kinds = String[pool_string(ds.kinds, ex.kinds[i][e]) for i = 1:n]
-    has_T = any(r -> !isnan(m.temperature[r]), rs)
-    has_P = any(r -> !isnan(m.pressure[r]), rs)
-    has_x =
-        Bool[!isempty(kinds[i]) && any(r -> !isnan(m.composition[i][r]), rs) for i = 1:n]
+    fixed_T = fixed_P = false
+    fixed_x = falses(n)
+    for i in conditions
+        (cd.role[i] == 1 && cd.group[i] != NO_ID) || continue
+        group = pool_string(ds.condition_groups, cd.group[i])
+        label = pool_string(ds.condition_labels, cd.label[i])
+        if group == "eTemperature" && label == "Temperature, K"
+            fixed_T = true
+        elseif group == "ePressure" && label == "Pressure, kPa"
+            fixed_P = true
+        elseif group == "eComponentComposition"
+            for k = 1:n
+                if cd.component[i] == ex.components[k][e] && label == kinds[k]
+                    fixed_x[k] = true
+                end
+            end
+        end
+    end
+    has_T = !fixed_T && any(r -> !isnan(m.temperature[r]), rs)
+    has_P = !fixed_P && any(r -> !isnan(m.pressure[r]), rs)
+    has_x = Bool[
+        !fixed_x[i] && !isempty(kinds[i]) && any(r -> !isnan(m.composition[i][r]), rs)
+        for i = 1:n
+    ]
     variables = Any[]
     var_T = var_P = 0
     var_x = zeros(Int, n)
     if has_T
         var_T = length(variables) + 1
-        push!(variables, variable_object(var_T, "eTemperature", "Temperature, K"))
+        push!(
+            variables,
+            variable_object(
+                var_T,
+                "eTemperature",
+                "Temperature, K",
+                0,
+                extra_string(extras, "variable_phase:temperature"),
+                extra_compound(
+                    extras,
+                    "variable_phase_component:temperature",
+                    local_number,
+                ),
+            ),
+        )
     end
     if has_P
         var_P = length(variables) + 1
-        push!(variables, variable_object(var_P, "ePressure", "Pressure, kPa"))
+        push!(
+            variables,
+            variable_object(
+                var_P,
+                "ePressure",
+                "Pressure, kPa",
+                0,
+                extra_string(extras, "variable_phase:pressure"),
+                extra_compound(extras, "variable_phase_component:pressure", local_number),
+            ),
+        )
     end
     for i = 1:n
         has_x[i] || continue
@@ -487,6 +679,34 @@ function thermoml_experiment(
                 "eComponentComposition",
                 kinds[i],
                 local_number[ex.components[i][e]],
+                extra_string(extras, "variable_phase:composition:" * string(i)),
+                extra_compound(
+                    extras,
+                    "variable_phase_component:composition:" * string(i),
+                    local_number,
+                ),
+            ),
+        )
+    end
+    # the other variables, numbered after those, in the order they first appear
+    other_number = Dict{NTuple{5,Int32},Int}()
+    for r in rs, i in get(context.row_conditions, r, Int32[])
+        cd.group[i] == NO_ID && continue
+        key =
+            (cd.group[i], cd.label[i], cd.component[i], cd.phase[i], cd.phase_component[i])
+        haskey(other_number, key) && continue
+        number = length(variables) + 1
+        other_number[key] = number
+        component = key[3] == NO_ID ? 0 : get(local_number, key[3], 0)
+        push!(
+            variables,
+            variable_object(
+                number,
+                pool_string(ds.condition_groups, key[1]),
+                pool_string(ds.condition_labels, key[2]),
+                component,
+                pool_string(ds.phases, key[4]),
+                key[5] == NO_ID ? 0 : get(local_number, key[5], 0),
             ),
         )
     end
@@ -514,6 +734,17 @@ function thermoml_experiment(
         for i = 1:n
             (has_x[i] && !isnan(m.composition[i][r])) || continue
             put_variable!(var_x[i], m.composition[i][r], m.composition_digits[i][r])
+        end
+        for i in get(context.row_conditions, r, Int32[])
+            cd.group[i] == NO_ID && continue
+            key = (
+                cd.group[i],
+                cd.label[i],
+                cd.component[i],
+                cd.phase[i],
+                cd.phase_component[i],
+            )
+            put_variable!(other_number[key], cd.value[i], cd.digits[i])
         end
         variant = variants[variant_of_row[j]]
         pv = JObject(

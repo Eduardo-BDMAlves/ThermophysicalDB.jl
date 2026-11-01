@@ -47,7 +47,7 @@ mixture("Viscosity")
 A mixture point carries the compositions `x1, x2, x3` of its components *in the order of the `components` column*, and `xkind` says what they express. The same system can therefore appear as `"ethanol + water"` in one article and as `"water + ethanol"` in another, and some articles give mass fractions instead of mole fractions. Look before you plot:
 
 ```@example mix
-tv = table(mixture("Viscosity"); unitful = true)
+tv = table(mixture("Viscosity"); quantities = Unitful)
 
 (
     points = length(tv.value),
@@ -75,7 +75,7 @@ length(x)
 The pure end members come from the same database, so mixture and references share the same sources of error (and any tendency of a laboratory to over- or under-estimate). Medians guard against a stray point:
 
 ```@example mix
-pure_median(name, property) = median(table(pure(name, property); unitful = true).value)
+pure_median(name, property) = median(table(pure(name, property); quantities = Unitful).value)
 
 η_ethanol = pure_median("ethanol", "Viscosity")
 η_water = pure_median("water", "Viscosity")
@@ -107,7 +107,7 @@ The density data give the second signature. We turn each mixture density into a 
 M_ethanol = 46.068u"g/mol"
 M_water = 18.015u"g/mol"
 
-td = table(mixture("Mass density"); unitful = true)
+td = table(mixture("Mass density"); quantities = Unitful)
 use = (td.xkind .== "Mole fraction") .& isfinite.(ethanol_fraction(td))
 
 xd = ethanol_fraction(td)[use]

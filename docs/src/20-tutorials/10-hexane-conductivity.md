@@ -26,7 +26,7 @@ v = points(db; component = "hexane", exact = true, property = "Thermal conductiv
 The columns of [`table`](@ref) are quantities:
 
 ```@example hex
-t = table(v; unitful = true)
+t = table(v; quantities = Unitful)
 
 T = t.temperature
 p = t.pressure

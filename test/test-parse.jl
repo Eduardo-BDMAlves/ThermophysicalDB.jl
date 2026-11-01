@@ -172,7 +172,13 @@ end
     @test m1.composition_digits == (0x02, T.NO_DIGITS, T.NO_DIGITS)   # digits of the constraint
     @test [m.property for m in e2.measurements] == [1, 2]
     @test all(m -> m.pressure == 101.325 && m.temperature == 293.15, e2.measurements)
-    @test all(m -> m.extras == ["Frequency, MHz" => 1.0], e2.measurements)
+    @test all(m -> m.conditions === nothing, e2.measurements)
+    # a constraint without a column is kept with the experiment, with its kind and its label
+    # (the pressure is also in the column of every point)
+    @test e2.constraints == [
+        T.ParsedCondition("ePressure", "Pressure, kPa", 101.325, T.NO_DIGITS, "", 0, 0),
+        T.ParsedCondition("eMiscellaneous", "Frequency, MHz", 1.0, T.NO_DIGITS, "", 0, 0),
+    ]
     @test isempty(e2.extras)
 end
 
@@ -290,10 +296,20 @@ end
         @test water.unit == ["kg/m3", ""]
         @test water.method == ["free text method", ""]
 
-        @test isequal(
-            T.extra_numbers(ds, :measurement, "Frequency, MHz"),
-            [NaN, NaN, 1.0, 1.0],
-        )
+        cd = ds.conditions
+        # the first system: its phase and the composition it fixes; the second: the pressure
+        # and the frequency it fixes
+        @test length(cd) == 4 &&
+              cd.scope == fill(0x01, 4) &&
+              cd.role == [0x03, 0x01, 0x01, 0x01]
+        @test T.pool_string(ds.condition_groups, cd.group[2]) == "eComponentComposition"
+        @test T.pool_string(ds.condition_groups, cd.group[3]) == "ePressure"
+        @test cd.value[2] == 0.5 && cd.value[3] == 101.325
+        @test T.pool_string(ds.condition_labels, cd.label[1]) == "Gas"
+        @test cd.component[1] == T.NO_ID
+        @test T.pool_string(ds.condition_groups, cd.group[4]) == "eMiscellaneous"
+        @test T.pool_string(ds.condition_labels, cd.label[4]) == "Frequency, MHz"
+        @test cd.value[4] == 1.0 && cd.digits[4] == T.NO_DIGITS
         @test T.extra_texts(ds, :measurement, "property_component") ==
               ["carbon dioxide", "carbon dioxide", "", ""]
         @test T.extra_texts(ds, :reference, "keywords") == ["carbon dioxide; methane"]

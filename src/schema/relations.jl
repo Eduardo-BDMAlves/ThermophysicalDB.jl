@@ -39,6 +39,14 @@ const FOREIGN_KEYS = Dict{Tuple{Symbol,Symbol},Symbol}(
     (:extras, :row) => :any,
     (:extras, :key) => :extra_keys,
     (:extras, :text) => :extra_texts,
+    (:conditions, :row) => :any,
+    (:conditions, :group) => :condition_groups,
+    (:conditions, :label) => :condition_labels,
+    (:conditions, :phase) => :phases,
+    (:conditions, :component) => :compounds,
+    (:conditions, :phase_component) => :compounds,
+    (:uncertainties, :row) => :any,
+    (:uncertainties, :method) => :unc_methods,
 )
 
 "`Int32` columns that are numbers and not identifiers."

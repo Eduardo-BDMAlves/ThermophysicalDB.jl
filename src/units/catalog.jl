@@ -1,52 +1,64 @@
 """
-    UnitSpec(native, unitful, si, to_si)
+    UnitSpec(native, unitful, si)
 
 One entry of the closed unit catalog used by the ThermoML archive.
 
 - `native`: unit string exactly as written in the property name (`"kPa*kg/mol"`).
 - `unitful`: the same unit as a string that `Unitful.uparse` understands.
 - `si`: the coherent SI unit with the same dimension (`"Pa*kg/mol"`).
-- `to_si`: factor that converts a value in `native` into `si`.
+- `exact`: the exact factor that converts a value in `native` into `si`, as a rational.
+- `to_si`: `exact` rounded once to `Float64`.
 
-Only multiplicative conversions occur in the archive (all temperatures are kelvin), so
-no offset is needed.
+The factor is not typed in: it is derived from the two strings with exact rational
+arithmetic (`parse_exact_unit`), and the constructor throws if the two units do not have the
+same dimension. Only multiplicative conversions occur in the archive (all temperatures are
+kelvin), so no offset is needed.
 """
 struct UnitSpec
     native::String
     unitful::String
     si::String
     to_si::Float64
+    exact::Exact
+end
+
+function UnitSpec(native::String, unitful::String, si::String)
+    from, to = parse_exact_unit(native), parse_exact_unit(si)
+    from.dim == to.dim ||
+        throw(ArgumentError("\"$native\" and \"$si\" do not have the same dimension"))
+    ratio = from.scale / to.scale
+    return UnitSpec(native, unitful, si, Float64(ratio), ratio)
 end
 
 # Every unit found in the 11,923 archive files (census of 2026-10). Dimensionless
 # properties carry no suffix and are therefore absent from this table.
 const UNIT_SPECS = UnitSpec[
-    UnitSpec("K", "K", "K", 1.0),
-    UnitSpec("kPa", "kPa", "Pa", 1.0e3),
-    UnitSpec("kg/m3", "kg/m^3", "kg/m^3", 1.0),
-    UnitSpec("Pa*s", "Pa*s", "Pa*s", 1.0),
-    UnitSpec("m/s", "m/s", "m/s", 1.0),
-    UnitSpec("N/m", "N/m", "N/m", 1.0),
-    UnitSpec("S/m", "S/m", "S/m", 1.0),
-    UnitSpec("m2/s", "m^2/s", "m^2/s", 1.0),
-    UnitSpec("W/m/K", "W/m/K", "W/m/K", 1.0),
-    UnitSpec("kJ/mol", "kJ/mol", "J/mol", 1.0e3),
-    UnitSpec("J/K/mol", "J/K/mol", "J/K/mol", 1.0),
-    UnitSpec("J/K/kg", "J/K/kg", "J/K/kg", 1.0),
-    UnitSpec("J/K/m3", "J/K/m^3", "J/K/m^3", 1.0),
-    UnitSpec("m3/mol", "m^3/mol", "m^3/mol", 1.0),
-    UnitSpec("m3/kg", "m^3/kg", "m^3/kg", 1.0),
-    UnitSpec("m6/mol2", "m^6/mol^2", "m^6/mol^2", 1.0),
-    UnitSpec("mol/kg", "mol/kg", "mol/kg", 1.0),
-    UnitSpec("mol/m3", "mol/m^3", "mol/m^3", 1.0),
-    UnitSpec("mol/dm3", "mol/dm^3", "mol/m^3", 1.0e3),
-    UnitSpec("S*m2/mol", "S*m^2/mol", "S*m^2/mol", 1.0),
-    UnitSpec("1/K", "K^-1", "K^-1", 1.0),
-    UnitSpec("1/kPa", "kPa^-1", "Pa^-1", 1.0e-3),
-    UnitSpec("kPa/K", "kPa/K", "Pa/K", 1.0e3),
-    UnitSpec("K/kPa", "K/kPa", "K/Pa", 1.0e-3),
-    UnitSpec("kPa*kg/mol", "kPa*kg/mol", "Pa*kg/mol", 1.0e3),
-    UnitSpec("kPa*dm3/mol", "kPa*dm^3/mol", "Pa*m^3/mol", 1.0),
+    UnitSpec("K", "K", "K"),
+    UnitSpec("kPa", "kPa", "Pa"),
+    UnitSpec("kg/m3", "kg/m^3", "kg/m^3"),
+    UnitSpec("Pa*s", "Pa*s", "Pa*s"),
+    UnitSpec("m/s", "m/s", "m/s"),
+    UnitSpec("N/m", "N/m", "N/m"),
+    UnitSpec("S/m", "S/m", "S/m"),
+    UnitSpec("m2/s", "m^2/s", "m^2/s"),
+    UnitSpec("W/m/K", "W/m/K", "W/m/K"),
+    UnitSpec("kJ/mol", "kJ/mol", "J/mol"),
+    UnitSpec("J/K/mol", "J/K/mol", "J/K/mol"),
+    UnitSpec("J/K/kg", "J/K/kg", "J/K/kg"),
+    UnitSpec("J/K/m3", "J/K/m^3", "J/K/m^3"),
+    UnitSpec("m3/mol", "m^3/mol", "m^3/mol"),
+    UnitSpec("m3/kg", "m^3/kg", "m^3/kg"),
+    UnitSpec("m6/mol2", "m^6/mol^2", "m^6/mol^2"),
+    UnitSpec("mol/kg", "mol/kg", "mol/kg"),
+    UnitSpec("mol/m3", "mol/m^3", "mol/m^3"),
+    UnitSpec("mol/dm3", "mol/dm^3", "mol/m^3"),
+    UnitSpec("S*m2/mol", "S*m^2/mol", "S*m^2/mol"),
+    UnitSpec("1/K", "K^-1", "K^-1"),
+    UnitSpec("1/kPa", "kPa^-1", "Pa^-1"),
+    UnitSpec("kPa/K", "kPa/K", "Pa/K"),
+    UnitSpec("K/kPa", "K/kPa", "K/Pa"),
+    UnitSpec("kPa*kg/mol", "kPa*kg/mol", "Pa*kg/mol"),
+    UnitSpec("kPa*dm3/mol", "kPa*dm^3/mol", "Pa*m^3/mol"),
 ]
 
 const UNIT_CATALOG = Dict{String,UnitSpec}(spec.native => spec for spec in UNIT_SPECS)

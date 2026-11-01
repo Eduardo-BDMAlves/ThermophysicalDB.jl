@@ -125,8 +125,10 @@ end
         :experiments,
         :measurements,
         :extras,
+        :conditions,
+        :uncertainties,
     ]
-    @test length(pools) == 15
+    @test length(pools) == 17
 
     # every column of every table is described, apart from the lookup dictionary
     ds = T.Dataset()

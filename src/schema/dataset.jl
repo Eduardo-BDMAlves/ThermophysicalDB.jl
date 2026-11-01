@@ -21,6 +21,8 @@ struct Dataset
     purposes::StringPool
     unc_methods::StringPool
     method_texts::StringPool
+    condition_groups::StringPool
+    condition_labels::StringPool
     references::ReferenceTable
     compounds::CompoundTable
     samples::SampleTable
@@ -29,10 +31,14 @@ struct Dataset
     experiments::ExperimentTable
     measurements::MeasurementTable
     extras::ExtraTable
+    conditions::ConditionTable
+    uncertainties::UncertaintyTable
 end
 
 function Dataset()
     return Dataset(
+        StringPool(),
+        StringPool(),
         StringPool(),
         StringPool(),
         StringPool(),
@@ -56,6 +62,8 @@ function Dataset()
         ExperimentTable(),
         MeasurementTable(),
         ExtraTable(),
+        ConditionTable(),
+        UncertaintyTable(),
     )
 end
 
@@ -172,6 +180,31 @@ function column_lengths(t::MeasurementTable)
     )
 end
 
+function column_lengths(t::ConditionTable)
+    return map(
+        length,
+        (
+            t.scope,
+            t.row,
+            t.role,
+            t.group,
+            t.label,
+            t.value,
+            t.digits,
+            t.phase,
+            t.component,
+            t.phase_component,
+        ),
+    )
+end
+
+function column_lengths(t::UncertaintyTable)
+    return map(
+        length,
+        (t.scope, t.row, t.quantity, t.kind, t.origin, t.value, t.k, t.level, t.method),
+    )
+end
+
 function column_lengths(t::ExtraTable)
     return map(length, (t.scope, t.row, t.key, t.number, t.text))
 end
@@ -198,6 +231,8 @@ function validate(ds::Dataset)
         :experiments => ds.experiments,
         :measurements => ds.measurements,
         :extras => ds.extras,
+        :conditions => ds.conditions,
+        :uncertainties => ds.uncertainties,
     )
     for (name, table) in tables
         allequal(column_lengths(table)) ||
@@ -243,6 +278,8 @@ function validate(ds::Dataset)
         ok || throw(ArgumentError("invalid identifier: $what points outside its table"))
     end
     validate_extras(ds)
+    validate_conditions(ds)
+    validate_uncertainties(ds)
     return true
 end
 
@@ -254,6 +291,27 @@ function validate_extras(ds::Dataset)
         code = ex.scope[i]
         (1 <= code <= length(EXTRA_SCOPES) && 1 <= ex.row[i] <= scope_length(ds, code)) ||
             throw(ArgumentError("invalid identifier: extra $i points outside its table"))
+    end
+    return nothing
+end
+
+function validate_conditions(ds::Dataset)
+    c = ds.conditions
+    in_range(c.group, length(ds.condition_groups)) &&
+    in_range(c.label, length(ds.condition_labels)) &&
+    in_range(c.phase, length(ds.phases)) &&
+    in_range(c.component, length(ds.compounds)) &&
+    in_range(c.phase_component, length(ds.compounds)) ||
+        throw(ArgumentError("invalid identifier: a condition points outside its pool"))
+    for i in eachindex(c.row)
+        code = c.scope[i]
+        (
+            1 <= code <= length(CONDITION_SCOPES) &&
+            1 <= c.role[i] <= length(CONDITION_ROLES) &&
+            1 <= c.row[i] <= (code == 1 ? length(ds.experiments) : length(ds.measurements))
+        ) || throw(
+            ArgumentError("invalid identifier: condition $i points outside its table"),
+        )
     end
     return nothing
 end
@@ -351,4 +409,34 @@ function extra_texts(ds::Dataset, scope::Symbol, key::AbstractString)
         end
     end
     return column
+end
+
+function validate_uncertainties(ds::Dataset)
+    u = ds.uncertainties
+    in_range(u.method, length(ds.unc_methods)) ||
+        throw(ArgumentError("invalid identifier: an uncertainty points outside its pool"))
+    seen = Set{NTuple{5,Int}}()
+    for i in eachindex(u.row)
+        code = u.scope[i]
+        (
+            1 <= code <= length(UNCERTAINTY_SCOPES) &&
+            1 <= u.quantity[i] <= length(UNCERTAINTY_QUANTITIES) &&
+            1 <= u.kind[i] <= length(UNCERTAINTY_KINDS) &&
+            1 <= u.origin[i] <= length(UNCERTAINTY_ORIGINS) &&
+            1 <= u.row[i] <= (code == 1 ? length(ds.experiments) : length(ds.measurements))
+        ) || throw(
+            ArgumentError("invalid identifier: uncertainty $i points outside its table"),
+        )
+        (isfinite(u.value[i]) && u.value[i] >= 0 && isfinite(u.k[i]) && u.k[i] > 0) ||
+            throw(ArgumentError("uncertainty $i has no valid value and coverage factor"))
+        key =
+            (Int(code), Int(u.row[i]), Int(u.quantity[i]), Int(u.kind[i]), Int(u.origin[i]))
+        key in seen && throw(
+            ArgumentError(
+                "uncertainty $i repeats a term of the same row, quantity, kind and origin",
+            ),
+        )
+        push!(seen, key)
+    end
+    return nothing
 end

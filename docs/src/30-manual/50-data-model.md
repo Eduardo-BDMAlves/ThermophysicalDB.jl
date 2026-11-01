@@ -38,7 +38,9 @@ Main.SchemaDiagrams.purity() # hide
 
 ### How the columns are held
 
-Each table is a *struct of arrays*, one contiguous vector per column, so a scan over one field reads memory in order. Repeated strings (database names, groups, methods, phases, composition kinds, the keys and texts of extra fields, and the origins, statuses, suppliers, analysis methods, purification methods, purposes and uncertainty methods of the samples and experiments, and the free-text methods) are interned in fifteen string pools; a column that refers to a pool holds the `Int32` position of the string, and comparing two strings is comparing two integers. The extra table is the one exception to the rule that a foreign key has a single target: its `row` refers to a row of the table named by `scope`.
+Each table is a *struct of arrays*, one contiguous vector per column, so a scan over one field reads memory in order. Repeated strings (database names, groups, methods, phases, composition kinds, the keys and texts of extra fields, and the origins, statuses, suppliers, analysis methods, purification methods, purposes and uncertainty methods of the samples and experiments, and the free-text methods) are interned in seventeen string pools; a column that refers to a pool holds the `Int32` position of the string, and comparing two strings is comparing two integers.
+
+The extra table and the condition table are the exceptions to the rule that a foreign key has a single target: their `row` refers to a row of the table named by `scope`. The condition table holds, one row each, the constraints and phases of an experiment (temperature, pressure and composition included, as the source stated them) and the variables of a measurement that are not temperature, pressure or composition (frequency, solvent composition, ...); [`condition_table`](@ref) reads it.
 
 ```@example datamodel
 Main.SchemaDiagrams.storage() # hide
@@ -54,6 +56,8 @@ Main.SchemaDiagrams.storage() # hide
 | [`ExperimentTable`](@ref) | studied system in a publication | a reference plus up to three compounds, their samples, the purpose of the experiment, and how the amount of each component is expressed |
 | [`MeasurementTable`](@ref) | measured value | the "long" format: one row per property value, with its conditions, uncertainty, and significant digits |
 | [`ExtraTable`](@ref) | extra field | sparse key–value store for anything without a core column |
+| [`ConditionTable`](@ref) | constraint, phase or variable of an experiment that has no column | frequency, composition of a solvent, the temperature, pressure and composition that an experiment fixes; read with [`condition_table`](@ref) |
+| [`UncertaintyTable`](@ref) | uncertainty term of a quantity | statistical, device, combined and expanded, each with its coverage; empty for the archive, filled by the data you supply ([`set_uncertainty!`](@ref)) |
 
 Repeated strings (database names, methods, phases, composition kinds) are *interned* in string pools and referred to by number, which keeps memory small and makes comparisons integer comparisons.
 

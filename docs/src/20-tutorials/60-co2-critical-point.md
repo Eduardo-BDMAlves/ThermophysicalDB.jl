@@ -107,7 +107,7 @@ function critical_values(property, unit)
     catch
         return Dict{String,typeof(1.0unit)}()
     end
-    t = table(v; unitful = true)
+    t = table(v; quantities = Unitful)
     return Dict(zip(t.doi, uconvert.(unit, t.value)))
 end
 
@@ -127,7 +127,7 @@ v = points(
     db; component = "carbon dioxide", exact = true, property = "Vapor or sublimation pressure",
     temperature = (240u"K", Tref),
 )
-t = table(v; unitful = true)
+t = table(v; quantities = Unitful)
 
 T = t.temperature
 p = t.value
@@ -176,7 +176,7 @@ vd = points(
     db; component = "carbon dioxide", exact = true, property = "Mass density",
     temperature = (270u"K", 340u"K"), pressure = (1u"MPa", 25u"MPa"),
 )
-td = table(vd; unitful = true)
+td = table(vd; quantities = Unitful)
 
 Td = td.temperature
 pd = td.pressure
@@ -326,7 +326,7 @@ for (j, (property, label, unit)) in enumerate((
         nothing
     end
     isnothing(selection) && continue
-    t = table(selection; unitful = true)
+    t = table(selection; quantities = Unitful)
     isempty(t.value) && continue
     push!(scatters, scatter!(
         ax, ustrip.(u"MPa", t.pressure), ustrip.(unit, t.value);

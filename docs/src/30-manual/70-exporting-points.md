@@ -162,6 +162,8 @@ The default `.json` has one record per point, so each point can be read on its o
 
 The composition of a point is the array `x`, with one entry per component in the order of `components`. Values that are not finite are not written.
 
+A point that has uncertainty terms of its own (data you supplied with [`set_uncertainty!`](@ref), see [Uncertainty](@ref uncertainty)) also has the member `uncertainties`: one record per term, with its `quantity`, `kind`, `origin` (`given` or `derived`), `value`, coverage factor `k`, `level` and `method`; the terms shared by the experiment come first and carry `"shared": true`. The values are in the units of the file, so with `units = :si` the pressure terms are in pascal. The data of the archive have no such terms. The ThermoML formats keep only the expanded uncertainty of the property, as the standard has it.
+
 ### In the ThermoML format
 
 `formats = :thermoml` and `formats = :thermoml_xml` write the selected points in the structure of the ThermoML standard: one `DataReport` per article, with its `Citation`, its `Compound`s (with their `Sample`s and purity steps) and the `PureOrMixtureData` that hold **only the selected points**. The first writes one JSON file with all the articles, the second a directory with one XML document per article, named by its DOI. Units are those of the archive whatever `units` says. Both need neither the references nor the network.
@@ -176,7 +178,9 @@ The elements follow the order that the schema (`xsd:sequence`) demands, and the 
 - The number of significant digits of a value is kept when the archive gives it (temperature, pressure and compositions); otherwise it is counted from the number.
 - A property without a method is written with the method `method not stated`. The uncertainty of each point is always written; the evaluation of the property (method, level of confidence, coverage factor) only when the method is known, and a warning counts the properties for which a level or a factor was left out.
 - Properties whose name the archive writes with a presentation (a ratio or a difference to a reference state) keep the exact presentation. A composition without a known kind cannot be typed and is not written.
-- Other conditions (frequency, for example) and the solvent are not exported.
+- The constraints of an experiment and the conditions that are not temperature, pressure or composition (frequency, the composition of a solvent, ...) are kept in the condition table and written as `Constraint`s or `Variable`s with their type, number of digits and phase. The phase of a variable, of a property and of its reference state is written with the compound it refers to (the standard allows one per element), and the solvent of a property as its `RegNum`. The constraints on temperature, pressure and composition are kept as the source stated them (with their digits and phase) and written back as `Constraint`; what a constraint fixes is not repeated as a variable of every point.
+- The `TRCRefID` of an article is written only when its four parts (year, first author, second author and the others) are known, because the schema requires all of them.
+- `ReactionData` (3% of the articles) is not supported: the package is about properties of substances and mixtures, not of reactions (the heat of combustion of a substance is a pure-compound property and is supported).
 
 !!! note "Enumerations newer than the schema"
     The archive uses some values (`Metastable liquid`, `Static method`, ...) that are newer than the schema copy in the standard; 20 of 2369 articles sampled fail validation in the archive itself, and the export keeps their text.

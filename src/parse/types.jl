@@ -40,6 +40,27 @@ struct ParsedCompound
     samples::Vector{ParsedSample}
 end
 
+"""
+A condition with no column of its own (see `ConditionTable`): `group` is the element of the
+schema that names its kind, `label` the exact name with its unit, `org` the component of
+the article it refers to (`0` for the whole system).
+"""
+struct ParsedCondition
+    group::String
+    label::String
+    value::Float64
+    digits::UInt8
+    phase::String
+    org::Int
+    phase_org::Int      # component the phase is stated for, `0` for none
+end
+
+"A phase of the system and the components of the article it is stated for (may be empty)."
+struct ParsedPhase
+    phase::String
+    orgs::Vector{Int}
+end
+
 struct ParsedProperty
     number::Int
     label::String           # without unit; presentation qualifiers are appended
@@ -52,6 +73,9 @@ struct ParsedProperty
     coverage::Float64       # coverage factor, NaN when not given
     unc_method::String      # how the uncertainty was evaluated, "" when not given
     extras::ExtraPairs      # constant for every point of this property
+    solvent_orgs::Vector{Int}           # components of the solvent, as numbered in the article
+    phase_orgs::Vector{Int}             # components the phase of the property is stated for
+    reference_phase_orgs::Vector{Int}   # the same for the reference phase
 end
 
 struct ParsedMeasurement
@@ -65,7 +89,7 @@ struct ParsedMeasurement
     temperature_digits::UInt8
     pressure_digits::UInt8
     composition_digits::NTuple{MAX_COMPONENTS,UInt8}
-    extras::Union{Nothing,ExtraPairs}
+    conditions::Union{Nothing,Vector{ParsedCondition}}   # variables without a column
 end
 
 struct ParsedExperiment
@@ -77,6 +101,8 @@ struct ParsedExperiment
     properties::Vector{ParsedProperty}
     measurements::Vector{ParsedMeasurement}
     extras::ExtraPairs
+    constraints::Vector{ParsedCondition}   # every constraint of the experiment
+    phases::Vector{ParsedPhase}
 end
 
 struct ParsedArticle

@@ -72,7 +72,7 @@ v = points(
     db; component = "water", exact = true, property = "Mass density",
     temperature = (24.95u"°C", 25.05u"°C"), pressure = (0.98u"atm", 1.02u"atm"),
 )
-t = table(v; unitful = true)
+t = table(v; quantities = Unitful)
 
 ρ = t.value
 U = t.unc_k2
@@ -121,7 +121,7 @@ vw = points(
     db; component = "water", exact = true, property = "Mass density",
     temperature = (0u"°C", 99u"°C"), pressure = (0.98u"atm", 1.02u"atm"),
 )
-tw = table(vw; unitful = true)
+tw = table(vw; quantities = Unitful)
 
 Tw = tw.temperature
 ρw = tw.value
@@ -202,6 +202,41 @@ extrema(filter(isfinite, normal ./ nominal))
 The output is the smallest and the largest ratio between the two versions of `unc_k2`, point by point. Both numbers are equal to ``2/1.95996 \approx 1.0204``, and this is the expected result, not a coincidence of the two policies. A source that states an expanded uncertainty at the 95 % level has to be restated at ``k = 2``. With `:nominal` the 95 % level is taken as ``k = 2`` already, so the value is kept. With `:normal` the coverage factor is 1.95996, and the value is multiplied by ``2/1.95996``, which makes it 2 % larger. Equal minimum and maximum mean that every point with a finite uncertainty in this selection was stated at the 95 % level, so all of them change by the same factor. A selection that mixed levels would show a minimum of 1 (sources that state ``k = 2`` directly, which no policy changes) and a maximum of 1.0204.
 
 Two conclusions follow. First, the choice is a uniform scale of 2 % on the affected points: the weights ``1/U_i^2`` of a weighted mean change by the same factor, so which points weigh more than others, and the weighted mean itself, do not change. Second, it matters only for the absolute size of the uncertainty of a derived quantity (the ``U`` of the weighted mean, or the share of points inside the band of the previous section), and the difference of 2 % is small next to the scatter between laboratories.
+
+## Terms of the data you supply
+
+The archive states one number per point, the expanded uncertainty of the property. A measurement of your own has more to say: the scatter of the repeated readings, the specification of each instrument, and the uncertainty of the temperature, the pressure and the composition at which the property was measured. ThermophysicalDB.jl keeps all of them, so that you can propagate them again through the model you fit (and so that error bars in ``T`` and ``P`` can be drawn).
+
+Following the GUM (JCGM 100:2008) and NIST Technical Note 1297, each term is one of four kinds:
+
+| Kind | What it is |
+| :-- | :-- |
+| `statistical` | type A: from the scatter of repeated observations, ``u_A = s/\sqrt{n}`` |
+| `device` | type B: from the specification of the instrument, its calibration or its resolution |
+| `combined` | the terms combined, ``u_c^2 = \sum u_i^2`` for uncorrelated terms |
+| `expanded` | ``U = k\,u_c``, with its coverage factor ``k`` |
+
+and every term is stored with its coverage: the value, the coverage factor ``k`` (``k = 1`` for a standard uncertainty) and the level of confidence. A plain number is a standard uncertainty; a term stated at ``k = 2`` or at 95 % is written `UncertaintyTerm(0.02; k = 2)` or `UncertaintyTerm(0.02; level = 0.95)`. A term can belong to one point or to a whole experiment (the specification of a thermometer, shared by all its points), and it is about one quantity: the property, the temperature, the pressure or one of the compositions.
+
+```julia
+using ThermophysicalDB
+
+# the thermometer is common to the experiment 1 ...
+set_uncertainty!(ds; scope = :experiment, row = 1, quantity = :temperature, device = 0.01)
+# ... and each point adds what is its own
+set_uncertainty!(ds; scope = :measurement, row = 17, quantity = :temperature,
+                 statistical = 0.02)
+set_uncertainty!(ds; scope = :measurement, row = 17, quantity = :property,
+                 combined = 0.12)                      # expanded at k = 2 by default
+
+error_T = expanded_uncertainty(view, :temperature)    # for the error bars, at k = 2
+uncertainty_table(view)                                # every term, with its coverage
+```
+
+When the combined or the expanded uncertainty is missing it is derived, and the derived rows are marked as such and say how: a `combined` term you give is used as it is to compute the expanded one (the coverage of the call, ``k = 2`` by default); an `expanded` term gives the combined one by ``u_c = U/k``; otherwise the combined uncertainty is the root sum of squares of the `statistical` and `device` terms of the point and of its experiment. For the property, the expanded uncertainty also fills the `unc`, `unc_k` and `unc_level` columns, so everything on this page works on your data like on the archive. The numbers you give are taken as they are, and so is their consistency: the package does not check a combined term against its parts.
+
+!!! note "What is combined, and what is not"
+    The combination above treats the terms of **one quantity**. The combined uncertainty of a property that you derive this way does not include the contribution of the uncertainty of ``T``, ``P`` and composition, which depends on the model: ``u_c^2(y) = u^2_{\text{own}} + \sum_i (\partial y/\partial x_i)^2 u^2(x_i)``. For a liquid density near ambient conditions the term in ``T`` usually dominates, since ``\partial\rho/\partial T`` is large and ``\partial\rho/\partial P`` small. The archive's combined uncertainty is supposed to include these contributions, but only 129,519 of its roughly 2.7 million uncertainties say that they were obtained by propagation. This is why the separate terms are kept: you can propagate them with your own model. In the ThermoML formats only the expanded uncertainty of the property is written, as the standard has it; the separate terms are in the `.json` of [`export_points`](@ref) and in [`uncertainty_table`](@ref).
 
 ## Sources of the data
 

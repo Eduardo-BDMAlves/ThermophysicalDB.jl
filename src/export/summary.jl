@@ -88,11 +88,9 @@ function central(values::Vector{Float64}, statistic::Symbol)
     return sum(values) / n
 end
 
-"`x` expressed in `to`, given in `from`; NaN stays NaN. Affine units (°C) are handled by Unitful."
-function convert_value(x::Float64, from, to)
-    isfinite(x) || return NaN
-    return Float64(Unitful.ustrip(to, x * from))
-end
+"`x`, in the native unit of `kind`, expressed in `to` (a unit name or a unit of a units package); NaN stays NaN."
+# A limit that is missing (infinite or NaN) stays missing, as NaN.
+convert_value(x::Float64, kind, to) = isfinite(x) ? convert_native(x, kind, to) : NaN
 
 # ----------------------------------------------------------------------------------
 # The summary
@@ -141,7 +139,7 @@ Tables.columns(s::ReferenceSummary) = getfield(s, :columns)
 Tables.schema(s::ReferenceSummary) = Tables.schema(getfield(s, :columns))
 
 """
-    reference_summary(view; temperature_unit = u"K", pressure_unit = u"MPa",
+    reference_summary(view; temperature_unit = "K", pressure_unit = "MPa",
                       statistic = :median, method_length = 24, purity_digits = 6,
                       policy = :nominal,
                       online = true, cache = true, refresh = false, include_source = true,
@@ -152,7 +150,8 @@ Summarise the articles behind the points of `view` ([`DataView`](@ref) or
 measured two properties has two rows.
 
 Each row has the number of points, the ranges of temperature and pressure (in the units
-you choose, any Unitful temperature and pressure unit), the methods and phases, and the
+you choose: a name such as `"K"`, `"°C"`, `"MPa"` or `"bar"`, or a unit of a units package
+whose extension is loaded, for example `u"MPa"` from Unitful), the methods and phases, and the
 expanded uncertainty at ``k = 2`` over the points that state one: the `statistic`
 (`:median`, the default, or `:mean`) of the relative uncertainty in percent, and of the
 absolute uncertainty in the unit of the property. A method name longer than
@@ -165,8 +164,8 @@ conversion of uncertainties to ``k = 2`` (see [`table`](@ref)).
 """
 function reference_summary(
     view::DataView;
-    temperature_unit = u"K",
-    pressure_unit = u"MPa",
+    temperature_unit = "K",
+    pressure_unit = "MPa",
     statistic::Symbol = :median,
     method_length::Integer = 24,
     purity_digits::Integer = 6,
@@ -286,7 +285,7 @@ function reference_summary(
 
     described =
         [describe_samples(ds, group_samples[g]; digits = purity_digits) for g in order]
-    from_T, from_p = u"K", u"kPa"
+    from_T, from_p = NativeTemperature(), NativePressure()
     columns = (;
         key = keys_[order],
         doi = String[rf.doi[group_ref[g]] for g in order],
@@ -727,7 +726,7 @@ rest, those of [`reference_summary`](@ref). The summary is returned.
 
 # Examples
 ```julia
-summary = write_references("water", v; pressure_unit = u"kPa", statistic = :mean)
+summary = write_references("water", v; pressure_unit = "kPa", statistic = :mean)
 ```
 """
 function write_references(

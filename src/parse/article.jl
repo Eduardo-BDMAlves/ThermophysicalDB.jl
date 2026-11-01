@@ -69,9 +69,13 @@ end
 
 "How one variable or constraint of an experiment is stored."
 struct ConditionSpec
-    role::Symbol    # :temperature, :pressure, :composition or :other (goes to extras)
+    role::Symbol    # :temperature, :pressure, :composition or :other (goes to the conditions)
     slot::Int       # component slot for :composition
-    label::String   # extras key when the value does not fit a core column
+    group::String   # element of the schema that names the kind of condition
+    label::String   # the name the source wrote, with its unit
+    phase::String
+    org::Int        # component the condition refers to, 0 for the whole system
+    phase_org::Int  # component the phase is stated for, 0 for none
 end
 
 mutable struct Conditions
@@ -81,7 +85,7 @@ mutable struct Conditions
     x_digits::NTuple{MAX_COMPONENTS,UInt8}
     temperature_digits::UInt8
     pressure_digits::UInt8
-    extras::Union{Nothing,ExtraPairs}
+    others::Union{Nothing,Vector{ParsedCondition}}
 end
 
 Conditions() = Conditions(
@@ -102,31 +106,36 @@ function copy_conditions(c::Conditions)
         c.x_digits,
         c.temperature_digits,
         c.pressure_digits,
-        c.extras === nothing ? nothing : copy(c.extras),
+        c.others === nothing ? nothing : copy(c.others),
     )
 end
 
-function condition_spec(type_obj, id_obj, phase::String, orgnums, kinds, names)
+function condition_spec(type_obj, id_obj, phase::String, phase_org, orgnums, kinds, names)
     key, value = only_entry(type_obj)
     text = value isa AbstractString ? String(value) : ""
     label = isempty(text) ? "unrecognised condition" : text
+    group = key === nothing ? "" : String(key)
+    org = jorgnum(id_obj)
     if key == "eTemperature" && text == "Temperature, K"
-        return ConditionSpec(:temperature, 0, label)
+        return ConditionSpec(:temperature, 0, group, label, phase, 0, phase_org)
     elseif key == "ePressure" && text == "Pressure, kPa"
-        return ConditionSpec(:pressure, 0, label)
-    elseif key == "eComponentComposition" || key == "eSolventComposition"
-        org = jorgnum(id_obj)
-        name = get(names, org, "component $org")
-        label = label * " [" * name * "]" * (isempty(phase) ? "" : " (" * phase * ")")
-        if key == "eComponentComposition"
-            slot = something(findfirst(==(org), orgnums), 0)
-            if slot != 0
-                isempty(kinds[slot]) && (kinds[slot] = text)
-                kinds[slot] == text && return ConditionSpec(:composition, slot, label)
-            end
+        return ConditionSpec(:pressure, 0, group, label, phase, 0, phase_org)
+    elseif key == "eComponentComposition"
+        slot = something(findfirst(==(org), orgnums), 0)
+        if slot != 0
+            isempty(kinds[slot]) && (kinds[slot] = text)
+            kinds[slot] == text && return ConditionSpec(
+                :composition,
+                slot,
+                group,
+                label,
+                phase,
+                org,
+                phase_org,
+            )
         end
     end
-    return ConditionSpec(:other, 0, label)
+    return ConditionSpec(:other, 0, group, label, phase, org, phase_org)
 end
 
 function apply_condition!(
@@ -145,11 +154,32 @@ function apply_condition!(
         c.x = Base.setindex(c.x, value, spec.slot)
         c.x_digits = Base.setindex(c.x_digits, digits, spec.slot)
     else
-        extras = c.extras === nothing ? (c.extras = ExtraPairs()) : c.extras
-        push!(extras, spec.label => value)
+        others = c.others === nothing ? (c.others = ParsedCondition[]) : c.others
+        push!(others, parsed_condition(spec, value, digits))
     end
     return nothing
 end
+
+# Whether the column that `spec` fills is still empty (a second value goes to the others).
+function is_free(c::Conditions, spec::ConditionSpec)
+    spec.role === :temperature && return isnan(c.temperature)
+    spec.role === :pressure && return isnan(c.pressure)
+    spec.role === :composition && return isnan(c.x[spec.slot])
+    return false
+end
+
+parsed_condition(spec::ConditionSpec, value::Float64, digits::UInt8) = ParsedCondition(
+    spec.group,
+    spec.label,
+    value,
+    digits,
+    spec.phase,
+    spec.org,
+    spec.phase_org,
+)
+
+# Components named by a `RegNum` that may be a list, a lone object or absent.
+orgs_of(x) = Int[jint(r, "nOrgNum") for r in jitems(jfield(x, "RegNum"))]
 
 # ----------------------------------------------------------------------------------
 # Properties
@@ -243,12 +273,30 @@ function parse_property(p, names)::Union{Nothing,ParsedProperty}
         jnum(uncertainty, "nCombCoverageFactor"),
         jstr(uncertainty, "eCombUncertEvalMethod"),
         extras,
+        orgs_of(jfield(p, "Solvent")),
+        orgs_of(jfield(p, "PropPhaseID")),
+        orgs_of(jfield(p, "RefPhaseID")),
     )
 end
 
 # ----------------------------------------------------------------------------------
 # Experiments
 # ----------------------------------------------------------------------------------
+
+# The phase of a temperature, a pressure or a composition has no column: it is kept as an
+# extra of the experiment named `variable_phase:<what>`.
+function note_phase!(extras::ExtraPairs, spec::ConditionSpec)
+    isempty(spec.phase) && return nothing
+    what =
+        spec.role === :temperature ? "temperature" :
+        spec.role === :pressure ? "pressure" :
+        spec.role === :composition ? "composition:" * string(spec.slot) : ""
+    isempty(what) && return nothing
+    push!(extras, "variable_phase:" * what => spec.phase)
+    spec.phase_org == 0 ||
+        push!(extras, "variable_phase_org:" * what => Float64(spec.phase_org))
+    return nothing
+end
 
 function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperiment}
     number = jint(pm, "nPureOrMixtureDataNumber")
@@ -288,26 +336,57 @@ function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperim
     end
 
     base = Conditions()
+    constraints = ParsedCondition[]
     for c in jitems(jfield(pm, "Constraint"))
         id = jfield(c, "ConstraintID")
-        phase = jstr(jfield(c, "ConstraintPhaseID"), "eConstraintPhase")
-        spec =
-            condition_spec(jfield(id, "ConstraintType"), id, phase, orgnums, kinds, names)
-        apply_condition!(
-            base,
-            spec,
-            jnum(c, "nConstraintValue"),
-            digits_code(c, "nConstrDigits"),
+        phase_obj = jfield(c, "ConstraintPhaseID")
+        phase = jstr(phase_obj, "eConstraintPhase")
+        spec = condition_spec(
+            jfield(id, "ConstraintType"),
+            id,
+            phase,
+            jorgnum(phase_obj),
+            orgnums,
+            kinds,
+            names,
         )
+        value = jnum(c, "nConstraintValue")
+        digits = digits_code(c, "nConstrDigits")
+        note_phase!(extras, spec)
+        if spec.role === :other
+            push!(constraints, parsed_condition(spec, value, digits))
+        else
+            # temperature, pressure and compositions also fill the columns of every point;
+            # the constraint itself is kept so that the export can write it back as one
+            !isnan(value) &&
+                is_free(base, spec) &&
+                push!(constraints, parsed_condition(spec, value, digits))
+            apply_condition!(base, spec, value, digits)
+        end
     end
 
     specs = Dict{Int,ConditionSpec}()
     for v in jitems(jfield(pm, "Variable"))
         id = jfield(v, "VariableID")
-        phase = jstr(jfield(v, "VarPhaseID"), "eVarPhase")
-        specs[jint(v, "nVarNumber")] =
-            condition_spec(jfield(id, "VariableType"), id, phase, orgnums, kinds, names)
+        phase_obj = jfield(v, "VarPhaseID")
+        phase = jstr(phase_obj, "eVarPhase")
+        spec = condition_spec(
+            jfield(id, "VariableType"),
+            id,
+            phase,
+            jorgnum(phase_obj),
+            orgnums,
+            kinds,
+            names,
+        )
+        specs[jint(v, "nVarNumber")] = spec
+        note_phase!(extras, spec)
     end
+
+    phase_list = ParsedPhase[
+        ParsedPhase(jstr(ph, "ePhase"), orgs_of(ph)) for
+        ph in jitems(jfield(pm, "PhaseID")) if !isempty(jstr(ph, "ePhase"))
+    ]
 
     measurements = ParsedMeasurement[]
     for row in jitems(jfield(pm, "NumValues"))
@@ -340,7 +419,7 @@ function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperim
                     conditions.temperature_digits,
                     conditions.pressure_digits,
                     conditions.x_digits,
-                    conditions.extras,
+                    conditions.others,
                 ),
             )
         end
@@ -354,6 +433,8 @@ function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperim
         properties,
         measurements,
         extras,
+        constraints,
+        phase_list,
     )
 end
 
@@ -392,6 +473,12 @@ function parse_article_unchecked(path::String, bytes)::ParsedArticle
     for tag in CITATION_TEXT_TAGS
         value = jstr(citation, tag)
         isempty(value) || push!(extras, "citation:" * tag => value)
+    end
+    trc = jfield(citation, "TRCRefID")
+    for tag in ("yrYrPub", "sAuthor1", "sAuthor2", "nAuthorn")
+        v = jfield(trc, tag)
+        text = v isa AbstractString ? String(v) : v isa Real ? string(v) : ""
+        isempty(text) || push!(extras, "citation:TRCRefID:" * tag => text)
     end
     abstract_text = jstr(citation, "sAbstract")
     isempty(abstract_text) || push!(extras, "abstract" => abstract_text)

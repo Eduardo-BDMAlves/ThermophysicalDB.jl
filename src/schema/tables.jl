@@ -621,3 +621,231 @@ end
 ExtraTable() = ExtraTable(UInt8[], Int32[], Int32[], Float64[], Int32[])
 
 Base.length(t::ExtraTable) = length(t.row)
+
+# ----------------------------------------------------------------------------------
+# Conditions
+# ----------------------------------------------------------------------------------
+
+"Rows a condition can be attached to; the position is the code stored on disk."
+const CONDITION_SCOPES = (:experiment, :measurement)
+
+"""
+What a [`ConditionTable`](@ref) row describes; the position is the code stored on disk:
+a `:constraint` (held fixed for the whole experiment), a `:variable` (its value changes
+from point to point) or a `:phase` (a phase of the system, optionally of one component).
+"""
+const CONDITION_ROLES = (:constraint, :variable, :phase)
+
+"""
+    ConditionTable()
+
+Conditions of an experiment that have no column of their own: everything besides the
+temperature, the pressure and the composition of the components (frequency, density of a
+second phase, the composition of a solvent, ...), and the phases of the system. One row
+per condition, in the order of the source.
+
+- `scope`/`row`: the row of the experiment (`:experiment`) or of the measurement
+  (`:measurement`) the condition belongs to. A constraint and a phase belong to an
+  experiment; the value of a variable belongs to a measurement.
+- `role`: index in [`CONDITION_ROLES`](@ref).
+- `group` (pool `condition_groups`): the kind of condition in the ThermoML schema, e.g.
+  `"eMiscellaneous"` or `"eSolventComposition"`. `label` (pool `condition_labels`): the
+  name written by the source, with its unit, e.g. `"Mass density, kg/m3"`; for a phase it
+  is the name of the phase.
+- `value`, `digits`: the number and its significant digits ([`NO_DIGITS`](@ref) when not
+  given); `NaN` for a phase.
+- `phase` (pool `phases`): the phase the condition refers to.
+- `component`: the compound the condition refers to, [`NO_ID`](@ref) for the whole system.
+  `phase_component`: the compound the phase is stated for, `NO_ID` for none.
+"""
+struct ConditionTable
+    scope::Vector{UInt8}
+    row::Vector{Int32}
+    role::Vector{UInt8}
+    group::Vector{Int32}
+    label::Vector{Int32}
+    value::Vector{Float64}
+    digits::Vector{UInt8}
+    phase::Vector{Int32}
+    component::Vector{Int32}
+    phase_component::Vector{Int32}
+end
+
+ConditionTable() = ConditionTable(
+    UInt8[],
+    Int32[],
+    UInt8[],
+    Int32[],
+    Int32[],
+    Float64[],
+    UInt8[],
+    Int32[],
+    Int32[],
+    Int32[],
+)
+
+Base.length(t::ConditionTable) = length(t.row)
+
+function condition_scope_code(scope::Symbol)
+    code = findfirst(==(scope), CONDITION_SCOPES)
+    code === nothing &&
+        throw(ArgumentError("scope must be one of $(CONDITION_SCOPES), got :$scope"))
+    return UInt8(code)
+end
+
+function condition_role_code(role::Symbol)
+    code = findfirst(==(role), CONDITION_ROLES)
+    code === nothing &&
+        throw(ArgumentError("role must be one of $(CONDITION_ROLES), got :$role"))
+    return UInt8(code)
+end
+
+"""
+    add_condition!(t::ConditionTable; scope, row, role, group = NO_ID, label = NO_ID,
+                   value = NaN, digits = NO_DIGITS, phase = NO_ID, component = NO_ID,
+                   phase_component = NO_ID) -> Int
+
+Append a condition (identifiers are pool positions, see [`ConditionTable`](@ref)) and
+return its position.
+"""
+function add_condition!(
+    t::ConditionTable;
+    scope::Symbol,
+    row::Integer,
+    role::Symbol,
+    group::Integer = NO_ID,
+    label::Integer = NO_ID,
+    value::Real = NaN,
+    digits::Integer = NO_DIGITS,
+    phase::Integer = NO_ID,
+    component::Integer = NO_ID,
+    phase_component::Integer = NO_ID,
+)
+    push!(t.scope, condition_scope_code(scope))
+    push!(t.row, Int32(row))
+    push!(t.role, condition_role_code(role))
+    push!(t.group, Int32(group))
+    push!(t.label, Int32(label))
+    push!(t.value, Float64(value))
+    push!(t.digits, UInt8(digits))
+    push!(t.phase, Int32(phase))
+    push!(t.component, Int32(component))
+    push!(t.phase_component, Int32(phase_component))
+    return length(t.row)
+end
+
+# ----------------------------------------------------------------------------------
+# Uncertainties
+# ----------------------------------------------------------------------------------
+
+"Rows an uncertainty can be attached to; the position is the code stored on disk."
+const UNCERTAINTY_SCOPES = (:experiment, :measurement)
+
+"""
+The quantity an [`UncertaintyTable`](@ref) row is about; the position is the code stored
+on disk. `:composition1` ... are the compositions of the components in the order of the
+experiment.
+"""
+const UNCERTAINTY_QUANTITIES =
+    (:property, :temperature, :pressure, :composition1, :composition2, :composition3)
+
+"""
+What an [`UncertaintyTable`](@ref) row is; the position is the code stored on disk:
+`:statistical` (type A, from the scatter of repeated observations), `:device` (type B,
+from the specification of the instrument), `:combined` (the terms combined) and
+`:expanded` (the combined uncertainty times a coverage factor).
+"""
+const UNCERTAINTY_KINDS = (:statistical, :device, :combined, :expanded)
+
+"Whether a row was stated by the user (`:given`) or computed by the package (`:derived`)."
+const UNCERTAINTY_ORIGINS = (:given, :derived)
+
+@assert length(UNCERTAINTY_QUANTITIES) == 3 + MAX_COMPONENTS
+
+"""
+    UncertaintyTable()
+
+Uncertainty terms of the quantities of a point or of an experiment, one row per term. It is
+sparse: the ThermoML archive states only the expanded uncertainty of the property (kept in
+the `unc` columns of the measurements), so a database built from the archive has no rows;
+they come from the data the user supplies (see [`set_uncertainty!`](@ref)).
+
+- `scope`/`row`: the experiment (`:experiment`; a term shared by all its points, such as
+  the specification of a thermometer) or the measurement (`:measurement`) it belongs to.
+- `quantity`, `kind`, `origin`: indices in [`UNCERTAINTY_QUANTITIES`](@ref),
+  [`UNCERTAINTY_KINDS`](@ref) and [`UNCERTAINTY_ORIGINS`](@ref).
+- `value`: the uncertainty as stated, in the unit of the quantity, and `k` its coverage
+  factor, so that the standard uncertainty is `value / k` (`k = 1` for a standard
+  uncertainty). `level` is the corresponding level of confidence as a fraction, `NaN` when
+  not known. Every row has a finite `k > 0`.
+- `method` (pool `unc_methods`): how the term was obtained, [`NO_ID`](@ref) for none.
+"""
+struct UncertaintyTable
+    scope::Vector{UInt8}
+    row::Vector{Int32}
+    quantity::Vector{UInt8}
+    kind::Vector{UInt8}
+    origin::Vector{UInt8}
+    value::Vector{Float64}
+    k::Vector{Float64}
+    level::Vector{Float64}
+    method::Vector{Int32}
+end
+
+UncertaintyTable() = UncertaintyTable(
+    UInt8[],
+    Int32[],
+    UInt8[],
+    UInt8[],
+    UInt8[],
+    Float64[],
+    Float64[],
+    Float64[],
+    Int32[],
+)
+
+Base.length(t::UncertaintyTable) = length(t.row)
+
+function symbol_code(name::AbstractString, options::Tuple, given::Symbol)
+    code = findfirst(==(given), options)
+    code === nothing && throw(ArgumentError("$name must be one of $(options), got :$given"))
+    return UInt8(code)
+end
+
+"""
+    add_uncertainty!(t::UncertaintyTable; scope, row, quantity, kind, value, k,
+                     level = NaN, method = NO_ID, origin = :given)
+
+Append one term (see [`UncertaintyTable`](@ref)) and return its position. This is the raw
+insertion; [`set_uncertainty!`](@ref) also derives the missing combined and expanded terms.
+"""
+function add_uncertainty!(
+    t::UncertaintyTable;
+    scope::Symbol,
+    row::Integer,
+    quantity::Symbol,
+    kind::Symbol,
+    value::Real,
+    k::Real,
+    level::Real = NaN,
+    method::Integer = NO_ID,
+    origin::Symbol = :given,
+)
+    isfinite(value) && value >= 0 ||
+        throw(ArgumentError("an uncertainty must be finite and not negative, got $value"))
+    isfinite(k) && k > 0 ||
+        throw(ArgumentError("the coverage factor must be finite and positive, got $k"))
+    isnan(level) ||
+        0 < level < 1 ||
+        throw(ArgumentError("the level of confidence is a fraction in (0, 1), got $level"))
+    push!(t.scope, symbol_code("scope", UNCERTAINTY_SCOPES, scope))
+    push!(t.row, Int32(row))
+    push!(t.quantity, symbol_code("quantity", UNCERTAINTY_QUANTITIES, quantity))
+    push!(t.kind, symbol_code("kind", UNCERTAINTY_KINDS, kind))
+    push!(t.origin, symbol_code("origin", UNCERTAINTY_ORIGINS, origin))
+    push!(t.value, Float64(value))
+    push!(t.k, Float64(k))
+    push!(t.level, Float64(level))
+    push!(t.method, Int32(method))
+    return length(t.row)
+end

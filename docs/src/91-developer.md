@@ -188,6 +188,28 @@ Cite from any page with `[key](@cite)`; the entries are listed on the [Bibliogra
 Check the volume and pages against the publisher.
 - **Data credit.** Every page that shows archive data should make clear that the data come from the NIST/TRC ThermoML Archive and the original articles, not from this package. See [About the data](@ref 40-about-data).
 
+## Supporting another unit package
+
+The package works with plain `Float64`; a unit package is only a way to write and to show quantities, and it is an extension in `ext/`, activated when the user loads the package. The core defines a small internal protocol (in `src/units/backend.jl`, nothing is exported), and an extension implements it for its package:
+
+| Function | What it does |
+|---|---|
+| `register_unit_backend!(Module, backend)` | called in `__init__`, so that `quantities = Module` finds the backend |
+| `parse_unit(backend, text)` | the unit of a text such as `"kPa"` |
+| `attach_unit(backend, column, unit)` | the `Float64` column with the unit |
+| `native_value(x, kind)` | the value of a quantity in the unit of the archive (`kind` is `NativeTemperature()`, `NativePressure()` or a unit of the catalog) |
+| `native_difference(x, kind)` | the same for an interval, by scale only (0.01 °C is 0.01 K) |
+| `unit_factor(backend, from, to)` | the factor between two parsed units of a property: a `Rational` if the package is exact, otherwise a `Float64`; it throws if the dimensions differ or if `to` has an offset |
+| `quantity_parts(backend, x)` | optional: `(number, unit_text)` of a quantity; if the text is understood the input is converted exactly by the package |
+| `package_native_value(backend, x, kind)`, `package_native_difference(backend, x, kind)` | the conversion of an input that the package does itself, when the unit is not understood (or when the package stores SI and keeps no text) |
+| `package_convert_native(backend, x, kind, to)` | the same for `reference_summary` |
+| `unit_text(backend, unit)` | optional: the unit as text in a syntax the exact parser reads (`"mW m^-1 K^-1"`), or `nothing`; when it is understood, the conversion is done by the package and the backend only attaches the unit |
+| `convert_native(x, kind, to)` | the conversion for `reference_summary` |
+
+The conversions that the core does by itself are in `src/units/exact.jl`: `ExactUnit` (an exact scale and the exponents of the six base dimensions), `ExactAffine` (scale and offset), `parse_exact_unit` (the strings of the catalog) and `FloatAffine` with the column kernels `apply` and `apply!`. A new unit is added by writing its legal definition with rationals; never write a rounded decimal.
+
+Do not call `uparse` at the top level of an extension: it evaluates code, which breaks precompilation. Use the `u"..."` macro or parse at run time. `ext/ThermophysicalDBUnitfulExt.jl` is the shortest model to copy, and `test/test-units-backends.jl` has the tests that a backend has to pass.
+
 ## Making a new release
 
 To create a new release, you can follow these simple steps:

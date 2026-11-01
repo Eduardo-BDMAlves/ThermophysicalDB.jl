@@ -5,7 +5,7 @@
 # confusing way: a different `SCHEMA_VERSION` simply triggers a rebuild. Lookup
 # dictionaries are not stored; they are rebuilt from the columns on load.
 
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 6
 const POOL_NAMES = (
     :sources,
     :groups,
@@ -22,6 +22,8 @@ const POOL_NAMES = (
     :purposes,
     :unc_methods,
     :method_texts,
+    :condition_groups,
+    :condition_labels,
 )
 const TABLE_NAMES = (
     :references,
@@ -32,6 +34,8 @@ const TABLE_NAMES = (
     :experiments,
     :measurements,
     :extras,
+    :conditions,
+    :uncertainties,
 )
 
 function store_columns!(sink, table, prefix::AbstractString)
