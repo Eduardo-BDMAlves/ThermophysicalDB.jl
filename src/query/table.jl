@@ -41,6 +41,12 @@ so `DataFrame(table(v))` works). One row per point, with the columns
 `source, doi, year, components, xkind, property, method, phase, temperature, pressure,
 x1, x2, x3, value, unit, unc, unc_k, unc_level, unc_k2`.
 
+With `details = true` the table also has what the source says about the data: `purpose`
+(purpose of the experiment), `unc_method` (how the uncertainty was evaluated), `digits`,
+`temperature_digits` and `pressure_digits` (significant digits, `-1` when not given) and,
+for each component `i`, `purityi`, `purity_kindi` and `purity_basisi` from its sample (see
+[`sample_table`](@ref)); `NaN` or `""` where the source does not say.
+
 `units = :native` keeps the unit of the source (kPa, kJ/mol, ...). `units = :si` converts
 `value`, `unc`, `unc_k2` and `pressure` (to Pa) and reports the SI unit in `unit`.
 `unc_k2` is the uncertainty at `k = 2` (see `coverage_factor` for `policy`); it is `NaN`
@@ -59,6 +65,7 @@ function table(
     units::Symbol = :native,
     policy::Symbol = :nominal,
     unitful::Bool = false,
+    details::Bool = false,
 )
     units in TABLE_UNITS ||
         throw(ArgumentError("units must be one of $(TABLE_UNITS), got :$units"))
@@ -160,6 +167,7 @@ function table(
         unc_level,
         unc_k2,
     )
+    details && (columns = merge(columns, detail_columns(ds, rows)))
     return unitful ? attach_units(columns, units) : columns
 end
 

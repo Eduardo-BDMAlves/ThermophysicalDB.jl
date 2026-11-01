@@ -14,7 +14,8 @@ v = points(db; component = "water", exact = true, property = "Mass density")
 
 export_points("data/water", v)                          # the default formats
 export_points("data/water", v; formats = (:csv, :md))   # only these
-export_points("data/water", v; formats = :thermoml)     # a subset in the ThermoML structure
+export_points("data/water", v; formats = :thermoml)     # the JSON form of ThermoML
+export_points("data/water", v; formats = :thermoml_xml) # ThermoML XML, one file per article
 ```
 
 | Format | File written |
@@ -25,7 +26,8 @@ export_points("data/water", v; formats = :thermoml)     # a subset in the Thermo
 | `:json` | `water.json`, one record per point |
 | `:jld2` | `water.jld2`, the columns, the units and the references as Julia data |
 | `:xlsx` | `water.xlsx`, one sheet per system, a `references` sheet and an `origin` sheet; written when XLSX.jl is loaded |
-| `:thermoml` | `water.thermoml.json`, a subset of the ThermoML schema, for the selected points only |
+| `:thermoml` | `water.thermoml.json`, the JSON form of ThermoML (the structure of the archive's JSON files), for the selected points only |
+| `:thermoml_xml` | the directory `water.thermoml/`, one ThermoML XML document per article (named by DOI), valid against the ThermoML schema |
 
 The default is `(:csv, :md, :tex, :json, :jld2)`, and `:xlsx` joins it when the XLSX package is loaded (`using XLSX`). A [`DataView`](@ref) or the whole [`Dataset`](@ref) can be given. A format that is not in the table is an error, so a typo never silently writes something else.
 
@@ -162,13 +164,22 @@ The composition of a point is the array `x`, with one entry per component in the
 
 ### In the ThermoML format
 
-`formats = :thermoml` writes the selected points in the structure of the archive's own files instead: one object per article with its `Citation`, its `Compound`s and the `PureOrMixtureData` that hold **only the selected points**. It is a subset, so what the package does not keep is absent, and the units are those of the archive whatever `units` says. Because the structure is the one the package reads, such a file can be read back with the same parser.
+`formats = :thermoml` and `formats = :thermoml_xml` write the selected points in the structure of the ThermoML standard: one `DataReport` per article, with its `Citation`, its `Compound`s (with their `Sample`s and purity steps) and the `PureOrMixtureData` that hold **only the selected points**. The first writes one JSON file with all the articles, the second a directory with one XML document per article, named by its DOI. Units are those of the archive whatever `units` says. Both need neither the references nor the network.
 
 ```julia
-export_points("data/water", v; formats = :thermoml)   # data/water/water.thermoml.json
+export_points("data/water", v; formats = (:thermoml, :thermoml_xml))
+# data/water/water.thermoml.json and data/water/water.thermoml/<doi>.xml
 ```
 
-This layout needs neither the references nor the network. Compounds are numbered within each article, as in the archive, and every point is one row of `NumValues`. Properties whose name the archive writes with a presentation (a ratio or a difference to a reference state) keep that qualifier in `ePropName`. A composition without a known kind cannot be typed in ThermoML and is not written.
+The elements follow the order that the schema (`xsd:sequence`) demands, and the XML was checked with `xmllint --schema ThermoML.xsd` on the whole archive. Compounds are numbered within each article, and every point is one row of `NumValues`. A few things are derived because the standard requires them and the archive does not always say:
+
+- The number of significant digits of a value is kept when the archive gives it (temperature, pressure and compositions); otherwise it is counted from the number.
+- A property without a method is written with the method `method not stated`. The uncertainty of each point is always written; the evaluation of the property (method, level of confidence, coverage factor) only when the method is known, and a warning counts the properties for which a level or a factor was left out.
+- Properties whose name the archive writes with a presentation (a ratio or a difference to a reference state) keep the exact presentation. A composition without a known kind cannot be typed and is not written.
+- Other conditions (frequency, for example) and the solvent are not exported.
+
+!!! note "Enumerations newer than the schema"
+    The archive uses some values (`Metastable liquid`, `Static method`, ...) that are newer than the schema copy in the standard; 20 of 2369 articles sampled fail validation in the archive itself, and the export keeps their text.
 
 ## Julia
 
@@ -190,7 +201,7 @@ end
 | open the data in a spreadsheet, with one sheet per system | `.xlsx` |
 | load them in R, Python, Julia or Matlab | `.csv` (a plain table) or `.json` |
 | keep every number exactly and reload it quickly in Julia | `.jld2` |
-| hand the data to something that reads ThermoML | `.thermoml.json` |
+| hand the data to something that reads ThermoML | `.thermoml.json` or `.thermoml/` (XML) |
 | paste the table in a README, a Quarto or a Jupyter text | `.md` |
 | give a colleague everything | the default directory |
 

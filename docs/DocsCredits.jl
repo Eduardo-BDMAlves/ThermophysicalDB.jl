@@ -52,10 +52,28 @@ function reset!()
     return nothing
 end
 
+# Two selections share a dataset when they read the same columns. The columns are compared,
+# not the `Dataset` values: a view holds a copy of the (immutable) `Dataset`, and what
+# matters is that both copies point at the same arrays.
+same_dataset(a::Dataset, b::Dataset) =
+    a === b || (
+        a.measurements.value === b.measurements.value &&
+        a.measurements.experiment === b.measurements.experiment
+    )
+
+function dataset_mismatch(a::Dataset, b::Dataset)
+    return ArgumentError(
+        "the selections come from different datasets " *
+        "(measurements $(length(a.measurements)) and $(length(b.measurements)), " *
+        "columns $(objectid(a.measurements.value)) and $(objectid(b.measurements.value)))",
+    )
+end
+
 function check_same_dataset(views)
     ds = first(views).dataset
-    all(v -> v.dataset === ds, views) ||
-        throw(ArgumentError("the selections come from different datasets"))
+    for v in views
+        same_dataset(v.dataset, ds) || throw(dataset_mismatch(v.dataset, ds))
+    end
     return ds
 end
 
@@ -74,8 +92,8 @@ function register!(view::DataView)
     if REGISTRY.dataset === nothing
         REGISTRY.dataset = view.dataset
         REGISTRY.mask = falses(length(view.dataset.measurements))
-    elseif REGISTRY.dataset !== view.dataset
-        throw(ArgumentError("the selections come from different datasets"))
+    elseif !same_dataset(REGISTRY.dataset, view.dataset)
+        throw(dataset_mismatch(REGISTRY.dataset, view.dataset))
     end
     mask = REGISTRY.mask
     for row in view.rows

@@ -78,16 +78,30 @@ mutable struct Conditions
     temperature::Float64
     pressure::Float64
     x::NTuple{MAX_COMPONENTS,Float64}
+    x_digits::NTuple{MAX_COMPONENTS,UInt8}
+    temperature_digits::UInt8
+    pressure_digits::UInt8
     extras::Union{Nothing,ExtraPairs}
 end
 
-Conditions() = Conditions(NaN, NaN, ntuple(_ -> NaN, MAX_COMPONENTS), nothing)
+Conditions() = Conditions(
+    NaN,
+    NaN,
+    ntuple(_ -> NaN, MAX_COMPONENTS),
+    ntuple(_ -> NO_DIGITS, MAX_COMPONENTS),
+    NO_DIGITS,
+    NO_DIGITS,
+    nothing,
+)
 
 function copy_conditions(c::Conditions)
     return Conditions(
         c.temperature,
         c.pressure,
         c.x,
+        c.x_digits,
+        c.temperature_digits,
+        c.pressure_digits,
         c.extras === nothing ? nothing : copy(c.extras),
     )
 end
@@ -115,13 +129,21 @@ function condition_spec(type_obj, id_obj, phase::String, orgnums, kinds, names)
     return ConditionSpec(:other, 0, label)
 end
 
-function apply_condition!(c::Conditions, spec::ConditionSpec, value::Float64)
+function apply_condition!(
+    c::Conditions,
+    spec::ConditionSpec,
+    value::Float64,
+    digits::UInt8 = NO_DIGITS,
+)
     if spec.role === :temperature && isnan(c.temperature)
         c.temperature = value
+        c.temperature_digits = digits
     elseif spec.role === :pressure && isnan(c.pressure)
         c.pressure = value
+        c.pressure_digits = digits
     elseif spec.role === :composition && isnan(c.x[spec.slot])
         c.x = Base.setindex(c.x, value, spec.slot)
+        c.x_digits = Base.setindex(c.x_digits, digits, spec.slot)
     else
         extras = c.extras === nothing ? (c.extras = ExtraPairs()) : c.extras
         push!(extras, spec.label => value)
@@ -175,26 +197,52 @@ function property_extras(p, names)
     return extras
 end
 
+# First element of something that may be a list, a lone object or absent.
+function first_item(x)
+    for item in jitems(x)
+        return item
+    end
+    return nothing
+end
+
 function parse_property(p, names)::Union{Nothing,ParsedProperty}
     group_key, group_obj = only_entry(jat(p, "Property-MethodID", "PropertyGroup"))
     group_key === nothing && return nothing
     raw = jstr(group_obj, "ePropName")
     isempty(raw) && return nothing
     method = jstr(group_obj, "eMethodName")
-    isempty(method) && (method = jstr(group_obj, "sMethodName"))
+    method_text = isempty(method)
+    method_text && (method = jstr(group_obj, "sMethodName"))
     label, spec = split_property_name(raw)
     unit = spec === nothing ? "" : spec.native
     qualifier, keeps_unit = presentation_qualifier(jstr(p, "ePresentation"))
     keeps_unit || (unit = "")
+    uncertainty = first_item(jfield(p, "CombinedUncertainty"))
+    extras = property_extras(p, names)
+    presentation = jstr(p, "ePresentation")
+    if !isempty(qualifier) || !keeps_unit
+        # the label and the unit no longer say what was written: keep the original words
+        push!(extras, "presentation" => presentation)
+        push!(extras, "property_name" => String(raw))
+    end
+    evaluator = jstr(uncertainty, "sCombUncertEvaluator")
+    isempty(evaluator) || push!(extras, "uncertainty_evaluator" => evaluator)
+    evaluation = jstr(uncertainty, "sCombUncertEvalMethod")
+    isempty(evaluation) || push!(extras, "uncertainty_evaluation_text" => evaluation)
+    assessment = jnum(uncertainty, "nCombUncertAssessNum")
+    isnan(assessment) || push!(extras, "uncertainty_assessment" => assessment)
     return ParsedProperty(
         jint(p, "nPropNumber"),
         String(label) * qualifier,
         unit,
         String(group_key),
         method,
+        method_text && !isempty(method),
         jstr(jfield(p, "PropPhaseID"), "ePropPhase"),
-        jnum(jfield(p, "CombinedUncertainty"), "nCombUncertLevOfConfid") / 100,
-        property_extras(p, names),
+        jnum(uncertainty, "nCombUncertLevOfConfid") / 100,
+        jnum(uncertainty, "nCombCoverageFactor"),
+        jstr(uncertainty, "eCombUncertEvalMethod"),
+        extras,
     )
 end
 
@@ -204,7 +252,9 @@ end
 
 function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperiment}
     number = jint(pm, "nPureOrMixtureDataNumber")
-    orgnums = Int[jorgnum(c) for c in jitems(jfield(pm, "Component"))]
+    components = collect(jitems(jfield(pm, "Component")))
+    orgnums = Int[jorgnum(c) for c in components]
+    samples = Int[jint(c, "nSampleNm") for c in components]
     if isempty(orgnums) || length(orgnums) > MAX_COMPONENTS
         push!(
             skipped,
@@ -243,7 +293,12 @@ function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperim
         phase = jstr(jfield(c, "ConstraintPhaseID"), "eConstraintPhase")
         spec =
             condition_spec(jfield(id, "ConstraintType"), id, phase, orgnums, kinds, names)
-        apply_condition!(base, spec, jnum(c, "nConstraintValue"))
+        apply_condition!(
+            base,
+            spec,
+            jnum(c, "nConstraintValue"),
+            digits_code(c, "nConstrDigits"),
+        )
     end
 
     specs = Dict{Int,ConditionSpec}()
@@ -260,7 +315,12 @@ function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperim
         for vv in jitems(jfield(row, "VariableValue"))
             spec = get(specs, jint(vv, "nVarNumber"), nothing)
             spec === nothing && continue
-            apply_condition!(conditions, spec, jnum(vv, "nVarValue"))
+            apply_condition!(
+                conditions,
+                spec,
+                jnum(vv, "nVarValue"),
+                digits_code(vv, "nVarDigits"),
+            )
         end
         for pv in jitems(jfield(row, "PropertyValue"))
             index = get(property_index, jint(pv, "nPropNumber"), 0)
@@ -276,12 +336,25 @@ function parse_experiment(pm, names, path, skipped)::Union{Nothing,ParsedExperim
                     conditions.temperature,
                     conditions.pressure,
                     conditions.x,
+                    digits_code(pv, "nPropDigits"),
+                    conditions.temperature_digits,
+                    conditions.pressure_digits,
+                    conditions.x_digits,
                     conditions.extras,
                 ),
             )
         end
     end
-    return ParsedExperiment(number, orgnums, kinds, properties, measurements, extras)
+    return ParsedExperiment(
+        number,
+        orgnums,
+        kinds,
+        samples,
+        jstr(pm, "eExpPurpose"),
+        properties,
+        measurements,
+        extras,
+    )
 end
 
 # ----------------------------------------------------------------------------------
@@ -293,6 +366,19 @@ function compound_display_name(c::ParsedCompound)
     return isempty(c.formula) ? c.inchikey : c.formula
 end
 
+# Citation fields that have no column: kept as reference extras named `citation:<tag>`.
+const CITATION_TEXT_TAGS = (
+    "eType",
+    "eSourceType",
+    "sDocumentOrigin",
+    "dateCit",
+    "eLanguage",
+    "urlCit",
+    "sCASCit",
+    "sIDNum",
+    "sLocation",
+)
+
 function parse_article_unchecked(path::String, bytes)::ParsedArticle
     root = JSON.parse(bytes)
     root isa AbstractDict ||
@@ -303,6 +389,12 @@ function parse_article_unchecked(path::String, bytes)::ParsedArticle
     extras = ExtraPairs()
     keywords = jstrings(jfield(citation, "sKeyword"))
     isempty(keywords) || push!(extras, "keywords" => join(keywords, "; "))
+    for tag in CITATION_TEXT_TAGS
+        value = jstr(citation, tag)
+        isempty(value) || push!(extras, "citation:" * tag => value)
+    end
+    abstract_text = jstr(citation, "sAbstract")
+    isempty(abstract_text) || push!(extras, "abstract" => abstract_text)
 
     compounds = ParsedCompound[
         ParsedCompound(
@@ -311,6 +403,7 @@ function parse_article_unchecked(path::String, bytes)::ParsedArticle
             jstr(c, "sStandardInChI"),
             jstr(c, "sFormulaMolec"),
             jstrings(jfield(c, "sCommonName")),
+            parse_samples(c),
         ) for c in jitems(jfield(root, "Compound"))
     ]
     names = Dict{Int,String}(c.org_num => compound_display_name(c) for c in compounds)

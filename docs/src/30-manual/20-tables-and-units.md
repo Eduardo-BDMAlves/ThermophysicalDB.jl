@@ -82,6 +82,21 @@ end
 
 Narrow the selection by `property`, or leave `unitful` off and use the `unit` column, which handles any mixture of properties.
 
+## What the source says about the data
+
+`table(v; details = true)` adds to every point what the article states about it, with the same convention for what it does not state (`NaN`, `""` or `-1`):
+
+| Column | Content |
+|---|---|
+| `purity1`, `purity2`, `purity3` | final purity of the sample of each component, as a fraction |
+| `purity_kind1`, ... | the basis of that purity: `mass`, `mole`, `volume` or `unspecified` |
+| `purity_basis1`, ... | `supplier`, `measured` or `estimated` |
+| `purpose` | purpose of the experiment, as the article declares it |
+| `unc_method` | how the uncertainty was evaluated |
+| `digits`, `temperature_digits`, `pressure_digits` | significant digits the article gave (`-1` when not given) |
+
+The samples themselves, one row each, and their purification steps are available as tables with [`sample_table`](@ref) and [`purity_step_table`](@ref); both accept a dataset or a selection.
+
 ## Tables.jl
 
 A `DataView` is itself a [Tables.jl](https://tables.juliadata.org) source, and `table` returns a Tables.jl column table, so anything in the ecosystem accepts them directly:

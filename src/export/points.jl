@@ -9,12 +9,13 @@
 #   .json          one record per point
 #   .jld2          columns, units and references as Julia data
 #   .xlsx          one sheet per system, plus `references` and `origin` (needs the XLSX package)
-#   .thermoml.json a subset of the ThermoML schema
+#   .thermoml.json ThermoML in the JSON form of the archive (see thermoml.jl)
+#   .thermoml/     one ThermoML XML document per article
 #
 # Tables hold only points. What describes an article lives in the references table, which
 # is linked to the points by the `reference` column (BibTeX key, written-out citation or DOI).
 
-const POINT_FORMATS = (:csv, :md, :tex, :json, :jld2, :xlsx, :thermoml)
+const POINT_FORMATS = (:csv, :md, :tex, :json, :jld2, :xlsx, :thermoml, :thermoml_xml)
 # What is written when `formats` is not given; `:xlsx` is added when the XLSX package is loaded.
 const DEFAULT_FORMATS = (:csv, :md, :tex, :json, :jld2)
 const REFERENCE_STYLES = (:key, :text, :doi)
@@ -600,235 +601,6 @@ function write_points_json(path::AbstractString, data::ExportData)
 end
 
 # ----------------------------------------------------------------------------------
-# JSON: a subset of the ThermoML schema
-# ----------------------------------------------------------------------------------
-
-function thermoml_property(ds::Dataset, key, number::Int)
-    property, method, phase, level = key
-    pr = ds.properties
-    group = pool_string(ds.groups, pr.group[property])
-    isempty(group) && (group = "Property")
-    unit = pr.unit[property]
-    name = isempty(unit) ? pr.label[property] : string(pr.label[property], ", ", unit)
-    named = JObject("ePropName" => name)
-    method_name = pool_string(ds.methods, method)
-    isempty(method_name) || add!(named, "eMethodName", method_name)
-    p = JObject("nPropNumber" => number)
-    add!(p, "Property-MethodID", JObject("PropertyGroup" => JObject(group => named)))
-    phase_name = pool_string(ds.phases, phase)
-    isempty(phase_name) || add!(p, "PropPhaseID", JObject("ePropPhase" => phase_name))
-    add!(p, "ePresentation", "Direct value, X")
-    isnan(level) || add!(
-        p,
-        "CombinedUncertainty",
-        JObject("nCombUncertLevOfConfid" => round(100 * level; digits = 10)),
-    )
-    return p
-end
-
-function thermoml_citation(rf::ReferenceTable, ref::Int32)
-    citation = JObject()
-    ref == NO_ID && return citation
-    isempty(rf.title[ref]) || add!(citation, "sTitle", rf.title[ref])
-    isempty(rf.journal[ref]) || add!(citation, "sPubName", rf.journal[ref])
-    rf.year[ref] > 0 && add!(citation, "yrPubYr", Int(rf.year[ref]))
-    isempty(rf.volume[ref]) || add!(citation, "sVol", rf.volume[ref])
-    isempty(rf.pages[ref]) || add!(citation, "sPage", rf.pages[ref])
-    isempty(rf.authors[ref]) || add!(citation, "sAuthor", Any[a for a in rf.authors[ref]])
-    isempty(rf.doi[ref]) || add!(citation, "sDOI", rf.doi[ref])
-    return citation
-end
-
-# One ThermoML article (Citation, Compound, PureOrMixtureData) holding the points `rows`,
-# which all belong to the reference `ref`. Compounds are numbered per article, as in the
-# archive, and each point becomes one row of NumValues.
-function thermoml_article(ds::Dataset, ref::Int32, rows::Vector{Int32})
-    m, ex, ct = ds.measurements, ds.experiments, ds.compounds
-
-    by_experiment = Dict{Int32,Vector{Int32}}()
-    order = Int32[]
-    for r in rows
-        e = m.experiment[r]
-        bucket = get!(by_experiment, e) do
-            push!(order, e)
-            Int32[]
-        end
-        push!(bucket, r)
-    end
-
-    local_number = Dict{Int32,Int}()
-    compound_order = Int32[]
-    for e in order, i = 1:Int(ex.ncomp[e])
-        c = ex.components[i][e]
-        if !haskey(local_number, c)
-            push!(compound_order, c)
-            local_number[c] = length(compound_order)
-        end
-    end
-    compounds = Any[]
-    for c in compound_order
-        o = JObject("RegNum" => JObject("nOrgNum" => local_number[c]))
-        isempty(ct.inchikey[c]) || add!(o, "sStandardInChIKey", ct.inchikey[c])
-        isempty(ct.inchi[c]) || add!(o, "sStandardInChI", ct.inchi[c])
-        isempty(ct.formula[c]) || add!(o, "sFormulaMolec", ct.formula[c])
-        isempty(ct.names[c]) || add!(o, "sCommonName", Any[s for s in ct.names[c]])
-        push!(compounds, o)
-    end
-
-    blocks = Any[]
-    for (k, e) in enumerate(order)
-        rs = by_experiment[e]
-        n = Int(ex.ncomp[e])
-        block = JObject("nPureOrMixtureDataNumber" => k)
-        add!(
-            block,
-            "Component",
-            Any[
-                JObject(
-                    "RegNum" => JObject("nOrgNum" => local_number[ex.components[i][e]]),
-                ) for i = 1:n
-            ],
-        )
-
-        # Variables: only the conditions the points actually have.
-        kinds = String[pool_string(ds.kinds, ex.kinds[i][e]) for i = 1:n]
-        has_T = any(r -> !isnan(m.temperature[r]), rs)
-        has_P = any(r -> !isnan(m.pressure[r]), rs)
-        has_x = Bool[
-            !isempty(kinds[i]) && any(r -> !isnan(m.composition[i][r]), rs) for i = 1:n
-        ]
-        variables = Any[]
-        var_T = var_P = 0
-        var_x = zeros(Int, n)
-        if has_T
-            var_T = length(variables) + 1
-            push!(
-                variables,
-                JObject(
-                    "nVarNumber" => var_T,
-                    "VariableID" => JObject(
-                        "VariableType" => JObject("eTemperature" => "Temperature, K"),
-                    ),
-                ),
-            )
-        end
-        if has_P
-            var_P = length(variables) + 1
-            push!(
-                variables,
-                JObject(
-                    "nVarNumber" => var_P,
-                    "VariableID" =>
-                        JObject("VariableType" => JObject("ePressure" => "Pressure, kPa")),
-                ),
-            )
-        end
-        for i = 1:n
-            has_x[i] || continue
-            var_x[i] = length(variables) + 1
-            push!(
-                variables,
-                JObject(
-                    "nVarNumber" => var_x[i],
-                    "VariableID" => JObject(
-                        "RegNum" =>
-                            JObject("nOrgNum" => local_number[ex.components[i][e]]),
-                        "VariableType" => JObject("eComponentComposition" => kinds[i]),
-                    ),
-                ),
-            )
-        end
-
-        # Properties: one per (property, method, phase, level of confidence).
-        property_number = Dict{Tuple{Int32,Int32,Int32,Float64},Int}()
-        properties = Any[]
-        property_of_row = Vector{Int}(undef, length(rs))
-        for (j, r) in enumerate(rs)
-            key = (m.property[r], m.method[r], m.phase[r], m.unc_level[r])
-            number = get(property_number, key, 0)
-            if number == 0
-                number = length(property_number) + 1
-                property_number[key] = number
-                push!(properties, thermoml_property(ds, key, number))
-            end
-            property_of_row[j] = number
-        end
-        add!(block, "Property", properties)
-        isempty(variables) || add!(block, "Variable", variables)
-
-        numvalues = Any[]
-        for (j, r) in enumerate(rs)
-            values = Any[]
-            has_T &&
-                !isnan(m.temperature[r]) &&
-                push!(
-                    values,
-                    JObject("nVarNumber" => var_T, "nVarValue" => m.temperature[r]),
-                )
-            has_P &&
-                !isnan(m.pressure[r]) &&
-                push!(values, JObject("nVarNumber" => var_P, "nVarValue" => m.pressure[r]))
-            for i = 1:n
-                (has_x[i] && !isnan(m.composition[i][r])) || continue
-                push!(
-                    values,
-                    JObject("nVarNumber" => var_x[i], "nVarValue" => m.composition[i][r]),
-                )
-            end
-            pv = JObject("nPropNumber" => property_of_row[j], "nPropValue" => m.value[r])
-            isnan(m.unc[r]) || add!(
-                pv,
-                "CombinedUncertainty",
-                JObject("nCombExpandUncertValue" => m.unc[r]),
-            )
-            row = JObject()
-            isempty(values) || add!(row, "VariableValue", values)
-            add!(row, "PropertyValue", Any[pv])
-            push!(numvalues, row)
-        end
-        add!(block, "NumValues", numvalues)
-        push!(blocks, block)
-    end
-
-    article = JObject("Citation" => thermoml_citation(ds.references, ref))
-    add!(article, "Compound", compounds)
-    add!(article, "PureOrMixtureData", blocks)
-    return article
-end
-
-function write_points_thermoml(
-    path::AbstractString,
-    view::DataView;
-    origin::Union{Nothing,DataOrigin} = origin_note(view),
-)
-    ds = view.dataset
-    groups = Dict{Int32,Vector{Int32}}()
-    for r in view.rows
-        ref = ds.experiments.reference[ds.measurements.experiment[r]]
-        push!(get!(Vector{Int32}, groups, ref), r)
-    end
-    open(path, "w") do io
-        write(io, "{\n")
-        if origin !== nothing
-            write(io, "  \"origin\": ")
-            write_json(io, origin_object(origin), 1, 2)
-            write(io, ",\n")
-        end
-        write(
-            io,
-            "  \"format\": \"subset of ThermoML (JSON form of the NIST/TRC archive), one object per article; units are those of the archive\",\n",
-        )
-        write(io, "  \"articles\": [")
-        for (k, ref) in enumerate(sort!(collect(keys(groups))))
-            write(io, k == 1 ? "\n    " : ",\n    ")
-            write_json(io, thermoml_article(ds, ref, groups[ref]), 2, 6)
-        end
-        write(io, "\n  ]\n}\n")
-    end
-    return nothing
-end
-
-# ----------------------------------------------------------------------------------
 # JLD2
 # ----------------------------------------------------------------------------------
 
@@ -1010,7 +782,8 @@ function export_directory(path::AbstractString)
 end
 
 file_extension(format::Symbol) =
-    format === :thermoml ? ".thermoml.json" : string('.', format)
+    format === :thermoml ? ".thermoml.json" :
+    format === :thermoml_xml ? ".thermoml" : string('.', format)
 
 # The formats to write: the ones asked for, or the defaults plus Excel when it is available.
 function export_formats(formats)
@@ -1043,6 +816,9 @@ function write_point_file(
     if format === :thermoml
         origin = data === nothing ? origin_note(view) : data.origin
         write_points_thermoml(path, view; origin)
+    elseif format === :thermoml_xml
+        origin = data === nothing ? origin_note(view) : data.origin
+        write_points_thermoml_xml(path, view; origin)
     elseif format === :csv
         write_points_csv(path, data)
     elseif format === :md
@@ -1103,7 +879,8 @@ format: for `export_points("data/water", v)`, `data/water/water.csv`, `water.md`
 | `:json` | `name.json` | one record per point, with the origin as its first entry |
 | `:jld2` | `name.jld2` | the columns, units and references as Julia data |
 | `:xlsx` | `name.xlsx` | one sheet per system (`sheets = :system`, or `:single`), a `references` sheet and an `origin` sheet |
-| `:thermoml` | `name.thermoml.json` | a subset of the ThermoML schema (see below) |
+| `:thermoml` | `name.thermoml.json` | the JSON form of ThermoML, one `DataReport` per article (see below) |
+| `:thermoml_xml` | `name.thermoml/` | ThermoML XML, one document per article, valid against the schema |
 
 The path is a directory name, not a file name: `"data/water.csv"` is an error, so a
 leftover extension never silently creates a directory with a dot in its name. End the path
@@ -1132,21 +909,23 @@ and that the articles must be credited. With `references = false` and `reference
 table keeps no way back to the DOIs, and a warning says so.
 
 `units = :si` converts values, uncertainties and pressure to SI (see [`table`](@ref)); the
-ThermoML subset always keeps the units of the archive. The uncertainty columns are `unc`
+ThermoML formats always keep the units of the archive. The uncertainty columns are `unc`
 (as reported) and `unc_k2` (at ``k = 2``, see `policy` in [`table`](@ref)). `online`,
 `cache`, `refresh` and `progress` act as in [`bibtex`](@ref).
 
-The ThermoML subset holds, for every article of the selection, its `Citation`, the
-`Compound`s and the `PureOrMixtureData` with the selected points only, in the structure
-the archive uses, and so can be read back with the same code. It is a subset: fields
-the package does not keep (such as the apparatus or the evaluator) are absent. A
-directory with only `formats = (:thermoml,)` needs neither references nor network.
+The ThermoML formats hold, for every article of the selection, its `Citation`, the
+`Compound`s with their samples and the `PureOrMixtureData` with the selected points only,
+in the element order of the standard (the XML validates against `ThermoML.xsd`). What the
+standard requires and the archive lacks is derived: the significant digits of a value are
+counted when not stored, and a property without a method is written as "method not
+stated". The other conditions and the solvent are not exported. A directory with only
+ThermoML formats needs neither references nor network.
 
 # Examples
 ```julia
 v = points(db; component = "water", exact = true, property = "Mass density")
 export_points("data/water", v)                                # csv, md, tex, json, jld2
-export_points("data/water", v; formats = (:csv, :thermoml))
+export_points("data/water", v; formats = (:csv, :thermoml, :thermoml_xml))
 ```
 """
 function export_points(
@@ -1177,7 +956,7 @@ function export_points(
     end
     # A ThermoML-only export reads nothing but the dataset: no references, no network.
     data =
-        chosen == (:thermoml,) ? nothing :
+        all(in((:thermoml, :thermoml_xml)), chosen) ? nothing :
         build_export_data(view; reference, units, policy, kwargs...)
 
     mkpath(directory)

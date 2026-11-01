@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning].
 ## [Unreleased]
 
 - Initial release
-- Added `export_points`, which writes the points of a selection to a directory (created if needed), one file per format chosen with `formats`, a tuple of symbols: `:csv`, `:md`, `:tex`, `:json`, `:jld2`, `:xlsx` (added to the default when XLSX.jl is loaded) and `:thermoml` (a ThermoML-format subset); the references table and the `.bib` are written next to the table formats, and a path with a file extension is an error
+- Added `export_points`, which writes the points of a selection to a directory (created if needed), one file per format chosen with `formats`, a tuple of symbols: `:csv`, `:md`, `:tex`, `:json`, `:jld2`, `:xlsx` (added to the default when XLSX.jl is loaded) `:thermoml` (the JSON form of ThermoML) and `:thermoml_xml` (ThermoML XML); the references table and the `.bib` are written next to the table formats, and a path with a file extension is an error
 - Added NOTICE.md, legal notices in the README and in the documentation, and the data source references in CITATION.cff
 - Added `find_outliers`, which splits a selection into kept points, outliers and disputed points with the reason for each (physical rules, local parabolas along each axis, a joint surface when several axes vary, and the generalized ESD test), plus `reasons`, `diagnostics` and `esd`; see the manual page "Detecting outliers"
 - Test fixtures use fictitious bibliographic data
@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning].
 - The build of the documentation logs the time of every phase and page and ends with a table of where the time went (`docs/DocsTiming.jl`; `THERMOPHYSICALDB_DOCS_TIMING=false` turns it off)
 - Added the PrecompileTools workload file `src/precompile.jl`, ready to receive workloads; it never calls `database` or anything that downloads
 
+- Schema version 2: the database now keeps what each article says about its samples, and an older cache is rebuilt on the next use. New `SampleTable` (one row per described sample: origin, status, final and initial purity with its basis, water content, analysis and purification methods, and `purity_basis`, the class `supplier`, `measured` or `estimated` derived from the analysis methods) and `PurityStepTable` (every purification step with the purities, water and halide contents, significant digits and free-text methods); each experiment points to the samples of its components and records its purpose; each measurement records the significant digits of the value, the temperature and the pressure, the coverage factor and the method of evaluating its uncertainty. The abstract of the article is kept as an extra field. A sample that an article does not describe is treated as any other absent value
+- Added `sample_table` and `purity_step_table`, which give the samples of a dataset or of a selection as Tables.jl tables, and `table(view; details = true)`, which adds the purity of each component, the digits, the purpose and the uncertainty method to the points
+- `reference_summary` and its LaTeX, Markdown and CSV tables have the columns `purity`, `purity_min`, `purity_max`, `purity_basis`, `purity_method`, `purification`, `sample_source` and `supplier`; the default tables show the purity, its analysis and the purification when an article states them, and `columns` chooses any of them
+
 <!-- Links -->
 
 [keep a changelog]: https://keepachangelog.com/en/1.1.0/
@@ -37,3 +41,6 @@ and this project adheres to [Semantic Versioning].
 <!-- Versions -->
 
 [unreleased]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.0...HEAD
+
+- The ThermoML export follows the standard: `:thermoml` writes the JSON form of the archive and the new `:thermoml_xml` a directory with one XML document per article, in the element order of the schema and validated with `xmllint` against `ThermoML.xsd`; samples and purity steps, the exact presentation of each property, the citation fields and the digits of every value are written, and what the standard requires but the archive lacks is derived (see the manual page "Exporting points")
+- The data schema is version 3: it stores the significant digits of the composition variables, the free-text methods (a new string pool) and the citation fields of the article; a cache of an older version is rebuilt

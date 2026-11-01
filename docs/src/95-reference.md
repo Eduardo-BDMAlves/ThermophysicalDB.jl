@@ -37,6 +37,8 @@ find_compounds
 ThermophysicalDB.CompoundMatches
 DataView
 table
+sample_table
+purity_step_table
 ```
 
 ## Exporting points

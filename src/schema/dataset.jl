@@ -1,7 +1,7 @@
 """
     Dataset()
 
-The complete in-memory database: the five relational tables plus the string pools they
+The complete in-memory database: the relational tables plus the string pools they
 point into. A `Dataset` can hold several sources at once; `sources` names them and every
 reference records the source it came from.
 """
@@ -13,8 +13,18 @@ struct Dataset
     kinds::StringPool
     extra_keys::StringPool
     extra_texts::StringPool
+    origins::StringPool
+    statuses::StringPool
+    suppliers::StringPool
+    analyses::StringPool
+    purifications::StringPool
+    purposes::StringPool
+    unc_methods::StringPool
+    method_texts::StringPool
     references::ReferenceTable
     compounds::CompoundTable
+    samples::SampleTable
+    purity_steps::PurityStepTable
     properties::PropertyTable
     experiments::ExperimentTable
     measurements::MeasurementTable
@@ -30,8 +40,18 @@ function Dataset()
         StringPool(),
         StringPool(),
         StringPool(),
+        StringPool(),
+        StringPool(),
+        StringPool(),
+        StringPool(),
+        StringPool(),
+        StringPool(),
+        StringPool(),
+        StringPool(),
         ReferenceTable(),
         CompoundTable(),
+        SampleTable(),
+        PurityStepTable(),
         PropertyTable(),
         ExperimentTable(),
         MeasurementTable(),
@@ -68,6 +88,52 @@ function column_lengths(t::CompoundTable)
     return map(length, (t.key, t.inchikey, t.inchi, t.formula, t.names))
 end
 
+function column_lengths(t::SampleTable)
+    return map(
+        length,
+        (
+            t.reference,
+            t.compound,
+            t.number,
+            t.origin,
+            t.status,
+            t.supplier,
+            t.nsteps,
+            t.purity,
+            t.purity_kind,
+            t.purity_initial,
+            t.purity_initial_kind,
+            t.water,
+            t.purity_basis,
+            t.analysis,
+            t.purification,
+        ),
+    )
+end
+
+function column_lengths(t::PurityStepTable)
+    return map(
+        length,
+        (
+            t.sample,
+            t.step,
+            t.mass,
+            t.mole,
+            t.volume,
+            t.unknown,
+            t.digits,
+            t.water_mass,
+            t.water_mole,
+            t.halide_mass,
+            t.halide_mole,
+            t.analysis,
+            t.analysis_text,
+            t.purification,
+            t.purification_text,
+        ),
+    )
+end
+
 column_lengths(t::PropertyTable) = map(length, (t.label, t.unit, t.group))
 
 function column_lengths(t::ExperimentTable)
@@ -75,6 +141,8 @@ function column_lengths(t::ExperimentTable)
         map(length, (t.reference, t.source, t.number, t.ncomp))...,
         map(length, t.components)...,
         map(length, t.kinds)...,
+        map(length, t.samples)...,
+        length(t.purpose),
     )
 end
 
@@ -93,9 +161,14 @@ function column_lengths(t::MeasurementTable)
                 t.unc_level,
                 t.temperature,
                 t.pressure,
+                t.unc_method,
+                t.digits,
+                t.temperature_digits,
+                t.pressure_digits,
             ),
         )...,
         map(length, t.composition)...,
+        map(length, t.composition_digits)...,
     )
 end
 
@@ -105,6 +178,8 @@ end
 
 # True when every identifier in `ids` is `NO_ID` or a valid position in `1:n`.
 in_range(ids::AbstractVector{Int32}, n::Integer) = all(id -> 0 <= id <= n, ids)
+in_range(lists::AbstractVector{Vector{Int32}}, n::Integer) =
+    all(ids -> in_range(ids, n), lists)
 
 """
     validate(ds::Dataset) -> true
@@ -117,6 +192,8 @@ function validate(ds::Dataset)
     tables = (
         :references => ds.references,
         :compounds => ds.compounds,
+        :samples => ds.samples,
+        :purity_steps => ds.purity_steps,
         :properties => ds.properties,
         :experiments => ds.experiments,
         :measurements => ds.measurements,
@@ -132,12 +209,35 @@ function validate(ds::Dataset)
         "component of an experiment" =>
             all(c -> in_range(c, length(ds.compounds)), ex.components),
         "composition kind" => all(k -> in_range(k, length(ds.kinds)), ex.kinds),
+        "sample of an experiment" =>
+            all(c -> in_range(c, length(ds.samples)), ex.samples),
+        "purpose of an experiment" => in_range(ex.purpose, length(ds.purposes)),
+        "uncertainty method of a measurement" =>
+            in_range(me.unc_method, length(ds.unc_methods)),
         "experiment of a measurement" => in_range(me.experiment, length(ex)),
         "property of a measurement" => in_range(me.property, length(ds.properties)),
         "method of a measurement" => in_range(me.method, length(ds.methods)),
         "phase of a measurement" => in_range(me.phase, length(ds.phases)),
         "group of a property" => in_range(ds.properties.group, length(ds.groups)),
         "source of a reference" => in_range(ds.references.source, length(ds.sources)),
+        "reference of a sample" =>
+            in_range(ds.samples.reference, length(ds.references)),
+        "compound of a sample" => in_range(ds.samples.compound, length(ds.compounds)),
+        "origin of a sample" => in_range(ds.samples.origin, length(ds.origins)),
+        "status of a sample" => in_range(ds.samples.status, length(ds.statuses)),
+        "supplier of a sample" => in_range(ds.samples.supplier, length(ds.suppliers)),
+        "analysis of a sample" => in_range(ds.samples.analysis, length(ds.analyses)),
+        "purification of a sample" =>
+            in_range(ds.samples.purification, length(ds.purifications)),
+        "sample of a purity step" =>
+            in_range(ds.purity_steps.sample, length(ds.samples)),
+        "analysis of a purity step" =>
+            in_range(ds.purity_steps.analysis, length(ds.analyses)),
+        "purification of a purity step" =>
+            in_range(ds.purity_steps.purification, length(ds.purifications)),
+        "text of a purity step" =>
+            in_range(ds.purity_steps.analysis_text, length(ds.extra_texts)) &&
+            in_range(ds.purity_steps.purification_text, length(ds.extra_texts)),
     )
     for (what, ok) in checks
         ok || throw(ArgumentError("invalid identifier: $what points outside its table"))

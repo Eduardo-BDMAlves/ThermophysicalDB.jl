@@ -5,10 +5,34 @@
 # confusing way: a different `SCHEMA_VERSION` simply triggers a rebuild. Lookup
 # dictionaries are not stored; they are rebuilt from the columns on load.
 
-const SCHEMA_VERSION = 1
-const POOL_NAMES = (:sources, :groups, :methods, :phases, :kinds, :extra_keys, :extra_texts)
-const TABLE_NAMES =
-    (:references, :compounds, :properties, :experiments, :measurements, :extras)
+const SCHEMA_VERSION = 3
+const POOL_NAMES = (
+    :sources,
+    :groups,
+    :methods,
+    :phases,
+    :kinds,
+    :extra_keys,
+    :extra_texts,
+    :origins,
+    :statuses,
+    :suppliers,
+    :analyses,
+    :purifications,
+    :purposes,
+    :unc_methods,
+    :method_texts,
+)
+const TABLE_NAMES = (
+    :references,
+    :compounds,
+    :samples,
+    :purity_steps,
+    :properties,
+    :experiments,
+    :measurements,
+    :extras,
+)
 
 function store_columns!(sink, table, prefix::AbstractString)
     for name in fieldnames(typeof(table))
@@ -69,6 +93,10 @@ function rebuild_indices!(ds::Dataset)
     end
     for (i, key) in enumerate(ds.compounds.key)
         ds.compounds.index[key] = Int32(i)
+    end
+    st = ds.samples
+    for i = 1:length(st)
+        st.index[(st.reference[i], st.compound[i], st.number[i])] = Int32(i)
     end
     pt = ds.properties
     for i = 1:length(pt)

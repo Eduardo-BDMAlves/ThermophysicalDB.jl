@@ -116,9 +116,17 @@ end
     pools = T.schema_pools()
     names = [t.name for t in tables]
 
-    @test names ==
-          [:references, :compounds, :properties, :experiments, :measurements, :extras]
-    @test length(pools) == 7
+    @test names == [
+        :references,
+        :compounds,
+        :samples,
+        :purity_steps,
+        :properties,
+        :experiments,
+        :measurements,
+        :extras,
+    ]
+    @test length(pools) == 15
 
     # every column of every table is described, apart from the lookup dictionary
     ds = T.Dataset()

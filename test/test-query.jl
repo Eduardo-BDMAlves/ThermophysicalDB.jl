@@ -81,6 +81,10 @@
                 value = 0.02 + temp / 1.0e5,
                 unc = 0.0004,
                 unc_level = 0.95,
+                unc_method = T.intern!(
+                    ds.unc_methods,
+                    "Propagation of evaluated standard uncertainties",
+                ),
                 temperature = temp,
                 pressure = press,
                 composition = (0.5, 0.5, NaN),
@@ -94,6 +98,10 @@
                 value = 998.0,
                 unc = 0.1,
                 unc_level = 0.95,
+                unc_method = T.intern!(
+                    ds.unc_methods,
+                    "Propagation of evaluated standard uncertainties",
+                ),
                 temperature = temp,
                 pressure = 101.325,
                 composition = (1.0, NaN, NaN),

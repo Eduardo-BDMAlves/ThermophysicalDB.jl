@@ -17,22 +17,42 @@ const FOREIGN_KEYS = Dict{Tuple{Symbol,Symbol},Symbol}(
     (:experiments, :source) => :sources,
     (:experiments, :components) => :compounds,
     (:experiments, :kinds) => :kinds,
+    (:experiments, :samples) => :samples,
+    (:experiments, :purpose) => :purposes,
+    (:samples, :reference) => :references,
+    (:samples, :compound) => :compounds,
+    (:samples, :origin) => :origins,
+    (:samples, :status) => :statuses,
+    (:samples, :supplier) => :suppliers,
+    (:samples, :analysis) => :analyses,
+    (:samples, :purification) => :purifications,
+    (:purity_steps, :sample) => :samples,
+    (:purity_steps, :analysis) => :analyses,
+    (:purity_steps, :analysis_text) => :extra_texts,
+    (:purity_steps, :purification) => :purifications,
+    (:purity_steps, :purification_text) => :extra_texts,
     (:measurements, :experiment) => :experiments,
     (:measurements, :property) => :properties,
     (:measurements, :method) => :methods,
     (:measurements, :phase) => :phases,
+    (:measurements, :unc_method) => :unc_methods,
     (:extras, :row) => :any,
     (:extras, :key) => :extra_keys,
     (:extras, :text) => :extra_texts,
 )
 
 "`Int32` columns that are numbers and not identifiers."
-const PLAIN_INT32_COLUMNS = Set{Tuple{Symbol,Symbol}}([(:experiments, :number)])
+const PLAIN_INT32_COLUMNS = Set{Tuple{Symbol,Symbol}}([
+    (:experiments, :number),
+    (:samples, :number),
+    (:purity_steps, :step),
+])
 
 "Columns whose values identify a row, besides its position (the index dictionary of the table)."
 const NATURAL_KEYS = Dict{Symbol,Vector{Symbol}}(
     :references => [:doi],
     :compounds => [:key],
+    :samples => [:reference, :compound, :number],
     :properties => [:label, :unit],
 )
 

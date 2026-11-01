@@ -8,7 +8,7 @@ module SchemaDiagrams
 
 using ThermophysicalDB: ThermophysicalDB
 
-export SchemaFigure, provenance, meaning, storage
+export SchemaFigure, provenance, meaning, purity, storage
 
 struct SchemaFigure
     svg::String
@@ -22,6 +22,8 @@ const COLORS = Dict(
     :references => "#2fe0ff",
     :compounds => "#58ff7a",
     :properties => "#ffb000",
+    :samples => "#d98cff",
+    :purity_steps => "#ff7ad9",
     :experiments => "#ff4a1c",
     :measurements => "#5c8dff",
     :extras => "#ffd36b",
@@ -37,6 +39,8 @@ const NOTES = Dict(
     :references => "one row per publication",
     :compounds => "one row per chemical species",
     :properties => "one row per (label, unit) pair",
+    :samples => "one row per sample described in a publication",
+    :purity_steps => "one row per purification step of a sample",
     :experiments => "one row per system studied in a publication",
     :measurements => "one row per measured value",
     :extras => "one row per extra field",
@@ -263,6 +267,51 @@ function meaning()
     draw_arrow(io, experiments, :components, compounds, :right, :left)
     height = draw_legend(io, experiments.y + max(experiments.h, compounds.h) + 30)
     return wrap(width, height, String(take!(io)), "What a measurement refers to")
+end
+
+"""
+    purity()
+
+How an experiment reaches the purity of its samples: experiment, sample, purification steps.
+"""
+function purity()
+    width, bw, gap, x0 = 760.0, 320.0, 60.0, 25.0
+    experiments = box(:experiments, x0, 20, bw; show = (:components, :samples, :purpose))
+    samples = box(
+        :samples,
+        x0 + bw + gap,
+        20,
+        bw;
+        show = (
+            :reference,
+            :compound,
+            :origin,
+            :purity,
+            :purity_kind,
+            :purity_basis,
+            :analysis,
+        ),
+    )
+    steps = box(
+        :purity_steps,
+        samples.x,
+        samples.y + samples.h + 44,
+        bw;
+        show = (:sample, :step, :mass, :mole, :analysis),
+    )
+    io = IOBuffer()
+    for b in (experiments, samples, steps)
+        draw_box(io, b)
+    end
+    draw_arrow(io, experiments, :samples, samples, :right, :left)
+    draw_arrow(io, steps, :sample, samples, :right, :right; xm = samples.x + bw + 18)
+    height = draw_legend(io, steps.y + steps.h + 30)
+    return wrap(
+        width,
+        height,
+        String(take!(io)),
+        "From an experiment to the purity of its samples",
+    )
 end
 
 """

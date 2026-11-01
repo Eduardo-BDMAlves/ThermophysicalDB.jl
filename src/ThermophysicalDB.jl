@@ -40,6 +40,7 @@ include("schema/relations.jl")
 include("query/compounds.jl")
 include("query/select.jl")
 include("parse/types.jl")
+include("parse/purity.jl")
 include("parse/article.jl")
 include("parse/ingest.jl")
 include("parse/build.jl")
@@ -52,8 +53,10 @@ include("notice.jl")
 include("export/bibtex.jl")
 include("export/citation.jl")
 include("export/check.jl")
+include("export/purity.jl")
 include("export/summary.jl")
 include("export/points.jl")
+include("export/thermoml.jl")
 include("outliers/stats.jl")
 include("outliers/esd.jl")
 include("outliers/physical.jl")
@@ -82,9 +85,11 @@ export DataView,
     markdown_table,
     mixture,
     points,
+    purity_step_table,
     reasons,
     reference_summary,
     reset_database_dir!,
+    sample_table,
     set_database_dir!,
     table,
     update_database!,
