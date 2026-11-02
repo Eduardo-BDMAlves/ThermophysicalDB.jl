@@ -50,6 +50,10 @@ include("uncertainty/budget.jl")
 include("store/serialize.jl")
 include("store/cache.jl")
 include("store/database.jl")
+include("compounds/seed.jl")
+include("compounds/table.jl")
+include("compounds/store.jl")
+include("compounds/link.jl")
 include("references.jl")
 include("notice.jl")
 include("export/bibtex.jl")
@@ -71,10 +75,13 @@ include("outliers/detect.jl")
 include("outliers/pipeline.jl")
 include("precompile.jl")
 
-export DataView,
+export CompoundDB,
+    DataView,
     UncertaintyTerm,
     bibtex,
     check_update,
+    compound_database,
+    compound_record,
     condition_table,
     csv_table,
     database_dir,
@@ -88,14 +95,18 @@ export DataView,
     find_outliers,
     install_archive!,
     latex_table,
+    link_compounds,
+    lookup_compounds,
     markdown_table,
     mixture,
     points,
     purity_step_table,
     reasons,
+    register_compound!,
     reference_summary,
     reset_database_dir!,
     sample_table,
+    save_compounds,
     set_database_dir!,
     set_uncertainty!,
     table,

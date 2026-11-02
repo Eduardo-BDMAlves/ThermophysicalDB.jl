@@ -25,6 +25,8 @@ Inside it, each data source has its own folder. The NIST archive lives in `therm
 | `dataset.jld2` | the parsed database as flat arrays (the binary cache) |
 | `dataset.toml` | which archive and schema version the cache was built from. Written last, so a cache without it is ignored. |
 
+The list of compounds (see [Compounds and their identifiers](@ref compounds)) lives next to it, in `compounds/`, and is downloaded the first time `compound_database()` is called.
+
 To keep the data somewhere else (a larger disk, a shared folder), use either of these. The environment variable wins when both are set:
 
 ```julia

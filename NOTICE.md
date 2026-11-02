@@ -39,6 +39,15 @@ What to cite when you use the data:
 4. The standard: M. Frenkel, R. D. Chirico, V. Diky, Q. Dong, K. N. Marsh, J. H. Dymond, W. A. Wakeham, S. E. Stein, E. Königsberger and A. R. H. Goodwin, "XML-based IUPAC standard for experimental, predicted, and critically evaluated thermodynamic property data storage and capture (ThermoML)", *Pure and Applied Chemistry* 78 (3), 541-612, 2006, [doi:10.1351/pac200678030541](https://doi.org/10.1351/pac200678030541).
 5. This package, as described in [CITATION.cff](CITATION.cff).
 
+## Compound identifiers (chemicals repository and PubChem)
+
+The compound database (`compound_database()`) is built from lists of identifiers published in the repository [CalebBell/chemicals](https://github.com/CalebBell/chemicals), folder `chemicals/Identifiers`, at the commit `e79047588b30cfabc564c79fb26d760c746877d7`. According to the authors of that repository, the largest list is a database of metadata on about 70 000 chemicals from [PubChem](https://pubchem.ncbi.nlm.nih.gov); the other lists add inorganic compounds, cations, anions and further examples.
+
+- **Not included.** This repository and the released package contain none of these lists. The package downloads them to the computer of each user, from that commit, and checks every file against its SHA-256 digest.
+- **chemicals.** The repository is released under the MIT license, copyright (C) 2016-2021 Caleb Bell. The package reads its lists; it does not use its code.
+- **PubChem.** The identifiers that originate in PubChem remain subject to the policies of PubChem and of the National Library of Medicine, and the sources that deposited the records may have terms of their own. Anyone who redistributes data obtained through the package should check them and credit PubChem as its policies ask.
+- **No warranty and no affiliation.** The lists are used as they are published, without review: names, identifiers and molar masses may contain errors. ThermophysicalDB.jl is not affiliated with, sponsored or endorsed by the authors of chemicals, PubChem or the National Library of Medicine.
+
 ## ThermoML standard and schema
 
 The package reads files that follow ThermoML, an XML-based IUPAC standard for thermophysical and thermochemical property data. The schema (`ThermoML.xsd`) is distributed by NIST together with the archive; this repository does not include a copy of it.

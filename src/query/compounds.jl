@@ -16,6 +16,20 @@
 Lower-case `text`, strip accents and keep only letters and digits.
 """
 function normalize_name(text::AbstractString)
+    # Almost every name is plain ASCII, for which a byte loop gives the same result
+    # as Unicode folding and is several times faster (the index holds hundreds of thousands).
+    if isascii(text)
+        bytes = Vector{UInt8}(undef, ncodeunits(text))
+        n = 0
+        for b in codeunits(text)
+            if 0x61 <= b <= 0x7a || 0x30 <= b <= 0x39
+                bytes[n+=1] = b
+            elseif 0x41 <= b <= 0x5a
+                bytes[n+=1] = b + 0x20
+            end
+        end
+        return String(view(bytes, 1:n))
+    end
     folded = Unicode.normalize(text; casefold = true, stripmark = true)
     io = IOBuffer()
     for c in folded
@@ -97,7 +111,9 @@ end
 # The index
 # ----------------------------------------------------------------------------------
 
-function build_name_index(t::CompoundTable)
+build_name_index(t::CompoundTable) = build_name_index(t.names)
+
+function build_name_index(names::AbstractVector{<:AbstractVector{<:AbstractString}})
     ids = Dict{String,Vector{Int32}}()
     nnames = 0
     function add!(key::String, id::Int32)
@@ -106,16 +122,16 @@ function build_name_index(t::CompoundTable)
         (isempty(list) || last(list) != id) && push!(list, id)
         return nothing
     end
-    for c in eachindex(t.names)
+    for c in eachindex(names)
         id = Int32(c)
-        for name in t.names[c]
+        for name in names[c]
             nnames += 1
             add!(normalize_name(name), id)
             # "n-hexane" is also reachable as "hexane".
             occursin(r"^[nN][-\s]", name) && add!(normalize_name(name[3:end]), id)
         end
     end
-    return NameIndex(length(t), nnames, ids, collect(String, Base.keys(ids)))
+    return NameIndex(length(names), nnames, ids, collect(String, Base.keys(ids)))
 end
 
 function name_index(t::CompoundTable)

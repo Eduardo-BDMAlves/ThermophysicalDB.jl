@@ -68,7 +68,8 @@ native_value(x::Real, ::Any) = Float64(x)
 function native_value(x, kind)
     backend = backend_of(x)
     value = exact_native(backend, x, kind, false)
-    return value === nothing ? package_native_value(backend, x, kind) : value
+    value === nothing || return value
+    return guarded(() -> package_native_value(backend, x, kind), x)
 end
 
 """
@@ -83,10 +84,21 @@ native_difference(x::Real, ::Any) = Float64(x)
 function native_difference(x, kind)
     backend = backend_of(x)
     value = exact_native(backend, x, kind, true)
-    return value === nothing ? package_native_difference(backend, x, kind) : value
+    value === nothing || return value
+    return guarded(() -> package_native_difference(backend, x, kind), x)
 end
 
 quantity_parts(backend, x) = nothing
+
+# A units package reports a wrong dimension with its own error; the user sees one kind.
+function guarded(f, x)
+    try
+        return f()
+    catch err
+        err isa ArgumentError && rethrow()
+        throw(ArgumentError("cannot convert $(x): " * sprint(showerror, err)))
+    end
+end
 
 function package_native_value(backend, x, kind)
     throw(ArgumentError("the backend $(typeof(backend)) cannot convert $(typeof(x))"))
@@ -232,7 +244,8 @@ function convert_native(x::Float64, kind::Union{NativeTemperature,NativePressure
     backend = backend_of(to)
     text = unit_text(backend, to)
     affine = text === nothing ? nothing : try_named_unit(kind, text)
-    affine === nothing && return package_convert_native(backend, x, kind, to)
+    affine === nothing &&
+        return guarded(() -> package_convert_native(backend, x, kind, to), to)
     return FloatAffine(inv(affine))(x)
 end
 convert_native(x::Float64, kind, to::Symbol) = convert_native(x, kind, String(to))

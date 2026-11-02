@@ -42,6 +42,20 @@ purity_step_table
 condition_table
 ```
 
+## Compounds and their identifiers
+
+```@docs
+compound_database
+lookup_compounds
+compound_record
+link_compounds
+register_compound!
+save_compounds
+ThermophysicalDB.CompoundRecords
+ThermophysicalDB.CompoundLinks
+CompoundDB
+```
+
 ## Uncertainty terms of your data
 
 ```@docs

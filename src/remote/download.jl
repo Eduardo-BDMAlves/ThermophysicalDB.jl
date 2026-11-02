@@ -21,7 +21,11 @@ message printed to the user says what can be done about it.
 struct DownloadError <: Exception
     url::String
     failures::Vector{String}
+    help::Vector{String}
 end
+
+# The default advice is about the NIST archive; other downloads pass their own.
+DownloadError(url, failures) = DownloadError(url, failures, String[])
 
 function Base.showerror(io::IO, err::DownloadError)
     println(io, "DownloadError: could not download ", err.url)
@@ -32,18 +36,24 @@ function Base.showerror(io::IO, err::DownloadError)
     println(io, "What you can do:")
     println(io, "  1. Check your internet connection, VPN or proxy (use the HTTPS_PROXY")
     println(io, "     environment variable if your network requires a proxy).")
-    println(
-        io,
-        "  2. Download the file in a browser from https://data.nist.gov/od/id/mds2-2422",
-    )
-    println(io, "     (ThermoML.vYYYY-MM-DD.tgz) and install it with")
-    println(
-        io,
-        "     install_archive!(\"path/to/ThermoML.vYYYY-MM-DD.tgz\"), then call database().",
-    )
+    if isempty(err.help)
+        println(
+            io,
+            "  2. Download the file in a browser from https://data.nist.gov/od/id/mds2-2422",
+        )
+        println(io, "     (ThermoML.vYYYY-MM-DD.tgz) and install it with")
+        println(
+            io,
+            "     install_archive!(\"path/to/ThermoML.vYYYY-MM-DD.tgz\"), then call database().",
+        )
+    else
+        foreach(line -> println(io, line), err.help)
+    end
     print(
         io,
-        "  3. Try again later: the NIST servers sometimes refuse requests temporarily.",
+        isempty(err.help) ?
+        "  3. Try again later: the NIST servers sometimes refuse requests temporarily." :
+        "  3. Try again later: the server sometimes refuses requests temporarily.",
     )
     return nothing
 end
