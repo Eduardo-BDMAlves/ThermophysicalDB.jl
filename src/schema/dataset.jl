@@ -20,6 +20,7 @@ struct Dataset
     purifications::StringPool
     purposes::StringPool
     unc_methods::StringPool
+    evaluators::StringPool
     method_texts::StringPool
     condition_groups::StringPool
     condition_labels::StringPool
@@ -37,6 +38,7 @@ end
 
 function Dataset()
     return Dataset(
+        StringPool(),
         StringPool(),
         StringPool(),
         StringPool(),
@@ -170,6 +172,8 @@ function column_lengths(t::MeasurementTable)
                 t.temperature,
                 t.pressure,
                 t.unc_method,
+                t.evaluator,
+                t.assessment,
                 t.digits,
                 t.temperature_digits,
                 t.pressure_digits,
@@ -210,7 +214,7 @@ function column_lengths(t::ExtraTable)
 end
 
 # True when every identifier in `ids` is `NO_ID` or a valid position in `1:n`.
-in_range(ids::AbstractVector{Int32}, n::Integer) = all(id -> 0 <= id <= n, ids)
+in_range(ids::AbstractVector{<:Integer}, n::Integer) = all(id -> 0 <= id <= n, ids)
 in_range(lists::AbstractVector{Vector{Int32}}, n::Integer) =
     all(ids -> in_range(ids, n), lists)
 
@@ -249,6 +253,8 @@ function validate(ds::Dataset)
         "purpose of an experiment" => in_range(ex.purpose, length(ds.purposes)),
         "uncertainty method of a measurement" =>
             in_range(me.unc_method, length(ds.unc_methods)),
+        "uncertainty evaluator of a measurement" =>
+            in_range(me.evaluator, length(ds.evaluators)),
         "experiment of a measurement" => in_range(me.experiment, length(ex)),
         "property of a measurement" => in_range(me.property, length(ds.properties)),
         "method of a measurement" => in_range(me.method, length(ds.methods)),
@@ -327,6 +333,10 @@ function scope_length(ds::Dataset, code::Integer)
     return length(ds.measurements)
 end
 
+# The identifier of an extra key, which must fit the one-byte column of the extras table.
+extra_key_code(ds::Dataset, key::AbstractString) =
+    narrow(UInt8, intern!(ds.extra_keys, key), "extra key")
+
 """
     add_extra!(ds, scope, row, key, value)
 
@@ -348,7 +358,7 @@ function add_extra!(
     ex = ds.extras
     push!(ex.scope, code)
     push!(ex.row, Int32(row))
-    push!(ex.key, intern!(ds.extra_keys, key))
+    push!(ex.key, extra_key_code(ds, key))
     if value isa AbstractString
         push!(ex.number, NaN)
         push!(ex.text, intern!(ds.extra_texts, value))

@@ -131,7 +131,7 @@ end
     ds = SampleData.build()
     store = Dict{String,Any}()
     T.write_dataset((key, value) -> store[key] = value, ds)
-    @test store["schema_version"] == 6
+    @test store["schema_version"] == 7
     back = T.restore_dataset(key -> store[key])
     @test T.validate(back)
     @test back.samples.purity ≈ ds.samples.purity

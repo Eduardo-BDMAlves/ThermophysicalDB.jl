@@ -5,7 +5,7 @@
 # confusing way: a different `SCHEMA_VERSION` simply triggers a rebuild. Lookup
 # dictionaries are not stored; they are rebuilt from the columns on load.
 
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 const POOL_NAMES = (
     :sources,
     :groups,
@@ -21,6 +21,7 @@ const POOL_NAMES = (
     :purifications,
     :purposes,
     :unc_methods,
+    :evaluators,
     :method_texts,
     :condition_groups,
     :condition_labels,
@@ -46,6 +47,9 @@ function store_columns!(sink, table, prefix::AbstractString)
             for (i, column) in enumerate(value)
                 sink("$prefix/$name/$i", column)
             end
+        elseif value isa PooledFloats
+            sink("$prefix/$name/codes", value.codes)
+            sink("$prefix/$name/pool", value.pool)
         else
             sink("$prefix/$name", value)
         end
@@ -61,6 +65,10 @@ function fill_columns!(table, source, prefix::AbstractString)
             for (i, column) in enumerate(value)
                 append!(column, source("$prefix/$name/$i"))
             end
+        elseif value isa PooledFloats
+            append!(value.codes, source("$prefix/$name/codes"))
+            append!(value.pool, source("$prefix/$name/pool"))
+            rebuild_lookup!(value)
         else
             append!(value, source("$prefix/$name"))
         end

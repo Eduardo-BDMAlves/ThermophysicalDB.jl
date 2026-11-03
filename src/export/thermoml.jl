@@ -330,6 +330,9 @@ function phase_object(name, phase, text, local_number)
     return o
 end
 
+# The assessment number of the source; 1 when it gave none.
+assessment_number(x::Real) = isnan(x) ? 1 : round(Int, x)
+
 function thermoml_property(
     context::ThermomlContext,
     e::Integer,
@@ -395,12 +398,11 @@ function thermoml_property(
         isnan(variant.level) && isnan(variant.coverage) ||
             (context.levels_without_method += 1)
     else
-        assessment = extra_value(extras, "uncertainty_assessment")
         u = JObject(
             "nCombUncertAssessNum" =>
-                assessment isa Float64 ? round(Int, assessment) : 1,
+                assessment_number(ds.measurements.assessment[variant.row]),
         )
-        evaluator = extra_string(extras, "uncertainty_evaluator")
+        evaluator = pool_string(ds.evaluators, ds.measurements.evaluator[variant.row])
         isempty(evaluator) || add!(u, "sCombUncertEvaluator", evaluator)
         add!(u, "eCombUncertEvalMethod", unc_method)
         text = extra_string(extras, "uncertainty_evaluation_text")
@@ -753,14 +755,11 @@ function thermoml_experiment(
             "nPropDigits" => digits_or_derived!(context, m.digits[r], m.value[r]),
         )
         if !isnan(m.unc[r])
-            extras_row = get(context.row_extras, variant.row, nothing)
-            assessment = extra_value(extras_row, "uncertainty_assessment")
             add!(
                 pv,
                 "CombinedUncertainty",
                 JObject(
-                    "nCombUncertAssessNum" =>
-                        assessment isa Float64 ? round(Int, assessment) : 1,
+                    "nCombUncertAssessNum" => assessment_number(m.assessment[variant.row]),
                     "nCombExpandUncertValue" => m.unc[r],
                 ),
             )

@@ -256,11 +256,8 @@ function parse_property(p, names)::Union{Nothing,ParsedProperty}
         push!(extras, "property_name" => String(raw))
     end
     evaluator = jstr(uncertainty, "sCombUncertEvaluator")
-    isempty(evaluator) || push!(extras, "uncertainty_evaluator" => evaluator)
     evaluation = jstr(uncertainty, "sCombUncertEvalMethod")
     isempty(evaluation) || push!(extras, "uncertainty_evaluation_text" => evaluation)
-    assessment = jnum(uncertainty, "nCombUncertAssessNum")
-    isnan(assessment) || push!(extras, "uncertainty_assessment" => assessment)
     return ParsedProperty(
         jint(p, "nPropNumber"),
         String(label) * qualifier,
@@ -272,6 +269,8 @@ function parse_property(p, names)::Union{Nothing,ParsedProperty}
         jnum(uncertainty, "nCombUncertLevOfConfid") / 100,
         jnum(uncertainty, "nCombCoverageFactor"),
         jstr(uncertainty, "eCombUncertEvalMethod"),
+        String(evaluator),
+        jnum(uncertainty, "nCombUncertAssessNum"),
         extras,
         orgs_of(jfield(p, "Solvent")),
         orgs_of(jfield(p, "PropPhaseID")),

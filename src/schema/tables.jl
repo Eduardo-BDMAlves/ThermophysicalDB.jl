@@ -491,7 +491,14 @@ unit the source used (see [`PropertyTable`](@ref)); `NaN` marks an absent number
   (level of confidence as a fraction) when the source gave them. The `k = 2` version is
   derived on demand, so changing the policy never leaves stale data on disk.
   `unc_method` is how the uncertainty was evaluated (pool `unc_methods`), and `unc_k` the
-  coverage factor when the source states it.
+  coverage factor when the source states it. `evaluator` (pool `evaluators`) names who
+  evaluated it and `assessment` is the assessment number of the source (`NaN` when absent).
+- To keep the table small, `property`, `phase`, `unc_method` and `method` use the narrowest
+  unsigned integer that holds their pool (`UInt8`, or `UInt16` for the methods), and
+  `unc_k`, `unc_level` and `assessment` are [`PooledFloats`](@ref): a byte per row that
+  points into the few distinct values. Reading them gives the same numbers as a plain
+  `Vector{Float64}`; adding more distinct values than the code can hold throws an
+  `ArgumentError`.
 - `digits`, `temperature_digits`, `pressure_digits` and `composition_digits[i]` are the
   numbers of significant digits the source gave for the value, the temperature, the
   pressure and the amount of component `i` ([`NO_DIGITS`](@ref) when not given).
@@ -501,17 +508,19 @@ unit the source used (see [`PropertyTable`](@ref)); `NaN` marks an absent number
 """
 struct MeasurementTable
     experiment::Vector{Int32}
-    property::Vector{Int32}
-    method::Vector{Int32}
-    phase::Vector{Int32}
+    property::Vector{UInt8}
+    method::Vector{UInt16}
+    phase::Vector{UInt8}
     value::Vector{Float64}
     unc::Vector{Float64}
-    unc_k::Vector{Float64}
-    unc_level::Vector{Float64}
+    unc_k::PooledFloats{UInt8}
+    unc_level::PooledFloats{UInt8}
     temperature::Vector{Float64}
     pressure::Vector{Float64}
     composition::NTuple{MAX_COMPONENTS,Vector{Float64}}
-    unc_method::Vector{Int32}
+    unc_method::Vector{UInt8}
+    evaluator::Vector{UInt16}
+    assessment::PooledFloats{UInt8}
     digits::Vector{UInt8}
     temperature_digits::Vector{UInt8}
     pressure_digits::Vector{UInt8}
@@ -521,17 +530,19 @@ end
 function MeasurementTable()
     return MeasurementTable(
         Int32[],
-        Int32[],
-        Int32[],
-        Int32[],
+        UInt8[],
+        UInt16[],
+        UInt8[],
         Float64[],
         Float64[],
-        Float64[],
-        Float64[],
+        PooledFloats{UInt8}(),
+        PooledFloats{UInt8}(),
         Float64[],
         Float64[],
         ntuple(_ -> Float64[], MAX_COMPONENTS),
-        Int32[],
+        UInt8[],
+        UInt16[],
+        PooledFloats{UInt8}(),
         UInt8[],
         UInt8[],
         UInt8[],
@@ -555,6 +566,8 @@ function add_measurement!(
     pressure::Real = NaN,
     composition::NTuple{MAX_COMPONENTS,<:Real} = (NaN, NaN, NaN),
     unc_method::Integer = NO_ID,
+    evaluator::Integer = NO_ID,
+    assessment::Real = NaN,
     digits::Integer = NO_DIGITS,
     temperature_digits::Integer = NO_DIGITS,
     pressure_digits::Integer = NO_DIGITS,
@@ -565,9 +578,9 @@ function add_measurement!(
     ),
 )
     push!(t.experiment, Int32(experiment))
-    push!(t.property, Int32(property))
-    push!(t.method, Int32(method))
-    push!(t.phase, Int32(phase))
+    push!(t.property, narrow(UInt8, property, "property"))
+    push!(t.method, narrow(UInt16, method, "method"))
+    push!(t.phase, narrow(UInt8, phase, "phase"))
     push!(t.value, Float64(value))
     push!(t.unc, Float64(unc))
     push!(t.unc_k, Float64(unc_k))
@@ -577,7 +590,9 @@ function add_measurement!(
     for i = 1:MAX_COMPONENTS
         push!(t.composition[i], Float64(composition[i]))
     end
-    push!(t.unc_method, Int32(unc_method))
+    push!(t.unc_method, narrow(UInt8, unc_method, "uncertainty method"))
+    push!(t.evaluator, narrow(UInt16, evaluator, "uncertainty evaluator"))
+    push!(t.assessment, assessment)
     push!(t.digits, UInt8(digits))
     push!(t.temperature_digits, UInt8(temperature_digits))
     push!(t.pressure_digits, UInt8(pressure_digits))
@@ -608,17 +623,17 @@ Sparse key-value store (long format) for fields that have no column in the core 
 Row `i` says: in the table given by `scope[i]`, row `row[i]` has the field `key[i]` with
 the numeric value `number[i]` (`NaN` for text) or the text `text[i]` (`NO_ID` for a
 number). Keys and texts are identifiers into the dataset's `extra_keys` and
-`extra_texts` pools. Core queries never touch this table.
+`extra_texts` pools (there are at most 255 distinct keys, which keeps `key` to one byte). Core queries never touch this table.
 """
 struct ExtraTable
     scope::Vector{UInt8}
     row::Vector{Int32}
-    key::Vector{Int32}
+    key::Vector{UInt8}
     number::Vector{Float64}
     text::Vector{Int32}
 end
 
-ExtraTable() = ExtraTable(UInt8[], Int32[], Int32[], Float64[], Int32[])
+ExtraTable() = ExtraTable(UInt8[], Int32[], UInt8[], Float64[], Int32[])
 
 Base.length(t::ExtraTable) = length(t.row)
 
