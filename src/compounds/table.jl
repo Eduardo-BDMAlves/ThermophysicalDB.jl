@@ -487,19 +487,28 @@ end
 
 """
     register_compound!(db; names, inchikey = "", cas = "", cid = -1, formula = "",
-                       molar_mass = NaN, smiles = "", inchi = "", iupac = "") -> Int32
+                       molar_mass = NaN, smiles = "", inchi = "", iupac = "",
+                       save = false, dir = nothing) -> Int32
 
 Add a compound of your own, or complete one that is already there (found by its InChIKey,
 or by its first name when you give none): what you give replaces what the row had, and
 your names go first. `molar_mass` is in g/mol. The row is marked as yours, so that it
 survives an update of the list, and it is stored by [`save_compounds`](@ref).
+
+By default the database is changed only in the session. With `save = true` the compounds
+that are yours (this one and the ones added before) are written at once to the file of your
+own compounds, which `compound_database()` lays over the lists in every session. `dir` is
+the folder to write to; by default it is the one the database was loaded from. The lists
+themselves are never changed.
 """
 function register_compound!(
     db::CompoundDB;
     names::AbstractVector{<:AbstractString},
+    save::Bool = false,
+    dir::Union{Nothing,AbstractString} = nothing,
     kwargs...,
 )
-    return insert_record!(
+    id = insert_record!(
         db;
         names,
         source = "user",
@@ -507,4 +516,9 @@ function register_compound!(
         override = true,
         kwargs...,
     )
+    if save
+        folder = dir === nothing ? get(db.meta, "dir", compounds_dir()) : dir
+        save_compounds(db; dir = folder)
+    end
+    return id
 end

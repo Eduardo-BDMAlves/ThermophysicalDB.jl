@@ -118,25 +118,8 @@ function Base.show(io::IO, l::CompoundLinks)
     )
 end
 
-"""
-    link_compounds(ds, db) -> CompoundLinks
-
-Match every compound of the ThermoML dataset `ds` with the compound database `db`. The
-InChIKey is tried first, then the InChI, then the names (with the usual spelling variants).
-A compound with several candidates gets one row for each, and one found only by name is
-marked `via = :name`, because a name can describe more than one species: trust such a link only
-when `formula_check` and `inchi_check` are `:same`, and treat `:stereo` (the same skeleton with
-other stereochemistry or isotopes) and `:different` (a hydrate and its anhydrous salt, for
-example) as a related compound, not as the same one. `by_name = false` links by InChIKey and
-InChI only. The dataset is not modified.
-
-```julia
-db = database()
-cdb = compound_database()
-links = link_compounds(db, cdb)
-```
-"""
-function link_compounds(ds::Dataset, db::CompoundDB; by_name::Bool = true)
+# The table behind `link_compounds`: one row for each candidate of each compound of `ds`.
+function compound_links(ds::Dataset, db::CompoundDB; by_name::Bool = true)
     t = ds.compounds
     ex = exact_index(db)
     names = name_index(db)
@@ -238,22 +221,30 @@ function find_compounds(ds::Dataset, db::CompoundDB, text::AbstractString; limit
     limit >= 1 || throw(ArgumentError("limit must be at least 1"))
     t = ds.compounds
     ids = Int32[]
-    seen = Set{Int32}()
-    for r in lookup_compounds(db, text; limit = max(limit, 25)).id
+    how = Dict{Int32,Symbol}()
+    function add!(id, kind)
+        if !haskey(how, id)
+            push!(ids, id)
+            how[id] = kind
+        elseif match_rank(kind) < match_rank(how[id])
+            how[id] = kind
+        end
+        return nothing
+    end
+    records = lookup_compounds(db, text; limit = max(limit, 25))
+    for (r, kind) in zip(records.id, records.match)
         key = db.inchikey[r]
         isempty(key) && continue
         id = get(t.index, key, NO_ID)
-        id != NO_ID && !(id in seen) && (push!(seen, id); push!(ids, id))
+        id == NO_ID || add!(id, kind in (:contains, :similar) ? kind : :exact)
     end
     plain = find_compounds(ds, text; limit)
-    for id in plain.id
-        id in seen || (push!(seen, id); push!(ids, id))
+    for (id, kind) in zip(plain.id, plain.match)
+        add!(id, kind)
     end
     isempty(ids) && return plain
+    sort!(ids; by = id -> match_rank(how[id]), alg = MergeSort)
     length(ids) > limit && (ids = ids[1:limit])
-    how = Symbol[
-        id in plain.id ? plain.match[findfirst(==(id), plain.id)] : :exact for id in ids
-    ]
     return CompoundMatches(
         String(text),
         ids,
@@ -261,6 +252,8 @@ function find_compounds(ds::Dataset, db::CompoundDB, text::AbstractString; limit
         t.formula[ids],
         t.inchikey[ids],
         point_counts(ds, ids),
-        how,
+        [how[id] for id in ids],
     )
 end
+
+match_rank(kind::Symbol) = kind == :exact ? 1 : kind == :contains ? 2 : 3

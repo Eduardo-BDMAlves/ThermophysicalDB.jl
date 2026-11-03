@@ -184,6 +184,10 @@ it on a [`DataView`](@ref) refines that view, so filters can be chained.
 
 A component or property that matches nothing throws an `ArgumentError`, so a typo is
 never mistaken for "no data".
+
+Given a [`LinkedDatabase`](@ref) (see [`link_compounds`](@ref)) instead of the dataset, a
+component can also be a synonym, a CAS number, a PubChem CID, an InChI or a SMILES, and an
+ambiguous text is resolved by asking the user (keyword `choose`).
 """
 points(ds::Dataset; kwargs...) = points(DataView(ds); kwargs...)
 

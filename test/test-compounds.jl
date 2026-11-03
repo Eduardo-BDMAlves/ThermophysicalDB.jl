@@ -421,7 +421,9 @@ end
         )
         unknown = add(names = ["unobtainium"], formula = "Xx")
         before = (length(ds.compounds), copy(ds.compounds.names), copy(ds.compounds.key))
-        links = link_compounds(ds, cdb)
+        linked = link_compounds(ds, cdb)
+        @test linked isa LinkedDatabase && linked.dataset === ds
+        links = linked.links
         @test (length(ds.compounds), ds.compounds.names, ds.compounds.key) == before
         rows(c) = findall(==(Int32(c)), links.compound)
         @test links.via[only(rows(water))] == :inchikey
@@ -448,11 +450,13 @@ end
         @test links.inchi_check[rows(other)[1]] == :different
         @test links.formula_check[rows(other)[1]] == :different
         # by_name = false links only by InChIKey and InChI
-        strict = link_compounds(ds, cdb; by_name = false)
+        strict = link_compounds(ds, cdb; by_name = false).links
         @test :name ∉ strict.via
         @test strict.record[only(findall(==(Int32(by_name)), strict.compound))] == 0
         @test occursin("found in the compound database", sprint(show, links))
+        @test occursin("LinkedDatabase", sprint(show, linked))
         @test length(Tables.columntable(links).compound) == length(links)
+        @test Tables.columntable(linked).compound == links.compound
     end
 end
 
@@ -570,4 +574,215 @@ end
     @test T.identifier_kind("InChI=1S/H2O/h1H2") == :inchi
     @test T.identifier_kind("smiles=CCO") == :smiles
     @test T.identifier_kind("water") == :name
+end
+
+@testitem "a linked database finds a compound by any identifier and asks when it is ambiguous" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        ds = T.Dataset()
+        mole = T.intern!(ds.kinds, "Mole fraction")
+        source = T.intern!(ds.sources, "thermoml")
+        ref = T.add_reference!(ds.references; doi = "10.5555/linked-001", source)
+        add(; kwargs...) = T.add_compound!(ds.compounds; kwargs...)
+        water = add(
+            inchikey = "XLYOFNOQVPJJNP-UHFFFAOYSA-N",
+            inchi = "InChI=1S/H2O/h1H2",
+            names = ["water"],
+            formula = "H2O",
+        )
+        methane = add(
+            inchikey = "VNWKTOKETHGBQD-UHFFFAOYSA-N",
+            names = ["methane"],
+            formula = "CH4",
+        )
+        nbutane = add(
+            inchikey = "IJDNQMDRQITEOD-UHFFFAOYSA-N",
+            names = ["n-butane"],
+            formula = "C4H10",
+        )
+        isobutane = add(
+            inchikey = "NNPPMTNAJDCUHE-UHFFFAOYSA-N",
+            names = ["isobutane"],
+            formula = "C4H10",
+        )
+        density = T.add_property!(ds.properties, "Mass density", "kg/m3")
+        for (compounds, n) in (
+            ([water], 3),
+            ([methane], 2),
+            ([nbutane], 5),
+            ([isobutane], 1),
+            ([water, methane], 4),
+        )
+            e = T.add_experiment!(
+                ds.experiments;
+                reference = ref,
+                components = compounds,
+                kinds = fill(mole, length(compounds)),
+            )
+            for i = 1:n
+                T.add_measurement!(
+                    ds.measurements;
+                    experiment = e,
+                    property = density,
+                    temperature = 290.0 + i,
+                    pressure = 101.325,
+                    value = 1.0,
+                )
+            end
+        end
+        linked = link_compounds(ds, cdb)
+        used(view) = sort!(unique(view.dataset.measurements.experiment[view.rows]))
+
+        # a synonym, a CAS number and a CID that no article used lead to the same compound
+        @test length(points(linked; component = "oxidane")) == 3 + 4
+        @test length(points(linked; component = "7732-18-5")) == 3 + 4
+        @test length(points(linked; component = "962")) == 3 + 4
+        @test length(points(linked; component = "water", exact = true)) == 3
+        # everything else of `points` still works, and an integer id or a vector is accepted
+        @test length(points(linked; component = ["aqua", "methane"], match = :all)) == 4
+        @test length(points(linked; component = Int(water))) == 3 + 4
+        @test length(points(linked)) == length(points(ds))
+        @test length(mixture(linked, "7732-18-5", "74-82-8")) == 4
+        @test_throws ArgumentError mixture(linked, "water")
+        @test find_compounds(linked, "oxidane").id == find_compounds(ds, cdb, "oxidane").id
+
+        # a formula shared by two isomers is ambiguous
+        @test_throws ArgumentError points(linked; component = "C4H10", choose = :error)
+        err = try
+            points(linked; component = "C4H10", choose = :error)
+        catch e
+            e
+        end
+        message = sprint(showerror, err)
+        @test occursin("matches 2 compounds", message) &&
+              occursin("n-butane", message) &&
+              occursin("isobutane", message) &&
+              occursin("106-97-8", message)
+        # not interactive, no answer prepared: no guess either (the input is stdin)
+        @test_throws ArgumentError points(linked; component = "C4H10")
+
+        # the menu is ordered by number of points: 1 is n-butane (5), 2 is isobutane (1)
+        out = IOBuffer()
+        view = points(linked; component = "C4H10", input = IOBuffer("2\n"), output = out)
+        @test length(view) == 1
+        menu = String(take!(out))
+        @test occursin("1. n-butane", replace(menu, r"\s+" => " ")) ||
+              occursin("n-butane", menu)
+        @test occursin("Which one?", menu)
+        # the answer is remembered for the same text
+        @test haskey(linked.choices, "c4h10")
+        @test length(points(linked; component = "c4h10", choose = :error)) == 1
+        forget_choices!(linked)
+        @test isempty(linked.choices)
+        # an invalid answer asks again; "a" takes all of them; "q" cancels
+        out = IOBuffer()
+        view = points(
+            linked;
+            component = "C4H10",
+            input = IOBuffer("7\nxyz\na\n"),
+            output = out,
+        )
+        @test length(view) == 6
+        @test occursin("Not a valid answer", String(take!(out)))
+        forget_choices!(linked)
+        @test_throws ArgumentError points(
+            linked;
+            component = "C4H10",
+            input = IOBuffer("q\n"),
+            output = IOBuffer(),
+        )
+        @test_throws ArgumentError points(
+            linked;
+            component = "C4H10",
+            input = IOBuffer(""),
+            output = IOBuffer(),
+        )
+        @test isempty(linked.choices)
+        # prepared answers: a number, :all, or a symbol for every text
+        @test length(points(linked; component = "C4H10", choose = Dict("c4h10" => 1))) == 5
+        forget_choices!(linked)
+        @test length(points(linked; component = "C4H10", choose = Dict("C4H10" => 2))) == 1
+        forget_choices!(linked)
+        @test length(points(linked; component = "C4H10", choose = :all)) == 6
+        @test isempty(linked.choices)                       # :all is not remembered
+        @test length(points(linked; component = "C4H10", choose = Dict("C4H10" => :all))) ==
+              6
+        forget_choices!(linked)
+        @test_throws ArgumentError points(
+            linked;
+            component = "C4H10",
+            choose = Dict("C4H10" => 3),
+        )
+        @test_throws ArgumentError points(
+            linked;
+            component = "C4H10",
+            choose = Dict("C4H10" => "x"),
+        )
+        @test_throws ArgumentError points(linked; component = "C4H10", choose = :maybe)
+        @test_throws ArgumentError points(linked; component = "C4H10", choose = 1)
+        # a mixture asks for each ambiguous component
+        view = mixture(
+            linked,
+            "C4H10",
+            "74-82-8";
+            exact = false,
+            input = IOBuffer("1\n"),
+            output = IOBuffer(),
+        )
+        @test isempty(view)                                  # no butane + methane system exists
+        forget_choices!(linked)
+
+        # a close but inexact name is never taken without an answer
+        @test_throws ArgumentError points(linked; component = "watr", choose = :all)
+        @test_throws ArgumentError points(linked; component = "watr", choose = :error)
+        @test length(
+            points(
+                linked;
+                component = "watr",
+                input = IOBuffer("1\n"),
+                output = IOBuffer(),
+            ),
+        ) == 3 + 4
+        forget_choices!(linked)
+        # known by the compound database but not in the dataset
+        err = try
+            points(linked; component = "ethyl alcohol")
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("compound database", sprint(showerror, err)) ||
+              occursin("no compound", sprint(showerror, err))
+        # unknown everywhere
+        @test_throws ArgumentError points(linked; component = "unobtainium")
+    end
+end
+
+@testitem "register_compound! can save what it adds, and does not by default" tags = [:unit] setup =
+    [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        db = CompoundFixture.database(dir)
+        path = T.custom_cache_path(joinpath(dir, "local"))
+        first_id = register_compound!(db; names = ["compound one"], molar_mass = 10.0)
+        @test !isfile(path)                                   # not saved unless asked
+        second_id = register_compound!(
+            db;
+            names = ["cesium formate"],
+            inchikey = "WLHQEXWBUBNKIO-UHFFFAOYSA-N",
+            molar_mass = 177.92,
+            save = true,
+        )
+        @test isfile(path)                                    # in the folder it was loaded from
+        again = CompoundFixture.database(dir; rebuild = true)
+        @test only(lookup_compounds(again, "compound one").id) == first_id   # saved with it
+        @test again.molar_mass[second_id] == 177.92
+        @test count(again.custom) == 2
+        # another folder on request
+        other = joinpath(dir, "other")
+        register_compound!(db; names = ["compound two"], save = true, dir = other)
+        @test isfile(T.custom_cache_path(other))
+    end
 end

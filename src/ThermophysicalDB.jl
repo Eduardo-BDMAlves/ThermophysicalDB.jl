@@ -54,6 +54,7 @@ include("compounds/seed.jl")
 include("compounds/table.jl")
 include("compounds/store.jl")
 include("compounds/link.jl")
+include("compounds/linked.jl")
 include("references.jl")
 include("notice.jl")
 include("export/bibtex.jl")
@@ -76,6 +77,7 @@ include("outliers/pipeline.jl")
 include("precompile.jl")
 
 export CompoundDB,
+    LinkedDatabase,
     DataView,
     UncertaintyTerm,
     bibtex,
@@ -93,6 +95,7 @@ export CompoundDB,
     export_points,
     find_compounds,
     find_outliers,
+    forget_choices!,
     install_archive!,
     latex_table,
     link_compounds,

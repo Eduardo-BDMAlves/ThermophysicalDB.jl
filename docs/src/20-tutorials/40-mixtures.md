@@ -42,6 +42,42 @@ pure(name, property) = points(
 mixture("Viscosity")
 ```
 
+## Naming the components in other ways
+
+The names above are the ones the articles use, but you do not have to remember them. The archive stays as NIST publishes it, and a second, separate database, the [compound database](@ref compounds), knows every way of naming a compound. Joining the two with [`link_compounds`](@ref) gives a [`LinkedDatabase`](@ref), and in it each component can be named in a different way: here ethanol by its SMILES and water by its CAS number.
+
+```@example mix
+cdb = compound_database(progress = false)
+linked = link_compounds(db, cdb)
+
+by_identifiers = points(
+    linked; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true,
+    property = "Viscosity", temperature = window,
+)
+
+(
+    by_names = length(mixture("Viscosity")),
+    by_identifiers = length(by_identifiers),
+    same_points = by_identifiers.rows == mixture("Viscosity").rows,
+)
+```
+
+The same points come back, because both texts lead to the same two compounds of the archive (through their InChIKeys). A CAS number (`"64-17-5"`), a PubChem CID (`"702"` for ethanol, `"962"` for water) or a synonym that no article used (`"oxidane"`) work as well. A SMILES needs the prefix `SMILES=`, since `"CO"` is carbon monoxide as a formula and methanol as a SMILES.
+
+A text that fits more than one compound is never guessed. The formula `C2H6O` belongs to ethanol and to dimethyl ether, so asking for it lists both:
+
+```@example mix
+message = try
+    points(linked; component = ["C2H6O", "7732-18-5"], match = :all, exact = true, choose = :error)
+    "the formula led to a single compound"
+catch err
+    sprint(showerror, err)
+end
+println(message)
+```
+
+In a terminal the same question is asked for you (`choose = :ask`, the default): answer with the number of the compound you mean. A script that nobody watches cannot answer, so it receives the error above, or you prepare the answer with `choose = Dict("C2H6O" => 1)`. See [Compounds and their identifiers](@ref compounds) for all the options.
+
 ## Composition needs care
 
 A mixture point carries the compositions `x1, x2, x3` of its components *in the order of the `components` column*, and `xkind` says what they express. The same system can therefore appear as `"ethanol + water"` in one article and as `"water + ethanol"` in another, and some articles give mass fractions instead of mole fractions. Look before you plot:
@@ -139,6 +175,7 @@ The excess volume is negative: the mixture is *denser* than the ideal mixture. T
 
 - Change the temperature window to see how both excess properties move with temperature.
 - Replace the pair: `["methanol", "water"]` or `["propan-2-ol", "water"]` are well covered in the archive.
+- Name the pair with other identifiers: `["64-17-5", "962"]` (CAS number and PubChem CID) or `["ethyl alcohol", "SMILES=O"]`.
 - Colour the points by article (`tv.doi`) to spot laboratories whose mixture data are systematically offset.
 
 ## Sources of the data

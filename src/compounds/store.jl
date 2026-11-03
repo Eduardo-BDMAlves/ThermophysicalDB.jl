@@ -307,6 +307,7 @@ function compound_database(;
         end
     end
     load_custom!(db, dir)
+    db.meta["dir"] = String(dir)
     COMPOUND_MEMO[] = (String(dir), db)
     return db
 end

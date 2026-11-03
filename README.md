@@ -33,6 +33,7 @@ Experimental data on density, viscosity, thermal conductivity, vapor pressure, h
 - **Units that mean something.** Limits accept [Unitful.jl](https://github.com/PainterQubits/Unitful.jl) quantities such as `25u"°C"` or `1u"atm"`, and tables can return Unitful columns.
 - **Uncertainty on one footing.** Every expanded uncertainty is also restated at *k* = 2 by an explicit, documented rule, so points from different laboratories can be weighted somewhat consistently.
 - **Tables.jl all the way.** A selection is a Tables.jl table made of plain vectors: plot it with Makie, hand it to a DataFrame, or write it to disk.
+- **Two databases.** The experimental points (ThermoML) and the nomenclature and base properties of the compounds (names, CAS number, PubChem CID, SMILES, InChI, molar mass) are two separate databases, linked on demand. A compound can be named by any of them, and when a name is ambiguous the user chooses; the ThermoML data are never changed.
 - **Cite what you use.** A selection exports its BibTeX file and a summary table of the articles behind it (LaTeX, Markdown or CSV).
 - **Extensible.** The same schema is meant to hold other databases, including your own local data.
 

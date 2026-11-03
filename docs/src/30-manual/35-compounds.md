@@ -8,6 +8,17 @@ The ThermoML Archive names its compounds as each article did, and a few of them 
 
 Nothing here changes the ThermoML data. The archive stays exactly as NIST publishes it, and when the two disagree both are shown and you choose.
 
+## Two databases
+
+The package keeps two databases, side by side and never mixed:
+
+| Database | What it holds | Where it comes from | Can you change it? |
+| :-- | :-- | :-- | :-- |
+| the **thermophysical database** (`database()`) | the experimental points: properties, conditions, uncertainties, samples, references | the ThermoML Archive of NIST/TRC | no, it is the reference; you only add your own points as another source |
+| the **compound database** (`compound_database()`) | the nomenclature and the base properties of the compounds: every name, CAS number, PubChem CID, formula, molar mass, SMILES, InChI and InChIKey | lists derived from PubChem, fixed at one commit | the lists are never touched; the compounds you add or complete with [`register_compound!`](@ref) go to a separate file of your own (`custom.jld2`) and are loaded together with the lists, as one database |
+
+What you add is kept apart on your computer and never written into the lists or into the archive: `register_compound!` changes the database in the session, and [`save_compounds`](@ref) writes only the compounds you added or changed to `custom.jld2`. Every call of `compound_database()` reads the lists and then lays that file over them, so the variable you work with is a single database. [`link_compounds`](@ref) joins the two in a [`LinkedDatabase`](@ref). The join only records which compound of the compound database describes each compound of the archive; it never renames, merges or corrects anything in the archive. Where the two disagree you see both and you choose.
+
 ## Getting it
 
 ```julia
@@ -54,10 +65,11 @@ The first search by name in a session builds an index of the names (about three 
 
 ```julia
 db = database()
-links = link_compounds(db, cdb)
+linked = link_compounds(db, cdb)
+linked.links          # the table of links
 ```
 
-The InChIKey is tried first, then the InChI, then the names. The result has one row for each pair (compound of the archive, compound of the database that may describe it), and says how reliable the pair is:
+The InChIKey is tried first, then the InChI, then the names. `linked.links` has one row for each pair (compound of the archive, compound of the database that may describe it), and says how reliable the pair is:
 
 | Column | Meaning |
 | :-- | :-- |
@@ -70,14 +82,50 @@ A link through the InChIKey or the InChI is the same species. **A link through a
 
 On that archive (8 526 compounds, 8 517 of them with an InChIKey), 4 363 were found by InChIKey, 293 only by name and 3 870 were not found, and the compounds found account for 87 % of the appearances of a component in a measurement. The compounds that are missing are, above all, ionic liquids and uncommon organic compounds that the lists do not cover, and some of them, such as 1-butyl-3-methylimidazolium tetrafluoroborate, are among the most measured. The measurement was made on that date and changes with the archive and the lists.
 
-[`find_compounds`](@ref) understands the database too, when you give it as the second argument:
+[`find_compounds`](@ref) understands the database too, when you give it as the second argument, or the linked database as the first:
 
 ```julia
 find_compounds(db, cdb, "7732-18-5")   # water in the archive, from its CAS number
-find_compounds(db, cdb, "oxidane")     # from a synonym that no article used
+find_compounds(linked, "oxidane")      # the same, from a synonym that no article used
 ```
 
 The ThermoML compounds with the same InChIKey as any compound the text identifies are found first. A compound of the archive that has no InChIKey is reached only through its own names, so nothing is guessed.
+
+## Searching the archive with any name
+
+A [`LinkedDatabase`](@ref) takes the place of the archive in [`points`](@ref) and [`mixture`](@ref), and a compound can be named by anything either database knows:
+
+```julia
+points(linked; component = "oxidane", property = "Mass density")   # a synonym
+points(linked; component = "7732-18-5", temperature = (280, 300))  # a CAS number
+mixture(linked, "7732-18-5", "64-17-5")                            # water + ethanol
+```
+
+The result is an ordinary [`DataView`](@ref) of the archive, so everything else works on it as before. Because a view does not remember the compound database, refine it with the names that the archive itself uses.
+
+### When a name is ambiguous
+
+A text that leads to one compound of the archive is used as it is. A text that leads to several is not guessed: a formula such as `"C4H10"` belongs to two isomers, and a name can be used for different species. The candidates are listed, with their formula, InChIKey, CAS number, other names and number of points, ordered by number of points and then by name, so the same number means the same compound every time on the same data:
+
+```text
+"C4H10" matches 2 compounds of the dataset:
+  1. n-butane  |  C4H10  |  IJDNQMDRQITEOD-UHFFFAOYSA-N  |  CAS 106-97-8  |  5 points
+  2. isobutane  |  C4H10  |  NNPPMTNAJDCUHE-UHFFFAOYSA-N  |  CAS 75-28-5  |  1 points
+Which one? (1-2, a for all of them, q to cancel):
+```
+
+Answer with the number, `a` for all of them (they then count as the same component, as in `points(db; component = "C4H10")`), or `q` to cancel. An invalid answer is asked again. A text with no exact candidate but close ones (a misspelling) is listed in the same way, without the `a` option: a close name is never taken without your answer.
+
+The keyword `choose` of `points` and `mixture` controls this:
+
+| `choose` | Behavior |
+| :-- | :-- |
+| `:ask` (default) | asks in the terminal when the session is interactive (`isinteractive()` is `true`, as in the REPL and in VS Code); otherwise throws an `ArgumentError` that lists the candidates, because a script that nobody watches must not choose |
+| `:error` | never asks; throws the same error |
+| `:all` | takes every exact candidate; a text with only close candidates is still refused |
+| `Dict("butane" => 2, "C4H10" => :all)` | an answer prepared for each text, by the number the menu shows, so a script does not stop; a text that is not in the dictionary is handled as with `:ask` |
+
+The question is read from `input` and written to `output` (`stdin` and `stdout` by default), which is how it is tested. The answers you give are kept in `linked.choices` and used again for the same text during the session; [`forget_choices!`](@ref) clears them. Nothing is written to disk, and the archive is never changed.
 
 ## Adding your own compounds
 
@@ -90,8 +138,16 @@ register_compound!(cdb;
     cas = "3495-36-1",
     molar_mass = 177.92,          # g/mol, for example from the certificate of the supplier
 )
-save_compounds(cdb)
+save_compounds(cdb)               # without this, the compound exists only in this session
 ```
+
+By default `register_compound!` changes the database only in the session, so that nothing is written to your disk without you asking. Pass `save = true` to write at once, in the same call:
+
+```julia
+register_compound!(cdb; names = ["cesium formate"], molar_mass = 177.92, save = true)
+```
+
+With `save = true` all the compounds that are yours (this one and the ones added before in the session) are written to `custom.jld2`, in the folder the database was loaded from, or in `dir = "..."` if you give one. The lists are never written to.
 
 A compound needs an InChIKey or a name. The rows you added or changed are marked (`custom`) and kept in `custom.jld2`; they are laid over the lists again every time the database loads, so a new version of the lists does not remove them. A molar mass that you give is the one the conversions of concentration will use first.
 

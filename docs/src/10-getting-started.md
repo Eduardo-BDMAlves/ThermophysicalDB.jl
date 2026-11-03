@@ -115,6 +115,19 @@ fig
     - The [manual](30-manual/10-selecting.md) documents every function and the reasoning behind its behaviour.
     - If the download does not work on your network, see [Downloads, updates and cache](@ref updates).
 
+## Name a compound in any way
+
+The archive names a compound as each article did. The package also keeps a second, separate database of the compounds, with all their names, CAS numbers, PubChem CIDs, SMILES and InChIs. Joining the two lets you search the archive with any of them (the first call downloads the lists, about 47 MB):
+
+```julia
+cdb = compound_database()
+linked = link_compounds(db, cdb)
+
+points(linked; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true)   # ethanol + water
+```
+
+When a text fits more than one compound, such as the formula `"C2H6O"`, you are asked which one you mean. See [Compounds and their identifiers](@ref compounds) and the [binary mixtures tutorial](@ref tutorial_mixtures).
+
 ## Sources of the data
 
 ```@raw html
