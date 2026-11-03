@@ -264,7 +264,7 @@ end
 What [`lookup_compounds`](@ref) returns: the compounds found, as columns `id`, `name`,
 `cas`, `cid`, `formula`, `molar_mass` (g/mol), `inchikey`, `source` and `match` (how the
 text was matched: `:inchikey`, `:inchi`, `:cas`, `:cid`, `:smiles`, `:formula`, `:name`,
-`:contains` or `:similar`). It is a Tables.jl table.
+`:contains`, `:similar` or `:pubchem`, for a compound that had to be asked of PubChem). It is a Tables.jl table.
 """
 struct CompoundRecords
     query::String
@@ -382,27 +382,8 @@ function matches_by(db::CompoundDB, text::AbstractString, by::Symbol)
     return found, kinds
 end
 
-"""
-    lookup_compounds(db, text; by = :auto, limit = 10) -> CompoundRecords
-
-Find the compounds that `text` identifies. With `by = :auto` the kind of identifier is
-recognised from how it is written: an InChIKey, a CAS number (`"7732-18-5"`), a text that
-starts with `InChI=`, or one that starts with `SMILES=`; anything else is a name, a PubChem
-CID (digits only) or a formula, tried in that order. Pass `by` (`:name`, `:cas`, `:cid`,
-`:inchikey`, `:inchi`, `:smiles`, `:formula`) to say what it is: a SMILES or a number cannot
-be told from a name by looking at it. Identifiers are compared as written (a SMILES is not
-canonicalised, and a formula must be written as the database writes it). Names follow the
-same rules as [`find_compounds`](@ref): case, accents, hyphens and spaces are ignored,
-and when nothing matches, names that contain the text or are close to it are listed.
-
-```julia
-cdb = compound_database()
-lookup_compounds(cdb, "7732-18-5")      # by CAS number
-lookup_compounds(cdb, "cesium formate")  # by name
-lookup_compounds(cdb, "CO"; by = :smiles)
-```
-"""
-function lookup_compounds(
+# The search in the compound database alone (see `lookup_compounds`).
+function lookup_local(
     db::CompoundDB,
     text::AbstractString;
     by::Symbol = :auto,
@@ -446,8 +427,17 @@ function lookup_compounds(
         end
     end
     length(ids) > limit && (ids = ids[1:limit]; how = how[1:limit])
+    return records_for(db, s, ids, how)
+end
+
+function records_for(
+    db::CompoundDB,
+    text::AbstractString,
+    ids::Vector{Int32},
+    how::Vector{Symbol},
+)
     return CompoundRecords(
-        s,
+        String(text),
         ids,
         [primary_name(db, i) for i in ids],
         db.cas[ids],
@@ -458,6 +448,65 @@ function lookup_compounds(
         db.source[ids],
         how,
     )
+end
+
+"""
+    lookup_compounds(db, text; by = :auto, limit = 10, online = false, choose = :ask,
+                     refresh = false, input = stdin, output = stdout) -> CompoundRecords
+
+Find the compounds that `text` identifies. With `by = :auto` the kind of identifier is
+recognised from how it is written: an InChIKey, a CAS number (`"7732-18-5"`), a text that
+starts with `InChI=`, or one that starts with `SMILES=`; anything else is a name, a PubChem
+CID (digits only) or a formula, tried in that order. Pass `by` (`:name`, `:cas`, `:cid`,
+`:inchikey`, `:inchi`, `:smiles`, `:formula`) to say what it is: a SMILES or a number cannot
+be told from a name by looking at it. Identifiers are compared as written (a SMILES is not
+canonicalised, and a formula must be written as the database writes it). Names follow the
+same rules as [`find_compounds`](@ref): case, accents, hyphens and spaces are ignored,
+and when nothing matches, names that contain the text or are close to it are listed.
+
+With `online = true`, a text that the database does not know (nothing found, or only close
+names) is asked of PubChem with [`fetch_pubchem!`](@ref): what PubChem answers is kept, added
+to the database and found again, and `choose`, `refresh`, `input` and `output` are those of
+`fetch_pubchem!`. A compound that had to be asked of PubChem is marked `:pubchem` when the
+text is none of its names. Without `online = true` the network is never used, and a
+formula (`by = :formula`) cannot be asked of PubChem.
+
+```julia
+cdb = compound_database()
+lookup_compounds(cdb, "7732-18-5")      # by CAS number
+lookup_compounds(cdb, "cesium formate")  # by name
+lookup_compounds(cdb, "CO"; by = :smiles)
+```
+"""
+function lookup_compounds(
+    db::CompoundDB,
+    text::AbstractString;
+    by::Symbol = :auto,
+    limit::Int = 10,
+    online::Bool = false,
+    choose = :ask,
+    refresh::Bool = false,
+    input::IO = stdin,
+    output::IO = stdout,
+)
+    found = lookup_local(db, text; by, limit)
+    online || return found
+    by == :formula && throw(
+        ArgumentError(
+            "PubChem is searched by name, CAS number, CID, InChIKey, InChI or SMILES, not by formula",
+        ),
+    )
+    any(k -> k ∉ (:contains, :similar), found.match) && return found
+    fetched = fetch_pubchem!(db, text; by, choose, refresh, input, output)
+    isempty(fetched) && return found
+    again = lookup_local(db, text; by, limit)
+    ids = copy(again.id)
+    how = copy(again.match)
+    for id in fetched
+        id in ids || (push!(ids, id); push!(how, :pubchem))
+    end
+    length(ids) > limit && (ids = ids[1:limit]; how = how[1:limit])
+    return records_for(db, again.query, ids, how)
 end
 
 """

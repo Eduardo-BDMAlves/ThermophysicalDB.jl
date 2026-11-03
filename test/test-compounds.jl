@@ -173,6 +173,128 @@
             kwargs...,
         )
     end
+
+    # ---- a stand-in for PubChem -------------------------------------------------------
+
+    const PUBCHEM = Dict(
+        702 => (
+            props = Dict(
+                "CID" => 702,
+                "MolecularFormula" => "C2H6O",
+                "MolecularWeight" => "46.07",
+                "InChI" => "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+                "InChIKey" => "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
+                "IUPACName" => "ethanol",
+                "SMILES" => "CCO",
+                "ConnectivitySMILES" => "CCO",
+            ),
+            synonyms = [
+                "Ethanol",
+                "ethyl alcohol",
+                "64-17-5",
+                "123-45-6",
+                "ETHYL ALCOHOL",
+                "CHEBI:16236",
+            ],
+        ),
+        5793 => (
+            props = Dict(
+                "CID" => 5793,
+                "MolecularFormula" => "C6H12O6",
+                "MolecularWeight" => 180.16,
+                "InChIKey" => "WQZGKKKJIJFFOK-GASJEMHNSA-N",
+                "IUPACName" => "(2R,3S,4R,5R)-2,3,4,5,6-pentahydroxyhexanal",
+                "IsomericSMILES" => "C(C=O)(C(C(C(CO)O)O)O)O",
+            ),
+            synonyms = ["glucose", "D-glucose", "50-99-7"],
+        ),
+        107526 => (
+            props = Dict(
+                "CID" => 107526,
+                "MolecularFormula" => "C6H12O6",
+                "MolecularWeight" => "180.16",
+                "InChIKey" => "GZCGUPFRVQAUEE-SLPGGIOYSA-N",
+                "IUPACName" => "(2R,3S,4R,5R)-2,3,4,5,6-pentahydroxyhexanal",
+                "CanonicalSMILES" => "C(C=O)(C(C(CO)O)O)O",
+            ),
+            synonyms = ["aldehydo-D-glucose", "2280-44-6"],
+        ),
+    )
+    const PUBCHEM_NAMES = Dict(
+        "ethanol" => [702],
+        "64-17-5" => [702],
+        "glucose" => [5793, 107526],
+        "water" => Int[],
+    )
+
+    function respond(body)
+        return 200, T.JSON.json(body)
+    end
+
+    """
+    A `fetch(method, url, body)` that answers like PubChem for the compounds above and records
+    every request in `calls`; a name that is not in `PUBCHEM_NAMES` is not found (404).
+    """
+    function pubchem_fake(calls)
+        return function (method, url, body)
+            push!(calls, (method, url, body))
+            path = replace(url, T.PUBCHEM_BASE * "/" => "")
+            parts = split(path, '/')
+            if parts[1] == "compound" && parts[(end-1):end] == ["cids", "JSON"]
+                value =
+                    body === nothing ?
+                    Base.unescape_string(replace(parts[3], "%" => "\\x")) :
+                    split(body, '=')[2]
+                if parts[2] == "name"
+                    haskey(PUBCHEM_NAMES, value) || return 404, "{}"
+                    isempty(PUBCHEM_NAMES[value]) && return 404, "{}"
+                    return respond(
+                        Dict("IdentifierList" => Dict("CID" => PUBCHEM_NAMES[value])),
+                    )
+                elseif parts[2] == "inchikey" && value == "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"
+                    return respond(Dict("IdentifierList" => Dict("CID" => [702])))
+                elseif parts[2] == "smiles" && value == "CCO"
+                    return respond(Dict("IdentifierList" => Dict("CID" => [702])))
+                end
+                return 404, "{}"
+            elseif parts[1] == "compound" &&
+                   parts[2] == "inchikey" &&
+                   parts[4] == "property"
+                for (cid, entry) in PUBCHEM
+                    entry.props["InChIKey"] == parts[3] && return respond(
+                        Dict("PropertyTable" => Dict("Properties" => [entry.props])),
+                    )
+                end
+                return 404, "{}"
+            elseif parts[1] == "compound" && parts[2] == "cid" && parts[4] == "property"
+                cids = parse.(Int, split(parts[3], ','))
+                found = [PUBCHEM[c].props for c in cids if haskey(PUBCHEM, c)]
+                isempty(found) && return 404, "{}"
+                return respond(Dict("PropertyTable" => Dict("Properties" => found)))
+            elseif parts[1] == "compound" && parts[2] == "cid" && parts[4] == "synonyms"
+                cids = parse.(Int, split(parts[3], ','))
+                found = [
+                    Dict("CID" => c, "Synonym" => PUBCHEM[c].synonyms) for
+                    c in cids if haskey(PUBCHEM, c)
+                ]
+                isempty(found) && return 404, "{}"
+                return respond(Dict("InformationList" => Dict("Information" => found)))
+            end
+            return 400, "unexpected request"
+        end
+    end
+
+    "Run `f()` with `fetch` instead of the network, and no pauses between retries."
+    function with_fetch(f, fetch)
+        old = (T.PUBCHEM_FETCH[], T.PUBCHEM_PAUSE[])
+        T.PUBCHEM_FETCH[] = fetch
+        T.PUBCHEM_PAUSE[] = _ -> nothing
+        try
+            return f()
+        finally
+            T.PUBCHEM_FETCH[], T.PUBCHEM_PAUSE[] = old
+        end
+    end
 end
 
 @testitem "the seed is pinned and every file has a digest" tags = [:unit, :fast] begin
@@ -784,5 +906,610 @@ end
         other = joinpath(dir, "other")
         register_compound!(db; names = ["compound two"], save = true, dir = other)
         @test isfile(T.custom_cache_path(other))
+    end
+end
+
+@testitem "what PubChem answers is read, and a question is built from a text" tags =
+    [:unit, :fast] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    @test T.valid_cas("64-17-5") && T.valid_cas("7732-18-5") && T.valid_cas("50-99-7")
+    @test !T.valid_cas("123-45-6") && !T.valid_cas("64-17") && !T.valid_cas("water")
+    @test T.percent_encode("1-butyl 3/methyl") == "1-butyl%203%2Fmethyl"
+    @test T.percent_encode("é") == "%C3%A9"
+    @test T.needs_post("a/b") && !T.needs_post("ethanol")
+    @test T.pubchem_kind("64-17-5", :auto) == :name
+    @test T.pubchem_kind("962", :auto) == :cid
+    @test T.pubchem_kind("LFQSCWFLJHTTHZ-UHFFFAOYSA-N", :auto) == :inchikey
+    @test T.pubchem_kind("SMILES=CCO", :auto) == :smiles
+    @test T.pubchem_kind("InChI=1S/H2O/h1H2", :auto) == :inchi
+    @test T.pubchem_kind("anything", :cas) == :name
+    @test_throws ArgumentError T.pubchem_kind("H2O", :formula)
+    @test T.pubchem_value("SMILES=CCO", :smiles) == "CCO"
+    @test T.pubchem_value("cid: 702", :cid) == "702"
+    @test T.pubchem_value("lfqscwfltjhthz-uhfffaoysa-n", :inchikey) ==
+          "LFQSCWFLTJHTHZ-UHFFFAOYSA-N"
+    # the answer is read under any of the names PubChem has used for the SMILES
+    for key in ("SMILES", "IsomericSMILES", "ConnectivitySMILES", "CanonicalSMILES")
+        record = T.pubchem_record(Dict("CID" => 1, key => "CCO"), String[])
+        @test record.smiles == "CCO"
+    end
+    ethanol = CompoundFixture.PUBCHEM[702]
+    record = T.pubchem_record(ethanol.props, ethanol.synonyms)
+    @test record.cid == 702 && record.formula == "C2H6O" && record.molar_mass == 46.07
+    @test record.cas == "64-17-5"                       # "123-45-6" fails the check digit
+    @test record.names[1] == "Ethanol"
+    @test count(==("ethyl alcohol"), lowercase.(record.names)) == 1   # no repeated spelling
+    @test "64-17-5" ∉ record.names
+    # the molar mass may be a number or a text, and may be missing
+    @test T.pubchem_record(Dict("CID" => 1, "MolecularWeight" => 18.015), String[]).molar_mass ==
+          18.015
+    @test isnan(T.pubchem_record(Dict("CID" => 1), String[]).molar_mass)
+    many = ["name $i" for i = 1:60]
+    @test length(T.pubchem_record(Dict("CID" => 1), many).names) == T.PUBCHEM_MAX_NAMES
+    @test_throws ArgumentError T.pubchem_rate!(0)
+    old = T.PUBCHEM_RATE[]
+    @test T.pubchem_rate!(2) == 2.0 && T.PUBCHEM_RATE[] == 2.0
+    T.PUBCHEM_RATE[] = old
+end
+
+@testitem "PubChem answers are kept as JSON, loaded again and never asked twice in vain" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        folder = joinpath(dir, "local")
+        calls = []
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            before = length(cdb)
+            ids = fetch_pubchem!(cdb, "ethanol")
+            @test length(ids) == 1 && length(cdb) == before + 1
+            record = T.compound_record(cdb, only(ids))
+            @test record.cid == 702 && record.cas == "64-17-5" && record.source == "pubchem"
+            @test record.names[1] == "Ethanol" && record.molar_mass == 46.07
+            @test record.inchikey == "LFQSCWFLJHTTHZ-UHFFFAOYSA-N" && !record.custom
+            @test length(calls) == 3                       # the CID, the properties, the synonyms
+            @test all(c -> c[1] == "GET", calls)
+            # the raw answer is kept, with the date and the question
+            file = T.pubchem_file(folder, 702)
+            @test isfile(file)
+            document = T.JSON.parse(read(file, String))
+            @test document["cid"] == 702 && document["query"] == "ethanol"
+            @test document["properties"]["InChIKey"] == "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"
+            @test "64-17-5" in document["synonyms"] && haskey(document, "retrieved")
+            # the database knows it now: nothing is asked, the rows it has are returned
+            n = length(calls)
+            @test fetch_pubchem!(cdb, "ethanol") == ids
+            @test ids ⊆ fetch_pubchem!(cdb, "64-17-5")      # the seed row has this CAS too
+            @test fetch_pubchem!(cdb, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N") == ids
+            @test fetch_pubchem!(cdb, "702") == ids
+            @test length(calls) == n
+            # force = true asks which CID it is; the rest is read from the file
+            @test fetch_pubchem!(cdb, "ethanol"; force = true) == ids
+            @test length(calls) == n + 1
+            # refresh asks for everything again
+            fetch_pubchem!(cdb, "ethanol"; refresh = true)
+            @test length(calls) == n + 4
+            # a compound can be asked by InChIKey, by a SMILES (in the body) and by CID
+            empty!(calls)
+            @test fetch_pubchem!(cdb, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"; force = true) == ids
+            @test occursin("/inchikey/", calls[1][2])
+            @test fetch_pubchem!(cdb, "SMILES=CCO"; force = true) == ids
+            @test any(c -> c[1] == "POST" && c[3] == "smiles=CCO", calls)
+            @test fetch_pubchem!(cdb, "702"; force = true) == ids
+            @test fetch_pubchem!(cdb, "702"; by = :cid, force = true) == ids
+            @test_throws ArgumentError fetch_pubchem!(cdb, "H2O"; by = :formula)
+            @test_throws ArgumentError fetch_pubchem!(cdb, "   ")
+            @test_throws ArgumentError fetch_pubchem!(cdb, "ethanol"; limit = 0)
+        end
+        # a new session reads the files and finds the compound without the network
+        again = CompoundFixture.database(dir; reload = true)
+        found = lookup_compounds(again, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N")
+        @test length(found) == 1 && again.cas[only(found.id)] == "64-17-5"
+        @test only(lookup_compounds(again, "Ethanol").id) == only(found.id)
+        # a damaged file is ignored with a warning, the rest still loads
+        write(T.pubchem_file(folder, 999), "not json")
+        damaged =
+            @test_logs (:warn, r"could not be read") match_mode = :any CompoundFixture.database(
+                dir;
+                reload = true,
+            )
+        @test length(lookup_compounds(damaged, "ethanol")) == 1
+        # what the user registers goes on top of what PubChem said
+        register_compound!(
+            again;
+            names = ["Ethanol"],
+            inchikey = "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
+            molar_mass = 46.0,
+        )
+        @test again.molar_mass[only(found.id)] == 46.0
+    end
+end
+
+@testitem "a question PubChem cannot answer is remembered for 180 days" tags = [:unit] setup =
+    [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        folder = joinpath(dir, "local")
+        calls = []
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            before = length(cdb)
+            @test isempty(fetch_pubchem!(cdb, "unobtainium"))
+            @test length(cdb) == before && length(calls) == 1
+            @test isfile(T.pubchem_missing_path(folder))
+            @test haskey(T.read_pubchem_missing(folder), "name:unobtainium")
+            # not asked again ...
+            @test_logs (:info, r"had nothing") fetch_pubchem!(cdb, "Unobtainium")
+            @test length(calls) == 1
+            # ... unless asked to
+            @test isempty(fetch_pubchem!(cdb, "unobtainium"; refresh = true))
+            @test length(calls) == 2
+            # or when the answer is older than 180 days
+            missing = T.read_pubchem_missing(folder)
+            missing["name:unobtainium"] = string(T.Dates.today() - T.Dates.Day(181))
+            open(io -> T.TOML.print(io, missing), T.pubchem_missing_path(folder), "w")
+            @test !T.known_missing(folder, "name:unobtainium") == true
+            @test isempty(fetch_pubchem!(cdb, "unobtainium"))
+            @test length(calls) == 3
+            missing["name:unobtainium"] = string(T.Dates.today() - T.Dates.Day(179))
+            open(io -> T.TOML.print(io, missing), T.pubchem_missing_path(folder), "w")
+            @test T.known_missing(folder, "name:unobtainium")
+            # a name that is found later is no longer missing
+            T.record_missing!(folder, "name:ethanol")
+            @test !isempty(fetch_pubchem!(cdb, "ethanol"; refresh = true))
+            @test !haskey(T.read_pubchem_missing(folder), "name:ethanol")
+        end
+        # a damaged list of questions is ignored
+        write(T.pubchem_missing_path(folder), "= = =")
+        @test_logs (:warn, r"was ignored") @test isempty(T.read_pubchem_missing(folder))
+    end
+end
+
+@testitem "several compounds for one text: the user chooses" tags = [:unit] setup =
+    [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        folder = joinpath(dir, "local")
+        calls = []
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            before = length(cdb)
+            err = try
+                fetch_pubchem!(cdb, "glucose"; choose = :error)
+            catch e
+                e
+            end
+            @test err isa ArgumentError
+            message = sprint(showerror, err)
+            @test occursin("matches 2 compounds in PubChem", message) &&
+                  occursin("CID 5793", message) &&
+                  occursin("CID 107526", message) &&
+                  occursin("180.16 g/mol", message)
+            @test length(cdb) == before                  # nothing is added without an answer
+            # not interactive and nothing prepared: no guess either (the input is stdin)
+            @test_throws ArgumentError fetch_pubchem!(cdb, "glucose")
+            # the menu, in the order PubChem gives
+            out = IOBuffer()
+            ids = fetch_pubchem!(cdb, "glucose"; input = IOBuffer("2\n"), output = out)
+            @test length(ids) == 1 && cdb.cid[only(ids)] == 107526
+            @test "glucose" in lowercase.(cdb.names[only(ids)])   # the text PubChem matched
+            @test occursin("Which one?", String(take!(out)))
+            @test isfile(T.pubchem_file(folder, 107526))
+            @test !isfile(T.pubchem_file(folder, 5793))  # only the chosen one is kept
+            # an invalid answer asks again; "a" takes both; "q" and no answer cancel
+            out = IOBuffer()
+            ids = fetch_pubchem!(
+                cdb,
+                "glucose";
+                force = true,
+                input = IOBuffer("9\nxyz\na\n"),
+                output = out,
+            )
+            @test length(ids) == 2 && isfile(T.pubchem_file(folder, 5793))
+            @test occursin("Not a valid answer", String(take!(out)))
+            for answer in ("q\n", "")
+                @test_throws ArgumentError fetch_pubchem!(
+                    cdb,
+                    "glucose";
+                    force = true,
+                    input = IOBuffer(answer),
+                    output = IOBuffer(),
+                )
+            end
+            # prepared answers
+            @test cdb.cid[only(
+                fetch_pubchem!(cdb, "glucose"; force = true, choose = Dict("Glucose" => 1)),
+            )] == 5793
+            @test length(fetch_pubchem!(cdb, "glucose"; force = true, choose = :all)) == 2
+            @test length(
+                fetch_pubchem!(
+                    cdb,
+                    "glucose";
+                    force = true,
+                    choose = Dict("glucose" => :all),
+                ),
+            ) == 2
+            @test_throws ArgumentError fetch_pubchem!(
+                cdb,
+                "glucose";
+                force = true,
+                choose = Dict("glucose" => 3),
+            )
+            @test_throws ArgumentError fetch_pubchem!(
+                cdb,
+                "glucose";
+                force = true,
+                choose = :maybe,
+            )
+            # at most `limit` candidates are offered
+            @test length(fetch_pubchem!(cdb, "glucose"; force = true, limit = 1)) == 1
+        end
+    end
+end
+
+@testitem "PubChem busy, unreachable or refusing: retries, then a clear error and no change" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        inner = CompoundFixture.pubchem_fake([])
+        function flaky(failures, status)
+            count = Ref(0)
+            return function (method, url, body)
+                count[] += 1
+                count[] <= failures && return status, "busy"
+                return inner(method, url, body)
+            end
+        end
+        # two busy answers, then the real one
+        pauses = Float64[]
+        old = T.PUBCHEM_PAUSE[]
+        try
+            CompoundFixture.with_fetch(flaky(2, 503)) do
+                T.PUBCHEM_PAUSE[] = seconds -> push!(pauses, seconds)
+                @test length(fetch_pubchem!(cdb, "ethanol")) == 1
+            end
+        finally
+            T.PUBCHEM_PAUSE[] = old
+        end
+        @test pauses == [2, 5]
+        before = length(cdb)
+        # always busy, or no answer at all: PubChemError, with advice, and nothing added
+        for (status, expected) in ((503, "busy"), (0, "did not answer"))
+            forever = (m, u, b) -> (status, "no connection")
+            CompoundFixture.with_fetch(forever) do
+                err = try
+                    fetch_pubchem!(cdb, "something else")
+                catch e
+                    e
+                end
+                @test err isa T.PubChemError && err.status == status
+                message = sprint(showerror, err)
+                @test occursin(expected, message) &&
+                      occursin("Try again later", message) &&
+                      occursin("Nothing was changed", message) &&
+                      occursin("/compound/name/something%20else/cids/JSON", message)
+            end
+        end
+        # a refusal is not retried
+        refused = Ref(0)
+        CompoundFixture.with_fetch((m, u, b) -> (refused[] += 1; (400, "bad request"))) do
+            @test_throws T.PubChemError fetch_pubchem!(cdb, "ethanol"; force = true)
+            @test refused[] == 1
+        end
+        @test length(cdb) == before
+        # a failure is not remembered as "not found"
+        @test !isfile(T.pubchem_missing_path(joinpath(dir, "local")))
+    end
+end
+
+@testitem "online = true asks PubChem only for what is not known" tags = [:unit] setup =
+    [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        calls = []
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            # without online = true the network is never used
+            @test isempty(lookup_compounds(cdb, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"))
+            @test isempty(calls)
+            # a text the database knows is not asked
+            @test length(lookup_compounds(cdb, "water"; online = true)) >= 1
+            @test isempty(calls)
+            # one it does not know is asked, kept, and found again
+            found = lookup_compounds(cdb, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"; online = true)
+            @test length(found) == 1 && found.match[1] == :inchikey
+            @test !isempty(calls)
+            n = length(calls)
+            @test length(
+                lookup_compounds(cdb, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"; online = true),
+            ) == 1
+            @test length(calls) == n                         # now it is known
+            # a compound that PubChem knows under another name is marked as such
+            found = lookup_compounds(cdb, "64-17-5"; by = :name, online = true)
+            @test :pubchem in found.match || :name in found.match
+            # PubChem has nothing: what the database had is returned, nothing is added
+            before = length(cdb)
+            nothing_found = lookup_compounds(cdb, "unobtainium"; online = true)
+            @test length(cdb) == before && isempty(nothing_found)
+            @test_throws ArgumentError lookup_compounds(
+                cdb,
+                "H2O";
+                by = :formula,
+                online = true,
+            )
+        end
+    end
+end
+
+@testitem "a linked database can ask PubChem for a compound that neither database knows" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        ds = T.Dataset()
+        mole = T.intern!(ds.kinds, "Mole fraction")
+        source = T.intern!(ds.sources, "thermoml")
+        ref = T.add_reference!(ds.references; doi = "10.5555/pubchem-001", source)
+        ethanol = T.add_compound!(
+            ds.compounds;
+            inchikey = "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
+            names = ["alcohol of the article"],
+            formula = "C2H6O",
+        )
+        density = T.add_property!(ds.properties, "Mass density", "kg/m3")
+        e = T.add_experiment!(
+            ds.experiments;
+            reference = ref,
+            components = [ethanol],
+            kinds = [mole],
+        )
+        for i = 1:3
+            T.add_measurement!(
+                ds.measurements;
+                experiment = e,
+                property = density,
+                temperature = 290.0 + i,
+                pressure = 101.325,
+                value = 789.0,
+            )
+        end
+        linked = link_compounds(ds, cdb)
+        calls = []
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            # the CAS number is in the compound database, but without an InChIKey: no link
+            @test_throws ArgumentError points(linked; component = "64-17-5")
+            @test isempty(calls)
+            # asked of PubChem, the InChIKey arrives and the compound of the dataset is found
+            view = points(linked; component = "64-17-5", online = true)
+            @test length(view) == 3 && !isempty(calls)
+            n = length(calls)
+            @test length(points(linked; component = "64-17-5", online = true)) == 3
+            @test length(calls) == n                  # known now, so not asked again
+            @test length(points(linked; component = "Ethanol")) == 3   # a name PubChem gave
+            # unknown to PubChem too: the usual error
+            @test_throws ArgumentError points(
+                linked;
+                component = "unobtainium",
+                online = true,
+            )
+            @test length(
+                mixture(linked, "64-17-5", "64-17-5"; exact = false, online = true),
+            ) in (0, 3)
+        end
+        # the database knows water (with an InChIKey) but the dataset has no water: PubChem
+        # would bring the same compound, so it is not asked
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            n = length(calls)
+            @test_throws ArgumentError points(linked; component = "water", online = true)
+            @test length(calls) == n
+        end
+        # the menu of PubChem has its own prepared answers
+        glucose = T.add_compound!(
+            ds.compounds;
+            inchikey = "GZCGUPFRVQAUEE-SLPGGIOYSA-N",
+            names = ["glucose of the article"],
+        )
+        e2 = T.add_experiment!(
+            ds.experiments;
+            reference = ref,
+            components = [glucose],
+            kinds = [mole],
+        )
+        T.add_measurement!(
+            ds.measurements;
+            experiment = e2,
+            property = density,
+            temperature = 300.0,
+            pressure = 101.325,
+            value = 1500.0,
+        )
+        linked2 = link_compounds(ds, cdb)
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            @test_throws ArgumentError points(linked2; component = "glucose", online = true)
+            view = points(
+                linked2;
+                component = "glucose",
+                online = true,
+                choose = Dict("pubchem:glucose" => 2),
+            )
+            @test length(view) == 1
+        end
+    end
+end
+
+@testitem "the most measured compounds that the database lacks are fetched in advance" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        folder = joinpath(dir, "local")
+        ds = T.Dataset()
+        mole = T.intern!(ds.kinds, "Mole fraction")
+        source = T.intern!(ds.sources, "thermoml")
+        ref = T.add_reference!(ds.references; doi = "10.5555/prefetch-001", source)
+        density = T.add_property!(ds.properties, "Mass density", "kg/m3")
+        function measured(points; kwargs...)
+            c = T.add_compound!(ds.compounds; kwargs...)
+            e = T.add_experiment!(
+                ds.experiments;
+                reference = ref,
+                components = [c],
+                kinds = [mole],
+            )
+            for i = 1:points
+                T.add_measurement!(
+                    ds.measurements;
+                    experiment = e,
+                    property = density,
+                    temperature = 290.0 + i,
+                    pressure = 101.325,
+                    value = 1.0,
+                )
+            end
+            return c
+        end
+        water = measured(7; inchikey = "XLYOFNOQVPJJNP-UHFFFAOYSA-N", names = ["water"])
+        ethanol = measured(3; inchikey = "LFQSCWFLJHTTHZ-UHFFFAOYSA-N", names = ["ethanol"])
+        glucose = measured(5; inchikey = "GZCGUPFRVQAUEE-SLPGGIOYSA-N", names = ["glucose"])
+        unknown =
+            measured(10; inchikey = "AAAAAAAAAAAAAA-BBBBBBBBBB-C", names = ["ionic liquid"])
+        keyless = measured(20; names = ["no key at all"])
+        @test T.unlinked_compounds(ds, cdb) == Int32[ethanol, glucose, unknown]   # water is known
+        calls = []
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake(calls)) do
+            @test_throws ArgumentError prefetch_compounds!(ds, cdb; top = 0)
+            @test_throws ArgumentError prefetch_compounds!(ds, cdb; batch = 0)
+            before = length(cdb)
+            # the 3 most measured are the unknown one (10), water (7) and glucose (5); water
+            # is already known, so the other two are asked
+            summary = prefetch_compounds!(ds, cdb; top = 3, progress = false)
+            @test summary == (
+                considered = 3,
+                unknown = 2,
+                requested = 2,
+                fetched = 1,
+                not_found = 1,
+                remembered_missing = 0,
+            )
+            @test length(calls) == 3                  # two InChIKeys, and one batch of synonyms
+            @test length(cdb) == before + 1
+            @test only(lookup_compounds(cdb, "GZCGUPFRVQAUEE-SLPGGIOYSA-N").id) != 0
+            @test isfile(T.pubchem_file(folder, 107526))
+            @test haskey(
+                T.read_pubchem_missing(folder),
+                "inchikey:aaaaaaaaaaaaaa-bbbbbbbbbb-c",
+            )
+            # the link now exists, and the one PubChem lacks is not asked again
+            @test T.unlinked_compounds(ds, cdb) == Int32[ethanol, unknown]
+            # the same 3 are in the database now: nothing new is asked
+            empty!(calls)
+            summary = prefetch_compounds!(ds, cdb; top = 3, progress = false)
+            @test summary == (
+                considered = 3,
+                unknown = 1,
+                requested = 0,
+                fetched = 0,
+                not_found = 0,
+                remembered_missing = 1,
+            )
+            @test isempty(calls)
+            # a larger rank reaches ethanol (3 points), the only one that is new
+            summary = prefetch_compounds!(ds, cdb; top = 4, progress = false)
+            @test summary.considered == 4 && summary.unknown == 2
+            @test summary.requested == 1 && summary.fetched == 1 && summary.not_found == 0
+            @test summary.remembered_missing == 1
+            @test length(calls) == 2                  # one InChIKey, and the synonyms
+            @test T.unlinked_compounds(ds, cdb) == Int32[unknown]
+            # nothing left to ask, unless asked to
+            empty!(calls)
+            summary = prefetch_compounds!(ds, cdb; progress = false)
+            @test summary.requested == 0 && isempty(calls)
+            summary = prefetch_compounds!(ds, cdb; refresh = true, progress = false)
+            @test summary.requested == 1 && summary.not_found == 1 && length(calls) == 1
+            # a linked database and the dataset alone are accepted
+            @test prefetch_compounds!(link_compounds(ds, cdb); progress = false).requested ==
+                  0
+        end
+        # the files are read in the next session, and the link is made by InChIKey
+        again = CompoundFixture.database(dir; reload = true)
+        linked = link_compounds(ds, again)
+        links = linked.links
+        @test links.via[only(findall(==(Int32(glucose)), links.compound))] == :inchikey
+        @test links.via[only(findall(==(Int32(ethanol)), links.compound))] == :inchikey
+        @test links.record[only(findall(==(Int32(keyless)), links.compound))] == 0
+    end
+end
+
+@testitem "a failure while fetching in advance keeps what was fetched and tells what happened" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        folder = joinpath(dir, "local")
+        ds = T.Dataset()
+        mole = T.intern!(ds.kinds, "Mole fraction")
+        source = T.intern!(ds.sources, "thermoml")
+        ref = T.add_reference!(ds.references; doi = "10.5555/prefetch-002", source)
+        density = T.add_property!(ds.properties, "Mass density", "kg/m3")
+        for (key, n) in
+            (("LFQSCWFLJHTTHZ-UHFFFAOYSA-N", 4), ("GZCGUPFRVQAUEE-SLPGGIOYSA-N", 3))
+            c = T.add_compound!(ds.compounds; inchikey = key, names = [key])
+            e = T.add_experiment!(
+                ds.experiments;
+                reference = ref,
+                components = [c],
+                kinds = [mole],
+            )
+            for i = 1:n
+                T.add_measurement!(
+                    ds.measurements;
+                    experiment = e,
+                    property = density,
+                    temperature = 290.0 + i,
+                    pressure = 101.325,
+                    value = 1.0,
+                )
+            end
+        end
+        inner = CompoundFixture.pubchem_fake([])
+        count = Ref(0)
+        # the first compound is answered (its InChIKey, then its synonyms) and the service
+        # goes down at the next request
+        failing = function (method, url, body)
+            count[] += 1
+            count[] <= 2 && return inner(method, url, body)
+            return 503, "busy"
+        end
+        CompoundFixture.with_fetch(failing) do
+            @test_throws T.PubChemError prefetch_compounds!(
+                ds,
+                cdb;
+                batch = 1,
+                progress = false,
+            )
+        end
+        # batch = 1 writes each compound as soon as it is answered, so the first one is kept,
+        # and the failure was not remembered as "not found"
+        @test isfile(T.pubchem_file(folder, 702))
+        @test !isfile(T.pubchem_file(folder, 107526))
+        @test !haskey(
+            T.read_pubchem_missing(folder),
+            "inchikey:gzcgupfrvqauee-slpggioysa-n",
+        )
+        # in `database(; prefetch_compounds = n)` the failure is only a warning
+        CompoundFixture.with_fetch((m, u, b) -> (503, "busy")) do
+            @test_logs (:warn, r"could not be fetched from PubChem") T.prefetch_missing_compounds(
+                ds,
+                5,
+                false,
+                () -> cdb,
+            )
+        end
+        # and the helper does what it says when the service answers
+        CompoundFixture.with_fetch(CompoundFixture.pubchem_fake([])) do
+            @test T.prefetch_missing_compounds(ds, 5, false, () -> cdb) === nothing
+            @test T.unlinked_compounds(ds, cdb) == Int32[]
+        end
     end
 end

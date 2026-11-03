@@ -53,6 +53,7 @@ include("store/database.jl")
 include("compounds/seed.jl")
 include("compounds/table.jl")
 include("compounds/store.jl")
+include("compounds/pubchem.jl")
 include("compounds/link.jl")
 include("compounds/linked.jl")
 include("references.jl")
@@ -93,6 +94,7 @@ export CompoundDB,
     esd,
     expanded_uncertainty,
     export_points,
+    fetch_pubchem!,
     find_compounds,
     find_outliers,
     forget_choices!,
@@ -103,6 +105,8 @@ export CompoundDB,
     markdown_table,
     mixture,
     points,
+    prefetch_compounds!,
+    pubchem_rate!,
     purity_step_table,
     reasons,
     register_compound!,

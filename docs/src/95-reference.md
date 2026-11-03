@@ -53,6 +53,10 @@ LinkedDatabase
 forget_choices!
 register_compound!
 save_compounds
+fetch_pubchem!
+prefetch_compounds!
+pubchem_rate!
+ThermophysicalDB.PubChemError
 ThermophysicalDB.CompoundRecords
 ThermophysicalDB.CompoundLinks
 CompoundDB
@@ -112,5 +116,5 @@ These docstrings document the implementation. They are not part of the public in
 ```@autodocs
 Modules = [ThermophysicalDB]
 Public = false
-Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult))
+Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult))
 ```

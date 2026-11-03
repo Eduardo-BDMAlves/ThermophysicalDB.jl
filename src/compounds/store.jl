@@ -306,6 +306,7 @@ function compound_database(;
                 sprint(showerror, err)
         end
     end
+    load_pubchem!(db, dir)
     load_custom!(db, dir)
     db.meta["dir"] = String(dir)
     COMPOUND_MEMO[] = (String(dir), db)

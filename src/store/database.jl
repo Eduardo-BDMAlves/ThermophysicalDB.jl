@@ -22,6 +22,11 @@ archive (`update` as in [`ensure_archive`](@ref): `:notify` warns, `:install` up
 `:never` stays offline) and then load the cache, which is much faster than parsing. A
 changed archive or schema version rebuilds the cache automatically.
 
+`prefetch_compounds = n` also asks PubChem, once the database is ready, for the `n` most
+measured compounds that the compound database lacks (see [`prefetch_compounds!`](@ref); it
+needs the network and downloads the compound database if it is not there yet). It is off by
+default, and a failure only warns.
+
 Calling `database()` again in the same session returns the same object immediately;
 `reload = true` repeats the update check and the load, `rebuild = true` also ignores the
 cache and parses the archive again.
@@ -37,6 +42,7 @@ function database(;
     rebuild::Bool = false,
     dir::AbstractString = thermoml_dir(),
     progress::Bool = true,
+    prefetch_compounds::Integer = 0,
     fetch = fetch_latest_release,
     download = download_file,
 )
@@ -57,6 +63,25 @@ function database(;
                 sprint(showerror, err)
         end
     end
+    prefetch_compounds > 0 && prefetch_missing_compounds(ds, prefetch_compounds, progress)
     DATABASE_MEMO[] = (String(dir), ds)
     return ds
+end
+
+# `database(; prefetch_compounds = n)`: ask PubChem for the n most measured compounds that the
+# compound database lacks. A failure here must not make the database unusable.
+function prefetch_missing_compounds(
+    ds::Dataset,
+    top::Integer,
+    progress::Bool,
+    load = () -> compound_database(; progress),
+)
+    try
+        prefetch_compounds!(ds, load(); top = Int(top), progress)
+    catch err
+        err isa InterruptException && rethrow()
+        @warn "The compounds could not be fetched from PubChem; the database is usable without them" reason =
+            sprint(showerror, err)
+    end
+    return nothing
 end

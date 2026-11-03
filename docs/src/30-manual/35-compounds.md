@@ -33,6 +33,7 @@ The files live in `compounds/` inside the [data directory](@ref updates):
 | :-- | :-- |
 | `seed/*.tsv` | the downloaded lists, verified against their digests |
 | `seed.jld2`, `seed.toml` | the parsed lists, and a description written last (the commit and the digests they were built from) |
+| `pubchem/CID-*.json`, `pubchem_missing.toml` | what PubChem answered when you asked it (one file for each compound), and the questions it could not answer, see [Asking PubChem](@ref compounds_pubchem) |
 | `custom.jld2` | the compounds that you added or changed |
 
 If the download fails, the error says where to get the files in a browser; copy them with the same names into `compounds/seed/` and call `compound_database()` again. Files with the right digest are used as they are. The commit is fixed, so everybody who installs the same version of the package gets the same lists. `rebuild = true` ignores the cache and parses the lists again.
@@ -91,7 +92,7 @@ find_compounds(linked, "oxidane")      # the same, from a synonym that no articl
 
 The ThermoML compounds with the same InChIKey as any compound the text identifies are found first. A compound of the archive that has no InChIKey is reached only through its own names, so nothing is guessed.
 
-## Searching the archive with any name
+## [Searching the archive with any name](@id compounds_linked_search)
 
 A [`LinkedDatabase`](@ref) takes the place of the archive in [`points`](@ref) and [`mixture`](@ref), and a compound can be named by anything either database knows:
 
@@ -127,6 +128,53 @@ The keyword `choose` of `points` and `mixture` controls this:
 
 The question is read from `input` and written to `output` (`stdin` and `stdout` by default), which is how it is tested. The answers you give are kept in `linked.choices` and used again for the same text during the session; [`forget_choices!`](@ref) clears them. Nothing is written to disk, and the archive is never changed.
 
+## [Asking PubChem](@id compounds_pubchem)
+
+The lists do not cover everything: ionic liquids and uncommon organic compounds are the usual gaps. [`fetch_pubchem!`](@ref) asks [PubChem](https://pubchem.ncbi.nlm.nih.gov) about a compound and adds the answer to the database:
+
+```julia
+fetch_pubchem!(cdb, "1-butyl-3-methylimidazolium tetrafluoroborate")   # a name
+fetch_pubchem!(cdb, "64-17-5")                                        # a CAS number
+fetch_pubchem!(cdb, "SMILES=CCO")                                     # a SMILES
+fetch_pubchem!(cdb, "702")                                            # a PubChem CID
+```
+
+**The network is used only when you ask for it**, with this function or with `online = true`: the package never reaches PubChem by itself, and a session without `online = true` works offline. Even then, nothing is asked that the database already knows: if the text matches a compound exactly (a name, CAS number, CID, InChIKey, InChI or SMILES), those rows are returned without a request. `force = true` asks PubChem anyway, for example to complete a row that has no InChIKey; `refresh = true` also forces the question and writes the answer again.
+
+```julia
+lookup_compounds(cdb, "bmim bf4"; online = true)       # asks PubChem only if the database does not know it
+points(linked; component = "64-17-5", online = true)   # the same, when searching the archive
+```
+
+What PubChem answers is kept as one JSON file for each compound in `compounds/pubchem/`, with the date and the question. That folder is the separate table of what came from PubChem: every time the database loads, the files are read and laid over the lists, and the compounds you register go on top of both, so the order of precedence is **lists, then PubChem, then your own compounds**. The files are plain JSON, so you can read them, and deleting one (or the whole folder) removes what it brought without touching your own compounds. A compound that PubChem described is marked `source = "pubchem"`, and the text you asked about is kept as one of its names.
+
+A name or a CAS number can belong to several compounds (salts, hydrates, stereoisomers). Then they are listed in the order PubChem gives, with the CID, the IUPAC name, the formula, the InChIKey and the molar mass, and you choose with the number, `a` for all of them or `q` to cancel, exactly as in the [search with any name](@ref compounds_linked_search). The same `choose` keyword works: `:ask` (the default, which asks only in an interactive session), `:error`, `:all`, or a `Dict("glucose" => 2)` of prepared answers; in `points(linked; online = true)` the prepared answers for the PubChem menu use the key `"pubchem:glucose"`, because the dataset has a menu of its own.
+
+A question that PubChem cannot answer is remembered for 180 days in `pubchem_missing.toml` and not asked again, so a name that does not exist does not cost a request every time; `refresh = true` asks again, and also asks again for the compounds that are already kept. Problems with the service never turn into a "not found": if PubChem is busy or unreachable the package retries a few times and then throws a [`ThermophysicalDB.PubChemError`](@ref) that says what happened; nothing is changed or remembered.
+
+PubChem's usage policy limits the requests to 5 per second and 400 per minute, and the package waits between requests to stay below that: 3 per second by default, which [`pubchem_rate!`](@ref) changes. Read the [usage policy](https://pubchem.ncbi.nlm.nih.gov/docs/programmatic-access) of PubChem before sending many requests. The data of PubChem come from many contributors who may have terms of their own (see `NOTICE.md`); the package keeps what it fetches only on your computer.
+
+### Filling the gaps in advance
+
+The compounds that matter most to your searches are the ones that the archive measured most, and some of them, ionic liquids in particular, are not in the lists. [`prefetch_compounds!`](@ref) asks PubChem about them in one go: it orders the compounds of the archive that have an InChIKey by number of points and looks at the first ones (`top = 200` by default); only those that the database does not know, and that PubChem has not already failed to answer, are asked. `top` is therefore a rank among the most measured compounds, not a number of requests: once those compounds are known, nothing is asked.
+
+```julia
+db = database()
+cdb = compound_database()
+prefetch_compounds!(db, cdb; top = 100)
+linked = link_compounds(db, cdb)       # again, to include what was fetched
+```
+
+It asks by InChIKey, so the answer is exactly the compound of the archive and there is nothing to choose; the compounds of the archive that have no InChIKey cannot be asked this way. What it fetches is kept like any other answer (one JSON file for each compound, and the questions PubChem could not answer are remembered for 180 days), so the run can be interrupted and repeated without asking twice. It sends about one request for each compound at 3 per second, so 200 compounds take about a minute. The result says how many compounds were considered, how many of them were unknown, and how many were requested, fetched, not found and skipped because PubChem was known to lack them (`considered`, `unknown`, `requested`, `fetched`, `not_found`, `remembered_missing`).
+
+To do it as soon as the archive is ready, ask `database()`:
+
+```julia
+db = database(; prefetch_compounds = 200)
+```
+
+This is off by default, because it needs the network and downloads the compound database if it is not there yet. If PubChem cannot be reached it only warns, and the database is returned as usual. If the 200 most measured compounds are already in the database (or remembered as missing), the call asks nothing.
+
 ## Adding your own compounds
 
 [`register_compound!`](@ref) adds a compound that the lists lack, or completes one they have. What you give replaces what the row had, and your first name becomes its main name:
@@ -156,4 +204,4 @@ A compound needs an InChIKey or a name. The rows you added or changed are marked
 - The lists come from a third party and are fixed at one commit; they are not updated by the package. A new commit comes with a new version of ThermophysicalDB.jl.
 - Names are ambiguous, identifiers are exact: prefer the InChIKey and check the `formula_check` and `inchi_check` of a link made through a name.
 - The molar mass of a row is that of the entry as the lists describe it. A hydrate and its anhydrous salt are different entries; choose the one that your sample is, or give the molar mass yourself.
-- Searching PubChem for the compounds that are missing is not part of this version.
+- PubChem is asked only on request (`fetch_pubchem!`, `online = true`), and only by name, CAS number, CID, InChIKey, InChI or SMILES, not by formula. Its answers are as good as its records: names, CAS numbers and molar masses can be wrong, as in any database, so check the ones that matter.

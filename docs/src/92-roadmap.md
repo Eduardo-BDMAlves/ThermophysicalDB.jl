@@ -63,7 +63,7 @@ The units of a selection are known when the table is built, and the quantities c
 
 ## In progress
 
-- **Compound database.** Done: the database of names and identifiers kept apart from the archive, its link to the archive and the search by any identifier ([Compounds and their identifiers](@ref compounds)). Next: look up compounds that are missing in PubChem on request, then the conversions of composition above.
+- **Compound database.** Done: the database of names and identifiers kept apart from the archive, its link to the archive and the search by any identifier ([Compounds and their identifiers](@ref compounds)). The lookup of missing compounds in PubChem, on request, is also done (`fetch_pubchem!`, `online = true`). Next: the conversions of composition above.
 
 ## Done
 

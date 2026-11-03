@@ -40,6 +40,14 @@ for all of them or `q` to cancel. The keyword `choose` of `points`, `mixture` an
 - `choose = Dict("butane" => 2, "C4H10" => :all)`: a prepared answer for each text, by the
   number the menu would show, so a script does not stop to ask.
 
+With `online = true` a text that neither database knows is asked of PubChem
+([`fetch_pubchem!`](@ref)) before giving up: what PubChem answers is kept in the compound
+database, so it is found again without the network. The compounds that PubChem lists for the
+text have their own menu, whose prepared answers are the entries of `choose` with a key that
+starts with `"pubchem:"` (`Dict("pubchem:glucose" => 1)`). A compound added this way is
+joined to the dataset by its InChIKey; call [`link_compounds`](@ref) again to refresh the
+table of links.
+
 `input` and `output` (default `stdin` and `stdout`) say where the question is read and
 written. The answers given are kept in `choices` and used again for the same text; call
 [`forget_choices!`](@ref) to clear them. The candidates are ordered by number of points and
@@ -114,6 +122,9 @@ function forget_choices!(l::LinkedDatabase)
     return l
 end
 
+prefetch_compounds!(l::LinkedDatabase; kwargs...) =
+    prefetch_compounds!(l.dataset, l.compounds; kwargs...)
+
 find_compounds(l::LinkedDatabase, text::AbstractString; limit::Int = 10) =
     find_compounds(l.dataset, l.compounds, text; limit)
 
@@ -122,6 +133,17 @@ find_compounds(l::LinkedDatabase, text::AbstractString; limit::Int = 10) =
 # ----------------------------------------------------------------------------------
 
 choice_key(text::AbstractString) = lowercase(strip(text))
+
+# The answers prepared for the menu of PubChem are the entries of `choose` whose key starts
+# with "pubchem:"; the others belong to the menu of the dataset.
+function pubchem_choice(choose)
+    choose isa AbstractDict || return choose
+    prefix = "pubchem:"
+    return Dict{String,Any}(
+        String(strip(string(k)[(length(prefix)+1):end])) => v for
+        (k, v) in choose if startswith(lowercase(string(k)), prefix)
+    )
+end
 
 subset(m::CompoundMatches, idx::AbstractVector{<:Integer}) = CompoundMatches(
     m.query,
@@ -136,8 +158,41 @@ subset(m::CompoundMatches, idx::AbstractVector{<:Integer}) = CompoundMatches(
 # The compounds that can be what `text` means: the exact ones when there are any, otherwise
 # the close ones. Ordered by number of points and then by name, so that a menu number is
 # reproducible.
-function candidate_compounds(l::LinkedDatabase, text::AbstractString)
+# True when the compound database knows the text (an exact match) and the compound has an
+# InChIKey: asking PubChem would bring the same compound, so the dataset simply has no data
+# for it. A compound without an InChIKey cannot be joined to the dataset, so PubChem is asked.
+function known_with_inchikey(db::CompoundDB, text::AbstractString)
+    known = lookup_compounds(db, text; limit = 25)
+    return any(
+        k ∉ (:contains, :similar) && !isempty(db.inchikey[id]) for
+        (id, k) in zip(known.id, known.match)
+    )
+end
+
+function candidate_compounds(
+    l::LinkedDatabase,
+    text::AbstractString;
+    online::Bool = false,
+    choose = :ask,
+    input::IO = stdin,
+    output::IO = stdout,
+)
     found = find_compounds(l.dataset, l.compounds, text; limit = 20)
+    if online && !any(==(:exact), found.match) && !known_with_inchikey(l.compounds, text)
+        fetched = fetch_pubchem!(
+            l.compounds,
+            text;
+            choose = pubchem_choice(choose),
+            force = true,
+            input,
+            output,
+        )
+        isempty(fetched) ||
+            (found = find_compounds(l.dataset, l.compounds, text; limit = 20))
+        if isempty(fetched) && isempty(found)
+            @info "\"$text\" is not in the compound database and PubChem has nothing for it"
+        end
+    end
     if isempty(found)
         records = lookup_compounds(l.compounds, text; limit = 1)
         known = !isempty(records) && records.match[1] ∉ (:contains, :similar)
@@ -254,11 +309,18 @@ function choice_for(choose, text::AbstractString)
     throw(ArgumentError("choose must be :ask, :all, :error or a Dict, got $(repr(choose))"))
 end
 
-function resolve_text(l::LinkedDatabase, text::AbstractString, choose, input, output)
+function resolve_text(
+    l::LinkedDatabase,
+    text::AbstractString,
+    choose,
+    input,
+    output;
+    online::Bool = false,
+)
     key = choice_key(text)
     saved = get(l.choices, key, nothing)
     saved === nothing || return saved
-    found = candidate_compounds(l, text)
+    found = candidate_compounds(l, text; online, choose, input, output)
     exact = all(==(:exact), found.match)
     exact && length(found) == 1 && return found
     action, position = choice_for(choose, text)
@@ -283,23 +345,38 @@ end
 
 # A `component` of the dataset's `points`, with every text replaced by the compounds of the
 # dataset it stands for.
-resolve_component(l::LinkedDatabase, ::Nothing, choose, input, output) = nothing
-resolve_component(l::LinkedDatabase, text::AbstractString, choose, input, output) =
-    resolve_text(l, text, choose, input, output)
-resolve_component(l::LinkedDatabase, other, choose, input, output) = other
-function resolve_component(l::LinkedDatabase, list::AbstractVector, choose, input, output)
-    return Any[resolve_component(l, item, choose, input, output) for item in list]
+resolve_component(l::LinkedDatabase, ::Nothing, choose, input, output; online = false) =
+    nothing
+resolve_component(
+    l::LinkedDatabase,
+    text::AbstractString,
+    choose,
+    input,
+    output;
+    online = false,
+) = resolve_text(l, text, choose, input, output; online)
+resolve_component(l::LinkedDatabase, other, choose, input, output; online = false) = other
+function resolve_component(
+    l::LinkedDatabase,
+    list::AbstractVector,
+    choose,
+    input,
+    output;
+    online = false,
+)
+    return Any[resolve_component(l, item, choose, input, output; online) for item in list]
 end
 
 function points(
     l::LinkedDatabase;
     component = nothing,
     choose = :ask,
+    online::Bool = false,
     input::IO = stdin,
     output::IO = stdout,
     kwargs...,
 )
-    resolved = resolve_component(l, component, choose, input, output)
+    resolved = resolve_component(l, component, choose, input, output; online)
     return points(l.dataset; component = resolved, kwargs...)
 end
 
@@ -308,12 +385,14 @@ function mixture(
     components...;
     exact::Bool = true,
     choose = :ask,
+    online::Bool = false,
     input::IO = stdin,
     output::IO = stdout,
     kwargs...,
 )
     length(components) >= 2 ||
         throw(ArgumentError("a mixture needs at least two components"))
-    resolved = Any[resolve_component(l, c, choose, input, output) for c in components]
+    resolved =
+        Any[resolve_component(l, c, choose, input, output; online) for c in components]
     return mixture(l.dataset, resolved...; exact, kwargs...)
 end
