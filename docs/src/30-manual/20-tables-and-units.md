@@ -149,6 +149,23 @@ The data are stored as `Float64` in the units of the archive (K, kPa and the uni
 
 An uncertainty is an interval, not a point of a scale: ``0.01\,^\circ\mathrm{C}`` is ``0.01\,\mathrm{K}``. DynamicQuantities has no affine units, and FlexUnits applies the offset when the quantity is built, so write a temperature difference in K with these two.
 
+## Another scale for the composition
+
+The sources give the amount of each component in the scale they chose: mole fraction, mass fraction, molality, molarity and others. `x1..x3` of the table are as the source gave them and `xkind` says which scale. `composition = :mass_fraction` (any of [`COMPOSITION_SCALES`](@ref)) converts all the points to one scale, whatever scale each source used:
+
+```julia
+v = points(db; component = ["sodium chloride", "water"], exact = true)
+t = table(v; composition = :mass_fraction, solvent = "water", compounds = cdb)
+```
+
+The conversion needs only what physics requires, and it never guesses:
+
+- **Molar masses.** Mole fractions and mass fractions differ by the molar masses. They come from `molar_mass`, a dictionary such as `Dict("water" => 18.01528)` (yours wins), then from the compound database `compounds` (which includes what was fetched from PubChem), and with `fetch_molar_mass = true` a compound that the database does not know is asked from PubChem by its InChIKey. The network is not used otherwise.
+- **Solvent.** The molality and the ratios are per amount of solvent, so the solvent has to be told (`solvent = "water"`); a source in molality does not state the amount of its solvent, and it is what is left. Only the components of the system are converted: a salt is one component, not its ions.
+- **Density.** The molarity is moles per volume of *solution*. The volume depends on the density of the solution, which depends on the temperature, the pressure and the composition itself, so it has to be given (`density = 1070.0` kg/m3, or a vector with one value for each point). A density as a function of the state is prepared for and not accepted yet.
+
+Mole fraction, mass fraction, molality and the ratios do not depend on temperature or pressure. A point that cannot be converted keeps `NaN`, a warning counts the points and says why, and `details = true` adds `composition_status` with the reason of each point (`:missing_molar_mass`, `:solvent_not_given`, `:missing_density`, `:no_composition`, ...). With `strict = true` the first problem is an `ArgumentError`. [`convert_composition`](@ref) also takes a vector with the amounts of one mixture, and `export_points` takes the same keywords; the ThermoML formats keep the composition as the source gave it.
+
 ## What the source says about the data
 
 `table(v; details = true)` adds to every point what the article states about it, with the same convention for what it does not state (`NaN`, `""` or `-1`):

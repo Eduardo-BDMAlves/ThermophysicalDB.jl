@@ -240,12 +240,7 @@ that contain further components are included.
 When nothing is found, a message tells whether the components do occur together with
 others, so an empty result can be told apart from a too strict one.
 """
-function mixture(
-    source::Union{Dataset,DataView},
-    components...;
-    exact::Bool = true,
-    kwargs...,
-)
+function mixture(source, components...; exact::Bool = true, kwargs...)
     length(components) >= 2 ||
         throw(ArgumentError("a mixture needs at least two components"))
     wanted = collect(components)

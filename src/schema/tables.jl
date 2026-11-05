@@ -493,6 +493,12 @@ unit the source used (see [`PropertyTable`](@ref)); `NaN` marks an absent number
   `unc_method` is how the uncertainty was evaluated (pool `unc_methods`), and `unc_k` the
   coverage factor when the source states it. `evaluator` (pool `evaluators`) names who
   evaluated it and `assessment` is the assessment number of the source (`NaN` when absent).
+- `block`: the measured property of an experiment that the point belongs to, given as the
+  row of the first point of that block (`0` when the point has no block). The extras that
+  are the same for every point of the block (the solvent, the component a property refers
+  to, ...) are stored once, with the scope `:block` and that row, instead of once per
+  point; [`extra_numbers`](@ref) and [`extra_texts`](@ref) still return them for every
+  point, and an extra attached to one point (`:measurement`) takes precedence.
 - To keep the table small, `property`, `phase`, `unc_method` and `method` use the narrowest
   unsigned integer that holds their pool (`UInt8`, or `UInt16` for the methods), and
   `unc_k`, `unc_level` and `assessment` are [`PooledFloats`](@ref): a byte per row that
@@ -521,6 +527,7 @@ struct MeasurementTable
     unc_method::Vector{UInt8}
     evaluator::Vector{UInt16}
     assessment::PooledFloats{UInt8}
+    block::Vector{Int32}
     digits::Vector{UInt8}
     temperature_digits::Vector{UInt8}
     pressure_digits::Vector{UInt8}
@@ -543,6 +550,7 @@ function MeasurementTable()
         UInt8[],
         UInt16[],
         PooledFloats{UInt8}(),
+        Int32[],
         UInt8[],
         UInt8[],
         UInt8[],
@@ -568,6 +576,7 @@ function add_measurement!(
     unc_method::Integer = NO_ID,
     evaluator::Integer = NO_ID,
     assessment::Real = NaN,
+    block::Integer = NO_ID,
     digits::Integer = NO_DIGITS,
     temperature_digits::Integer = NO_DIGITS,
     pressure_digits::Integer = NO_DIGITS,
@@ -593,6 +602,7 @@ function add_measurement!(
     push!(t.unc_method, narrow(UInt8, unc_method, "uncertainty method"))
     push!(t.evaluator, narrow(UInt16, evaluator, "uncertainty evaluator"))
     push!(t.assessment, assessment)
+    push!(t.block, Int32(block))
     push!(t.digits, UInt8(digits))
     push!(t.temperature_digits, UInt8(temperature_digits))
     push!(t.pressure_digits, UInt8(pressure_digits))
@@ -607,7 +617,7 @@ end
 # ----------------------------------------------------------------------------------
 
 "Tables an extra field can be attached to; the position is the code stored on disk."
-const EXTRA_SCOPES = (:reference, :compound, :experiment, :measurement)
+const EXTRA_SCOPES = (:reference, :compound, :experiment, :measurement, :block)
 
 function scope_code(scope::Symbol)
     code = findfirst(==(scope), EXTRA_SCOPES)

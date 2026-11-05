@@ -57,6 +57,8 @@ include("compounds/store.jl")
 include("compounds/pubchem.jl")
 include("compounds/link.jl")
 include("compounds/linked.jl")
+include("composition/scales.jl")
+include("composition/convert.jl")
 include("references.jl")
 include("notice.jl")
 include("export/bibtex.jl")
@@ -76,9 +78,23 @@ include("outliers/trend.jl")
 include("outliers/surface.jl")
 include("outliers/detect.jl")
 include("outliers/pipeline.jl")
+include("database/members.jl")
+include("database/registry.jl")
+include("database/database.jl")
 include("precompile.jl")
 
-export CompoundDB,
+export COMPOSITION_SCALES,
+    Database,
+    DatabaseView,
+    Member,
+    add_member!,
+    member_dataset,
+    members,
+    parts,
+    remove_member!,
+    CompositionConversion,
+    CompoundDB,
+    convert_composition,
     LinkedDatabase,
     DataView,
     UncertaintyTerm,

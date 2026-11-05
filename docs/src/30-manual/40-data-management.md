@@ -60,6 +60,26 @@ The keywords change this behaviour:
 | `rebuild = true` | Also ignore the cache and parse the archive again. |
 | `progress = false` | No progress bars, useful in scripts and in CI. |
 
+## Several databases that look like one
+
+[`database`](@ref) returns a [`Database`](@ref): a list of independent databases, the *members*. Today it holds the ThermoML archive (`:thermoml`); points you measure (`:user`) or take from the literature (`:literature`) are separate members with the same tables and the same fields, so nothing of the archive is ever changed by what you add. Every member lives in its own file and is read only when a query can find something in it.
+
+```julia
+db = database()
+members(db)                            # the databases, first the one that wins on a repeated point
+view = points(db; component = "methane")
+parts(view)                            # one DataView for each database that has points
+table(view)                            # all the points, with a column `database` when there are several
+```
+
+What makes this fast is a small index that is always in memory (the *registry*): it gives each compound, property and reference one number in all the members, and says which member has what. A question about a compound that only one member knows reads only that member. The tables of a member that are rarely needed (samples, purity, conditions and extra fields) are read the first time something asks for them; [`loaded_tables`](@ref) shows what is in memory.
+
+- A compound is the same in two members when its key is: the InChIKey, or `name:...` for a compound that the archive knows only by name. Nothing is merged by guessing. A compound that has only a name is listed in `db.registry.unkeyed`, so you can give it an InChIKey.
+- A property is the pair (label, unit) and a reference is a DOI.
+- [`add_member!`](@ref) and [`remove_member!`](@ref) manage the members; `priority` (smaller first) decides which database wins when the same point is in several.
+- `find_compounds(db, text)` joins the databases: one row for each compound, with the points of all of them, and its result can be given as the `component` of `points`.
+- Functions that join the points of several databases (export, outliers, references) work on one database for now: use `parts(view)`.
+
 ## Checking and updating by hand
 
 [`check_update`](@ref) compares the local archive with the latest one published by NIST. It never throws because of network problems: if NIST cannot be reached it falls back to the releases the package knows, and says so in `source`.

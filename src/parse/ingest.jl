@@ -13,7 +13,7 @@ end
 
 BuildReport() = BuildReport(0, 0, 0, String[], String[])
 
-const MEASUREMENT_SCOPE = scope_code(:measurement)
+const BLOCK_SCOPE = scope_code(:block)
 
 # Extras converted once to identifiers, so a property with 500 points interns its keys
 # a single time instead of 500.
@@ -272,8 +272,13 @@ function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::B
             p in pe.properties
         ]
 
+        block_row = zeros(Int32, length(pe.properties))   # first point of each block
         for m in pe.measurements
             k = Int(m.property)
+            if block_row[k] == 0
+                block_row[k] = Int32(length(ds.measurements) + 1)
+                push_prepared!(ds.extras, BLOCK_SCOPE, block_row[k], prepared[k])
+            end
             row = add_measurement!(
                 ds.measurements;
                 experiment,
@@ -287,6 +292,7 @@ function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::B
                 unc_method = isnan(m.unc) ? NO_ID : unc_method_ids[k],
                 evaluator = evaluator_ids[k],
                 assessment = pe.properties[k].assessment,
+                block = block_row[k],
                 digits = m.digits,
                 temperature_digits = m.temperature_digits,
                 pressure_digits = m.pressure_digits,
@@ -295,7 +301,6 @@ function ingest!(ds::Dataset, article::ParsedArticle, source::Integer, report::B
                 pressure = m.pressure,
                 composition = m.composition,
             )
-            push_prepared!(ds.extras, MEASUREMENT_SCOPE, row, prepared[k])
             if m.conditions !== nothing
                 for c in m.conditions
                     add_parsed_condition!(ds, :measurement, row, :variable, c, compound_ids)

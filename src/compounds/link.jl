@@ -119,7 +119,12 @@ function Base.show(io::IO, l::CompoundLinks)
 end
 
 # The table behind `link_compounds`: one row for each candidate of each compound of `ds`.
-function compound_links(ds::Dataset, db::CompoundDB; by_name::Bool = true)
+function compound_links(
+    ds::Dataset,
+    db::CompoundDB;
+    by_name::Bool = true,
+    only::Union{Nothing,AbstractVector{<:Integer}} = nothing,
+)
     t = ds.compounds
     ex = exact_index(db)
     names = name_index(db)
@@ -139,7 +144,7 @@ function compound_links(ds::Dataset, db::CompoundDB; by_name::Bool = true)
         formula_check = Symbol[],
         inchi_check = Symbol[],
     )
-    for c in eachindex(t.key)
+    for c in (only === nothing ? eachindex(t.key) : only)
         ids = Int32[]
         via = :none
         if !isempty(t.inchikey[c])

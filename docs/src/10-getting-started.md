@@ -45,7 +45,7 @@ What that call does depends on what is already on your machine:
 | Later sessions | Checks whether a new version of the database was published (it warns you if so, see [Updates](@ref updates)), then loads the binary cache, which is much faster than parsing. |
 | Same session | Returns the object it already built, immediately. |
 
-The result is a [`Dataset`](@ref): the whole archive in memory, organized as a few relational tables (see the [data model](@ref data_model)). You rarely touch it directly; you hand it to [`points`](@ref).
+The result is a [`Database`](@ref): the ThermoML archive and, when you add them, your own databases and the points you take from the literature, each independent and read from its own file only when a query needs it. The archive is a [`Dataset`](@ref), organized as a few relational tables (see the [data model](@ref data_model)). You rarely touch either directly; you hand the database to [`points`](@ref).
 
 !!! info "Where do the files go?"
     `database_dir()` tells you. On Windows it is `%LOCALAPPDATA%\ThermophysicalDB`, on macOS `~/Library/Application Support/ThermophysicalDB` and on Linux `~/.local/share/ThermophysicalDB`. You can move it with [`set_database_dir!`](@ref) or with the environment variable `THERMOPHYSICALDB_DATA_DIR`.

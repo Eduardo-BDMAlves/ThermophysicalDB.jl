@@ -2,7 +2,7 @@
 
 # (directory, dataset) of the last `database()` call, so asking again in the same session
 # is instant and does not touch the network.
-const DATABASE_MEMO = Ref{Union{Nothing,Tuple{String,Dataset}}}(nothing)
+const DATABASE_MEMO = Ref{Union{Nothing,Tuple{String,Any}}}(nothing)
 
 "Drop the in-session copy of the database (done after the archive is updated)."
 function forget_database!()
@@ -12,7 +12,7 @@ end
 
 """
     database(; update = :notify, reload = false, rebuild = false, dir = thermoml_dir())
-        -> Dataset
+        -> Database
 
 The ThermoML database, ready to query with [`points`](@ref).
 
@@ -51,8 +51,10 @@ function database(;
         return memo[2]
     end
     manifest = ensure_archive(; update, dir, fetch, download)
-    ds = rebuild ? nothing : read_cache(dir, manifest)
-    if ds === nothing
+    member = if !rebuild && cache_usable(dir, manifest)
+        # The dataset is read from the cache file the first time a query needs it.
+        Member("thermoml"; kind = :thermoml, path = cache_data_path(dir))
+    else
         @info "Building the local database from the ThermoML archive (needed once per archive version)"
         ds, _ = build_dataset(archive_path(manifest; dir); progress)
         try
@@ -62,10 +64,13 @@ function database(;
             @warn "The database was built but could not be cached; it will be rebuilt next time" reason =
                 sprint(showerror, err)
         end
+        Member("thermoml"; kind = :thermoml, path = cache_data_path(dir), dataset = ds)
     end
-    prefetch_compounds > 0 && prefetch_missing_compounds(ds, prefetch_compounds, progress)
-    DATABASE_MEMO[] = (String(dir), ds)
-    return ds
+    db = Database([member])
+    prefetch_compounds > 0 &&
+        prefetch_missing_compounds(member_dataset(member), prefetch_compounds, progress)
+    DATABASE_MEMO[] = (String(dir), db)
+    return db
 end
 
 # `database(; prefetch_compounds = n)`: ask PubChem for the n most measured compounds that the

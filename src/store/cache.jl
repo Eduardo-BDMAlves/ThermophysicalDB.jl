@@ -62,12 +62,37 @@ function read_cache(dir::AbstractString, manifest::Manifest)
     ) || return nothing
     try
         return JLD2.jldopen(data, "r") do file
-            restore_dataset(key -> file[key])
+            restore_dataset(key -> file[key]; lazy_path = data)
         end
     catch err
         err isa InterruptException && rethrow()
         @warn "The cached database could not be read and will be rebuilt" reason =
             sprint(showerror, err)
         return nothing
+    end
+end
+
+# True when the cache in `dir` was built from the archive of `manifest` with the current schema
+# version and its file can be opened; nothing else is read.
+function cache_usable(dir::AbstractString, manifest::Manifest)
+    data, meta_path = cache_data_path(dir), cache_meta_path(dir)
+    (isfile(data) && isfile(meta_path)) || return false
+    meta = try
+        TOML.parsefile(meta_path)
+    catch
+        return false
+    end
+    (
+        get(meta, "format", "") == CACHE_FORMAT &&
+        get(meta, "schema_version", -1) == SCHEMA_VERSION &&
+        get(meta, "archive_sha256", "") == manifest.sha256
+    ) || return false
+    return try
+        JLD2.jldopen(file -> file["schema_version"] == SCHEMA_VERSION, data, "r")
+    catch err
+        err isa InterruptException && rethrow()
+        @warn "The cached database could not be read and will be rebuilt" reason =
+            sprint(showerror, err)
+        false
     end
 end

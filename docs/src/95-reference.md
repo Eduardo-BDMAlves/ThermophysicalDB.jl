@@ -42,6 +42,31 @@ purity_step_table
 condition_table
 ```
 
+## Composition scales
+
+```@docs
+convert_composition
+COMPOSITION_SCALES
+CompositionConversion
+```
+
+## Several databases
+
+```@docs
+Database
+Member
+members
+add_member!
+remove_member!
+member_dataset
+DatabaseView
+parts
+ThermophysicalDB.Registry
+ThermophysicalDB.Catalog
+ThermophysicalDB.loaded_tables
+ThermophysicalDB.LAZY_FIELDS
+```
+
 ## Compounds and their identifiers
 
 ```@docs
@@ -116,5 +141,5 @@ These docstrings document the implementation. They are not part of the public in
 ```@autodocs
 Modules = [ThermophysicalDB]
 Public = false
-Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult))
+Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult, ThermophysicalDB.Registry, ThermophysicalDB.Catalog, ThermophysicalDB.loaded_tables, ThermophysicalDB.LAZY_FIELDS))
 ```

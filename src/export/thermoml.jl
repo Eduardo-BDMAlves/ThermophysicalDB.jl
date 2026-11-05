@@ -85,15 +85,27 @@ function ThermomlContext(view::DataView)
         end
     end
     t = ds.extras
+    # the extras shared by the points of a block are stored once, on its first point
+    wanted_block = Set{Int32}(m.block[r] for r in eachindex(wanted_row) if wanted_row[r])
+    block_extras = Dict{Int32,ExtraPairs}()
     for i in eachindex(t.row)
         code, row = t.scope[i], t.row[i]
         target =
             code == 1 ? (wanted_reference[row] ? context.reference_extras : nothing) :
             code == 3 ? (wanted_experiment[row] ? context.experiment_extras : nothing) :
-            code == 4 ? (wanted_row[row] ? context.row_extras : nothing) : nothing
+            code == 4 ? (wanted_row[row] ? context.row_extras : nothing) :
+            code == 5 ? (row in wanted_block ? block_extras : nothing) : nothing
         target === nothing && continue
         value = t.text[i] == NO_ID ? t.number[i] : pool_string(ds.extra_texts, t.text[i])
         push!(get!(ExtraPairs, target, row), pool_string(ds.extra_keys, t.key[i]) => value)
+    end
+    # a point's own extras come after those of its block, so they win
+    for r in eachindex(wanted_row)
+        wanted_row[r] || continue
+        pairs = get(block_extras, m.block[r], nothing)
+        pairs === nothing && continue
+        context.row_extras[Int32(r)] =
+            vcat(pairs, get(context.row_extras, Int32(r), ExtraPairs()))
     end
     ps = ds.purity_steps
     for i in eachindex(ps.sample)

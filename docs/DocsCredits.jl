@@ -19,7 +19,7 @@ using Markdown: htmlesc
 using Pkg
 using TOML
 using ThermophysicalDB
-using ThermophysicalDB: DataView, Dataset
+using ThermophysicalDB: DataView, DatabaseView, Dataset, parts
 
 const BIB_FILE = "data-credits.bib"
 const VERSIONS_FILE = "versions.toml"
@@ -87,6 +87,10 @@ function union_view(views)
     end
     return DataView(ds, Int32.(findall(mask)))
 end
+
+# The selection of a `Database` that has points of one database is used as its `DataView`.
+as_view(view::DataView) = view
+as_view(view::DatabaseView) = only(parts(view))
 
 function register!(view::DataView)
     if REGISTRY.dataset === nothing
@@ -176,8 +180,8 @@ and describe them: how many points and articles, and a table of the `top` articl
 the most points. The articles come from the metadata of the archive, so no network is
 needed.
 """
-function credits(views::DataView...; top::Integer = 8)
-    view = union_view(views)
+function credits(views::Union{DataView,DatabaseView}...; top::Integer = 8)
+    view = union_view(map(as_view, views))
     register!(view)
     isempty(view) && return HTML("<p>The selections of this page have no points.</p>")
     s = ThermophysicalDB.reference_summary(
