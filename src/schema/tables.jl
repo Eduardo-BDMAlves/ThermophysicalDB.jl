@@ -98,7 +98,8 @@ const DERIVED_FIELDS = (:index, :lookup)
 
 One row per distinct chemical species, shared by every source. The identity key is the
 standard InChIKey; when a record has none, the lower-cased first name is used instead
-(prefixed with `"name:"` so the two kinds of key cannot collide).
+(prefixed with `"name:"` so the two kinds of key cannot collide). Data of the user may give
+a CAS number instead, which makes the key `"cas:<number>"`.
 """
 struct CompoundTable
     key::Vector{String}
@@ -124,8 +125,14 @@ end
 
 Base.length(t::CompoundTable) = length(t.key)
 
-function compound_key(inchikey::AbstractString, names::AbstractVector{<:AbstractString})
+function compound_key(
+    inchikey::AbstractString,
+    names::AbstractVector{<:AbstractString};
+    cas::AbstractString = "",
+)
     isempty(inchikey) || return String(inchikey)
+    # A compound given by its CAS number only (the user's data, until an InChIKey is known).
+    isempty(cas) || return "cas:" * String(cas)
     isempty(names) &&
         throw(ArgumentError("a compound needs an InChIKey or at least one name"))
     return "name:" * lowercase(strip(first(names)))
@@ -137,8 +144,9 @@ function add_compound!(
     inchi::AbstractString = "",
     formula::AbstractString = "",
     names::AbstractVector{<:AbstractString} = String[],
+    cas::AbstractString = "",
 )
-    key = compound_key(inchikey, names)
+    key = compound_key(inchikey, names; cas)
     id = get(t.index, key, NO_ID)
     if id != NO_ID
         # Keep the first record but enrich it with what the new one adds.

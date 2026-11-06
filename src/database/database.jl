@@ -269,7 +269,11 @@ struct DatabaseView
     database::Database
     index::Vector{Int}
     parts::Vector{DataView}
+    repeats::Union{Nothing,DuplicateReport}
 end
+
+DatabaseView(db::Database, index::Vector{Int}, parts::Vector{DataView}) =
+    DatabaseView(db, index, parts, nothing)
 
 """
     parts(view) -> Vector{DataView}
@@ -295,6 +299,24 @@ function Base.show(io::IO, ::MIME"text/plain", v::DatabaseView; maxrows::Int = 1
     for (i, part) in zip(v.index, v.parts)
         println(io, "  ", rpad(v.database.members[i].name, 20), length(part))
     end
+    if v.repeats !== nothing
+        n = pair_counts(v.repeats)
+        println(
+            io,
+            "  ",
+            length(
+                unique(
+                    zip(
+                        v.repeats.other_database[v.repeats.kind .== :duplicate],
+                        v.repeats.other_row[v.repeats.kind .== :duplicate],
+                    ),
+                ),
+            ),
+            " repeated points left out (duplicates(view)); ",
+            n.conflicts,
+            " conflicts, both points kept (conflicts(view))",
+        )
+    end
     isempty(v) && return nothing
     left = maxrows
     index, trimmed = Int[], DataView[]
@@ -306,7 +328,7 @@ function Base.show(io::IO, ::MIME"text/plain", v::DatabaseView; maxrows::Int = 1
         left -= take
     end
     println(io)
-    shown = DatabaseView(v.database, index, trimmed)
+    shown = DatabaseView(v.database, index, trimmed, nothing)
     print_points(io, table(shown), length(shown), length(v) - length(shown))
     return nothing
 end
@@ -344,11 +366,15 @@ end
     points(db::Database; kwargs...) -> DatabaseView
 
 Select points in every database that can have them, with the keywords of
-[`points`](@ref) over a dataset. A component or property that no database knows is an
+[`points`](@ref) over a dataset, and `duplicate`: `true` (the default) keeps every point, `false`
+leaves out the points that another database with a higher priority holds too, and a
+[`DuplicateRules`](@ref) does the same with the tolerances you choose (see [`duplicates`](@ref) for
+what a repeated point is, and [`conflicts`](@ref) for the points that disagree, which are never
+left out). A component or property that no database knows is an
 `ArgumentError`; one that some databases lack is not. A component given as the result of
 `find_compounds(db, text)` is translated to the identifiers of each database.
 """
-function points(db::Database; component = nothing, kwargs...)
+function points(db::Database; component = nothing, duplicate = true, kwargs...)
     isempty(db.members) && throw(ArgumentError("the database has no members"))
     if length(db.members) > 1 &&
        (component isa Integer || component isa AbstractVector{<:Integer})
@@ -373,14 +399,18 @@ function points(db::Database; component = nothing, kwargs...)
     isempty(candidates) && (candidates = collect(eachindex(db.members)))
     sources = [member_dataset(db.members[m]) for m in candidates]
     if length(db.members) == 1
+        duplicate_rules(duplicate)    # a wrong value is an error whatever the number of databases
         return DatabaseView(db, [1], [points(sources[1]; component, kwargs...)])
     end
-    return select_parts(db, candidates, sources, component, kwargs)
+    return apply_duplicate(
+        select_parts(db, candidates, sources, component, kwargs),
+        duplicate,
+    )
 end
 
-function points(v::DatabaseView; component = nothing, kwargs...)
+function points(v::DatabaseView; component = nothing, duplicate = true, kwargs...)
     db = v.database
-    return select_parts(db, v.index, v.parts, component, kwargs)
+    return apply_duplicate(select_parts(db, v.index, v.parts, component, kwargs), duplicate)
 end
 
 # Counts of the points of every compound that matches, joined over the databases.

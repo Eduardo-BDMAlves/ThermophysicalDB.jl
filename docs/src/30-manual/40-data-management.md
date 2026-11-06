@@ -80,6 +80,65 @@ What makes this fast is a small index that is always in memory (the *registry*):
 - `find_compounds(db, text)` joins the databases: one row for each compound, with the points of all of them, and its result can be given as the `component` of `points`.
 - Functions that join the points of several databases (export, outliers, references) work on one database for now: use `parts(view)`.
 
+## Your own databases
+
+What you measure, or take from an article, goes into a database of your own: a member that starts empty, has the same tables as the archive and never touches it (the functions below refuse the archive). Nothing is written to disk until you call [`save_database`](@ref).
+
+```julia
+db = database()
+add_database!(db, "my_lab")                       # kind = :user; use kind = :literature for points from articles
+
+ref = add_reference!(db; doi = "10.1000/example", authors = ["Silva, A."], year = 2024)
+exp = add_experiment!(ref; components = ["water", "7647-14-5"], composition_scale = :molality)
+add_measurement!(exp; property = "Mass density", unit = "kg/m3", value = 1038.1,
+                 temperature = 293.15, pressure = 101.325, composition = [NaN, 1.0])
+
+save_database(db, "my_lab")                       # from now on database() opens it in every session
+```
+
+A reference is an article; an experiment is the part of it that measured one system, so an article can have several. [`add_reference_data!`](@ref) adds everything an article measured at once, from columns, and checks all of it before adding anything:
+
+```julia
+add_reference_data!(db;
+    reference = (doi = "10.1000/example", authors = ["Silva, A.", "Souza, B."], year = 2024),
+    experiments = [
+        (components = ["water", "7647-14-5"], composition_scale = :molality,
+         property = "Mass density", unit = "kg/m3",
+         temperature = [293.15, 298.15, 303.15], pressure = 101.325,
+         x2 = [1.0, 1.0, 1.0], value = [1038.1, 1036.4, 1034.5]),
+    ])
+```
+
+- **Compounds must be identified.** A component is an InChIKey, a CAS number, a name that the compound database knows exactly, or `(inchikey = ..., cas = ..., name = ...)`. A name that nobody knows is refused, never turned into a new compound. A CAS number that the compound database does not know is kept as the key `cas:<number>` until you give the InChIKey. The first CAS number or name may download the compound database once; pass `compounds =` a `CompoundDB` to avoid that.
+- **Units.** The tables hold plain numbers: temperature in K, pressure in kPa, and each property in the unit its database already uses for it. What you give is converted on the way in, once, so a number can be plain, a text with a unit or a quantity of a units package (Unitful, DynamicQuantities, FlexUnits): `temperature = "20 degC"`, `pressure = 1u"atm"`, `value = "0.9982 g/cm3"`. A plain temperature is in K and a plain pressure in kPa. `unit` is the unit of a plain `value` and `unc`; if the databases already have that property (`"Mass density"` is in kg/m3 in the archive), the point is stored in their unit (`unit = "g/cm3", value = 0.9982` is stored as 998.2 kg/m3); a property that no database has is stored in the SI (`"cP"` becomes `"Pa*s"`, `"bar"` becomes `"Pa"`), and a unit that is already SI is kept as you wrote it. An uncertainty is converted as a difference (`unc = "0.5 kg/m3"`, or `"0.1 %"` of the value), so `"0.5 degC"` is 0.5 K. A unit of another quantity, a gauge pressure or a unit that cannot be read is refused, and with no `unit` and a plain number nothing is converted. The units are not kept in any struct: what is stored is always `Float64`.
+- **Nothing is filled in.** What you do not give is `NaN` (a pure compound has no composition), and a point without a value, with a temperature that is not positive or with more amounts than components is refused with a message.
+- **The order of the databases** decides which one wins when a point is in several; [`set_priority!`](@ref) changes it, and a saved database remembers it.
+- **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. Removing the folder removes the database.
+- Functions that join the points of several databases (export, outliers, references) work on one database for now: select with `parts(view)`, or open the archive alone.
+
+## Repeated points
+
+The same measurement can be in two databases: the archive and the points you copied from the same article, for example. They are kept in both (so you can open just one), and `duplicate` decides what a selection over several databases shows:
+
+```julia
+points(db; doi = "10.1000/example")                      # every point of every database
+points(db; doi = "10.1000/example", duplicate = false)   # one copy of each, from the database with the highest priority
+duplicates(db; doi = "10.1000/example")                  # the pairs that are the same point
+conflicts(db; doi = "10.1000/example")                   # the pairs that disagree
+```
+
+Two points are the same point when they come from the same work and agree:
+
+1. **Same work.** The DOI is the same. When one reference has no DOI, the first author and the year are the same (and the titles agree, if both have one). Two different DOIs are two works. If nothing tells where a point comes from, it is **never** taken for a repeated one, however close it is to another: two independent measurements can agree by chance.
+2. **Same system and property**, a temperature within 0.1 K and a value within 0.1 %.
+3. **Pressure** within 0.01 bar (1 kPa) and the **amount of each component** within 0.1 %, in the scale the points were given in. A pressure or an amount that one of the points does not have is not compared: if the temperature and the value agree, they are the same point. When the amounts are in different scales they are not compared and both points are kept.
+
+A point without a temperature is never compared. Points of one database are never repeats of each other (a database may measure the same state twice), and no database is changed. The tolerances are those of [`DuplicateRules`](@ref): `points(db; duplicate = DuplicateRules(temperature = 0.05, value = 5e-4))`. They can be written with units, which are converted when the rules are made: `DuplicateRules(temperature = "0.1 degC", pressure = "0.01 bar", value = "0.1 %")` (a plain number is in K, in kPa, or a fraction).
+
+When the same work, with the same conditions (exactly the same temperature, pressure and amounts), has a different value in two databases, the pair is a *conflict*: `duplicate = false` never chooses between them, both points stay, and [`conflicts`](@ref) lists them for you to decide. A selection made with `duplicate = false` says how many points it left out and how many conflicts there are, and `duplicates(view)` is the report of that selection.
+
+[`add_reference_data!`](@ref) warns, after adding the data of an article, when the same work is already in another database: where, how many of the new points repeat points that are there, and the calls that show both (`points(db; doi = ...)`), one copy (`duplicate = false`) and the pairs. Nothing is removed. `warn_duplicates = false` silences it.
+
 ## Checking and updating by hand
 
 [`check_update`](@ref) compares the local archive with the latest one published by NIST. It never throws because of network problems: if NIST cannot be reached it falls back to the releases the package knows, and says so in `source`.

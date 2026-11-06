@@ -11,8 +11,8 @@ function forget_database!()
 end
 
 """
-    database(; update = :notify, reload = false, rebuild = false, dir = thermoml_dir())
-        -> Database
+    database(; update = :notify, reload = false, rebuild = false, dir = thermoml_dir(),
+             user_databases = true) -> Database
 
 The ThermoML database, ready to query with [`points`](@ref).
 
@@ -21,6 +21,10 @@ next to it, which takes a few minutes. Later sessions only check whether NIST ha
 archive (`update` as in [`ensure_archive`](@ref): `:notify` warns, `:install` upgrades,
 `:never` stays offline) and then load the cache, which is much faster than parsing. A
 changed archive or schema version rebuilds the cache automatically.
+
+The databases of your own that were saved with [`save_database`](@ref) are opened too (from
+`databases`, by default the folder `databases` next to `dir`; their tables are read only when a
+query needs them). `user_databases = false` gives the archive alone.
 
 `prefetch_compounds = n` also asks PubChem, once the database is ready, for the `n` most
 measured compounds that the compound database lacks (see [`prefetch_compounds!`](@ref); it
@@ -41,13 +45,16 @@ function database(;
     reload::Bool = false,
     rebuild::Bool = false,
     dir::AbstractString = thermoml_dir(),
+    user_databases::Bool = true,
+    databases = joinpath(dirname(dir), "databases"),
     progress::Bool = true,
     prefetch_compounds::Integer = 0,
     fetch = fetch_latest_release,
     download = download_file,
 )
+    memo_key = string(dir, '\0', user_databases ? databases : "")
     memo = DATABASE_MEMO[]
-    if memo !== nothing && !reload && !rebuild && memo[1] == dir
+    if memo !== nothing && !reload && !rebuild && memo[1] == memo_key
         return memo[2]
     end
     manifest = ensure_archive(; update, dir, fetch, download)
@@ -66,10 +73,12 @@ function database(;
         end
         Member("thermoml"; kind = :thermoml, path = cache_data_path(dir), dataset = ds)
     end
-    db = Database([member])
+    members = [member]
+    user_databases && append!(members, discover_members(databases; taken = [member.name]))
+    db = Database(members)
     prefetch_compounds > 0 &&
         prefetch_missing_compounds(member_dataset(member), prefetch_compounds, progress)
-    DATABASE_MEMO[] = (String(dir), db)
+    DATABASE_MEMO[] = (memo_key, db)
     return db
 end
 

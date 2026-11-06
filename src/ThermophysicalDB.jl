@@ -80,18 +80,35 @@ include("outliers/detect.jl")
 include("outliers/pipeline.jl")
 include("database/members.jl")
 include("database/registry.jl")
+include("database/inputs.jl")
+include("database/repeats.jl")
 include("database/database.jl")
+include("database/duplicates.jl")
+include("database/user.jl")
 include("precompile.jl")
 
 export COMPOSITION_SCALES,
     Database,
     DatabaseView,
+    DuplicateReport,
+    DuplicateRules,
+    ExperimentRef,
     Member,
+    ReferenceRef,
+    add_database!,
+    add_experiment!,
+    add_measurement!,
     add_member!,
+    add_reference!,
+    add_reference_data!,
+    databases_dir,
     member_dataset,
     members,
     parts,
     remove_member!,
+    resolve_compound,
+    save_database,
+    set_priority!,
     CompositionConversion,
     CompoundDB,
     convert_composition,
@@ -102,11 +119,13 @@ export COMPOSITION_SCALES,
     check_update,
     compound_database,
     compound_record,
+    conflicts,
     condition_table,
     csv_table,
     database_dir,
     database,
     diagnostics,
+    duplicates,
     ensure_archive,
     esd,
     expanded_uncertainty,
