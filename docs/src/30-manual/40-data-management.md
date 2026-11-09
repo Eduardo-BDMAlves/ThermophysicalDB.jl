@@ -110,11 +110,38 @@ add_reference_data!(db;
 ```
 
 - **Compounds must be identified.** A component is an InChIKey, a CAS number, a name that the compound database knows exactly, or `(inchikey = ..., cas = ..., name = ...)`. A name that nobody knows is refused, never turned into a new compound. A CAS number that the compound database does not know is kept as the key `cas:<number>` until you give the InChIKey. The first CAS number or name may download the compound database once; pass `compounds =` a `CompoundDB` to avoid that.
-- **Units.** The tables hold plain numbers: temperature in K, pressure in kPa, and each property in the unit its database already uses for it. What you give is converted on the way in, once, so a number can be plain, a text with a unit or a quantity of a units package (Unitful, DynamicQuantities, FlexUnits): `temperature = "20 degC"`, `pressure = 1u"atm"`, `value = "0.9982 g/cm3"`. A plain temperature is in K and a plain pressure in kPa. `unit` is the unit of a plain `value` and `unc`; if the databases already have that property (`"Mass density"` is in kg/m3 in the archive), the point is stored in their unit (`unit = "g/cm3", value = 0.9982` is stored as 998.2 kg/m3); a property that no database has is stored in the SI (`"cP"` becomes `"Pa*s"`, `"bar"` becomes `"Pa"`), and a unit that is already SI is kept as you wrote it. An uncertainty is converted as a difference (`unc = "0.5 kg/m3"`, or `"0.1 %"` of the value), so `"0.5 degC"` is 0.5 K. A unit of another quantity, a gauge pressure or a unit that cannot be read is refused, and with no `unit` and a plain number nothing is converted. The units are not kept in any struct: what is stored is always `Float64`.
+- **Units.** The tables hold plain numbers: temperature in K, pressure in kPa, and each property in the unit its database already uses for it. What you give is converted on the way in, once, so a number can be plain, a text with a unit or a quantity of a units package (Unitful, DynamicQuantities, FlexUnits): `temperature = "20 degC"`, `pressure = 1u"atm"`, `value = "0.9982 g/cm3"`. A plain temperature is in K and a plain pressure in kPa.
+  `unit` is the unit of a plain `value` and `unc`; if the databases already have that property (`"Mass density"` is in kg/m3 in the archive), the point is stored in their unit (`unit = "g/cm3", value = 0.9982` is stored as 998.2 kg/m3); a property that no database has is stored in the SI (`"cP"` becomes `"Pa*s"`, `"bar"` becomes `"Pa"`), and a unit that is already SI is kept as you wrote it. An uncertainty is converted as a difference (`unc = "0.5 kg/m3"`, or `"0.1 %"` of the value), so `"0.5 degC"` is 0.5 K. A unit of another quantity, a gauge pressure or a unit that cannot be read is refused, and with no `unit` and a plain number nothing is converted. The units are not kept in any struct: what is stored is always `Float64`.
 - **Nothing is filled in.** What you do not give is `NaN` (a pure compound has no composition), and a point without a value, with a temperature that is not positive or with more amounts than components is refused with a message.
 - **The order of the databases** decides which one wins when a point is in several; [`set_priority!`](@ref) changes it, and a saved database remembers it.
 - **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. Removing the folder removes the database.
 - Functions that join the points of several databases (export, outliers, references) work on one database for now: select with `parts(view)`, or open the archive alone.
+
+## Filling in a spreadsheet
+
+Typing the points of an article as columns in code is exact but tedious. With XLSX.jl loaded, the package writes a spreadsheet that you fill in, and imports it:
+
+```julia
+using ThermophysicalDB, XLSX
+
+db = database()
+export_template(db, "my_article.xlsx"; experiments = 3)      # a guide, the reference and the compounds, 3 pairs of sheets
+# ... fill in the light blue cells in Excel or LibreOffice, save ...
+report = import_template(db, "my_article.xlsx"; check = true) # the same checks, nothing is added
+report.problems                                              # every mistake, with its sheet and cell
+import_template(db, "my_article.xlsx")                        # add the data to the database named in the file
+```
+
+The workbook has a **Guide**, a **Reference** sheet (the DOI, the authors, and a list of up to 25 compounds with their samples) and, for each experiment, an **EXP-n** sheet (what was measured, the components, the method) and a **PTS-n** sheet (the points: composition, temperature, pressure, value, each with its unit, and the uncertainty). The menus are filled from your databases, so a property you type is the one that already exists. The cells that you do not fill in are not given: nothing is guessed.
+
+- **Units.** Each column has its unit cell (`degC`, `bar`, `g/cm3`, `%`...): the import converts as [`add_reference_data!`](@ref) does, to the units of the databases. The uncertainty of the value is absolute or relative (`%`), and has its coverage factor `k`.
+- **More experiments.** The number of pairs is chosen when the file is written. [`add_template_experiments!`](@ref) adds more to a file that you have started; what you typed stays where it is. Copying the sheets by hand does not work, because each pair has its own names.
+- **A work with more than 25 compounds.** Fill a second file with the same reference (the same DOI) and import both: `import_template(db, ["part1.xlsx", "part2.xlsx"])` joins the compounds by name and the experiments follow one another. Files of different works are refused.
+- **The database** is the one named on the Reference sheet (`database = "name"` overrides it); one that does not exist is created (`create = false` refuses). Everything is checked before anything is added, and all the mistakes come at once.
+- **Uncertainties of the conditions.** The columns `u(x1)`, `u(x2)`, `u(x3)`, `u(T)` and `u(P)` are stored in the uncertainty table ([`uncertainty_table`](@ref)), each with its coverage factor `k`. An absolute value is in the unit of its column and is a difference (0.05 degC is 0.05 K); a relative one (`%`) is taken of the temperature in K (also for degC and degF) and of the pressure in kPa, see [A percentage of a temperature is taken of the absolute scale](@ref).
+- **What is not stored yet.** The data of the samples (purity, supplier), the notes and the place in the article are read but not kept; the import lists them in `ignored` and in a warning, and never drops them in silence.
+- **Names, not addresses.** The importer finds each cell by a name defined in the workbook (`ref_doi`, `exp1_property`, `pts1_table`...), so a file that you filled in stays readable when the layout of the template changes.
+- Paste values only (Paste Special > Values) into the template: a normal paste replaces the menus and the checks of the cells.
 
 ## Repeated points
 

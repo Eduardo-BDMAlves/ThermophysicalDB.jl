@@ -85,6 +85,7 @@ include("database/repeats.jl")
 include("database/database.jl")
 include("database/duplicates.jl")
 include("database/user.jl")
+include("database/template.jl")
 include("precompile.jl")
 
 export COMPOSITION_SCALES,
@@ -96,6 +97,7 @@ export COMPOSITION_SCALES,
     Member,
     ReferenceRef,
     add_database!,
+    add_template_experiments!,
     add_experiment!,
     add_measurement!,
     add_member!,
@@ -130,9 +132,11 @@ export COMPOSITION_SCALES,
     esd,
     expanded_uncertainty,
     export_points,
+    export_template,
     fetch_pubchem!,
     find_compounds,
     find_outliers,
+    import_template,
     forget_choices!,
     install_archive!,
     latex_table,

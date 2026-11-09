@@ -763,6 +763,134 @@ function check_point(
     return ntuple(i -> i <= length(amounts) ? Float64(amounts[i]) : NaN, MAX_COMPONENTS)
 end
 
+# ----------------------------------------------------------------------------------
+# Uncertainties of the temperature, the pressure and the amounts of a point
+# ----------------------------------------------------------------------------------
+
+# Nothing was given for this uncertainty.
+input_missing(x) = x === nothing || x === missing || (x isa Real && isnan(x))
+
+# One uncertainty of an input of the point as a term in the native unit of the quantity (K, kPa,
+# the amount as stored). A plain number is a standard uncertainty (k = 1), as everywhere a term is
+# expected; an `UncertaintyTerm` states its own coverage. A text with a unit is a difference; a
+# percentage is a fraction of `reference`, the value as stored: of the temperature in K and of the
+# pressure in kPa, so a percentage of a temperature in degC or degF is always taken of the
+# absolute scale (K, and so also Ra for degF).
+function input_term(x, kind, reference::Real, quantity::Symbol, what::AbstractString)
+    isfinite(reference) || throw(
+        ArgumentError(
+            "the uncertainty of $what is given but $what is not: give the value or leave the uncertainty out",
+        ),
+    )
+    ctx = (;
+        kind,
+        reference = Float64(reference),
+        where = "the point",
+        why = "the amounts have no unit that can be given; use a number or a percentage",
+        relative_why = "",
+    )
+    try
+        return x isa UncertaintyTerm ? resolve_term(x, ctx, quantity) :
+               UncertaintyTerm(uncertainty_native(x, ctx, quantity); k = 1.0)
+    catch err
+        err isa ArgumentError || rethrow()
+        throw(ArgumentError("the uncertainty of $what: $(err.msg)"))
+    end
+end
+
+# The terms of a point, checked: `(quantity, term)` for every uncertainty that was given.
+# `u_composition` is one entry for each amount (a scalar stands for every amount that is given).
+function input_uncertainties(
+    ncomp::Integer,
+    t,
+    p,
+    comp,
+    u_temperature,
+    u_pressure,
+    u_composition,
+)
+    terms = Tuple{Symbol,UncertaintyTerm{Float64}}[]
+    if !input_missing(u_temperature)
+        push!(
+            terms,
+            (
+                :temperature,
+                input_term(
+                    u_temperature,
+                    NativeTemperature(),
+                    t,
+                    :temperature,
+                    "the temperature",
+                ),
+            ),
+        )
+    end
+    if !input_missing(u_pressure)
+        push!(
+            terms,
+            (
+                :pressure,
+                input_term(u_pressure, NativePressure(), p, :pressure, "the pressure"),
+            ),
+        )
+    end
+    list =
+        u_composition isa Union{AbstractVector,Tuple} ? collect(u_composition) :
+        fill(u_composition, ncomp)
+    length(list) <= ncomp || throw(
+        ArgumentError(
+            "$(length(list)) uncertainties of the composition for $ncomp component(s)",
+        ),
+    )
+    for (j, x) in enumerate(list)
+        input_missing(x) && continue
+        (j <= length(comp) && isfinite(comp[j])) || begin
+            u_composition isa Union{AbstractVector,Tuple} && throw(
+                ArgumentError(
+                    "the uncertainty of the amount of component $j is given but the amount is not",
+                ),
+            )
+            continue
+        end
+        q = Symbol("composition", j)
+        push!(terms, (q, input_term(x, nothing, comp[j], q, "the amount of component $j")))
+    end
+    return terms
+end
+
+# The terms are stored as the expanded uncertainty with its coverage, and the combined standard
+# uncertainty that follows from it (``u = U / k``), as `set_uncertainty!` does for an expanded term,
+# without its search for shared terms (these are the user's own points, one call for each point).
+function store_input_uncertainties!(ds::Dataset, row::Integer, terms)
+    isempty(terms) && return nothing
+    method = intern!(ds.unc_methods, DERIVED_FROM_EXPANDED_TEXT)
+    for (quantity, term) in terms
+        add_uncertainty!(
+            ds.uncertainties;
+            scope = :measurement,
+            row,
+            quantity,
+            kind = :expanded,
+            value = term.value,
+            k = term.k,
+            level = term.level,
+        )
+        add_uncertainty!(
+            ds.uncertainties;
+            scope = :measurement,
+            row,
+            quantity,
+            kind = :combined,
+            value = term.value / term.k,
+            k = 1.0,
+            level = level_of_coverage(1.0),
+            method,
+            origin = :derived,
+        )
+    end
+    return nothing
+end
+
 function commit_point!(
     e::ExperimentRef,
     property::AbstractString,
@@ -777,6 +905,7 @@ function commit_point!(
     unc,
     unc_k,
     unc_level,
+    terms = (),
 )
     ds = member_dataset(e.member)
     before = length(ds.properties)
@@ -800,14 +929,16 @@ function commit_point!(
         pressure,
         composition,
     )
+    store_input_uncertainties!(ds, row, terms)
     length(ds.properties) == before || refresh!(e.database, e.member)
     return row
 end
 
 """
     add_measurement!(experiment; property, unit = "", value, temperature = NaN, pressure = NaN,
-                     composition = (), unc = NaN, unc_k = NaN, unc_level = NaN, group = "",
-                     method = "", phase = "") -> Int
+                     composition = (), unc = NaN, unc_k = NaN, unc_level = NaN,
+                     unc_temperature = NaN, unc_pressure = NaN, unc_composition = NaN,
+                     group = "", method = "", phase = "") -> Int
 
 Add one point to an experiment of a database of your own and return its row. `property` is the
 name ThermoML uses ("Mass density"), `unit` the unit of a plain `value` and `unc` ("kg/m3"):
@@ -825,6 +956,17 @@ already use for the property (of the same dimension), and in the SI when none ha
 another quantity, a gauge pressure or a unit that cannot be read is an `ArgumentError`. An
 uncertainty is a difference: only its scale is converted. With no `unit`, a plain number is stored
 as it is.
+
+`unc_temperature`, `unc_pressure` and `unc_composition` (one for each amount, or a single value
+for all the amounts that are given) are the uncertainties of the conditions of the point; they are
+optional and stored in the uncertainty table (see [`uncertainty_table`](@ref)). A plain number is
+a standard uncertainty (``k = 1``) in K, kPa or the scale of the composition; a text with a unit is
+a difference (`"0.05 degC"` is 0.05 K, `"0.09 degF"` is 0.05 K); and `UncertaintyTerm(0.1; k = 2)`
+states the coverage. A **percentage** is taken of the value in an **absolute** scale: of the
+temperature in kelvin, even when the temperature was given in degC (`"0.01 %"` of 25 degC is 0.01 %
+of 298.15 K, that is 0.030 K) and, for degF, equally of the rankine scale (the same number of
+kelvin); of the pressure in kPa; and of the amount as stored. A relative uncertainty of a
+temperature in an offset scale would otherwise depend on where its zero is.
 """
 function add_measurement!(
     e::ExperimentRef;
@@ -837,6 +979,9 @@ function add_measurement!(
     unc = NaN,
     unc_k = NaN,
     unc_level = NaN,
+    unc_temperature = NaN,
+    unc_pressure = NaN,
+    unc_composition = NaN,
     group::AbstractString = "",
     method::AbstractString = "",
     phase::AbstractString = "",
@@ -861,6 +1006,15 @@ function add_measurement!(
         unc_k,
         unc_level,
     )
+    terms = input_uncertainties(
+        e.ncomp,
+        c.t,
+        c.p,
+        comp,
+        unc_temperature,
+        unc_pressure,
+        unc_composition,
+    )
     return commit_point!(
         e,
         property,
@@ -875,6 +1029,7 @@ function add_measurement!(
         c.unc,
         unc_k,
         unc_level,
+        terms,
     )
 end
 
@@ -893,6 +1048,11 @@ const POINT_COLUMNS = (
     :unc,
     :unc_k,
     :unc_level,
+    :unc_temperature,
+    :unc_pressure,
+    :unc_x1,
+    :unc_x2,
+    :unc_x3,
 )
 const EXPERIMENT_KEYS = (:components, :composition_scale, :purpose, :number, :compounds)
 
@@ -924,13 +1084,17 @@ Add everything one article measured: its `reference` (the fields of [`add_refere
 `experiments`, a list of `NamedTuple`s, each one system. An experiment gives `components`,
 optionally `composition_scale`, `purpose`, `number`, and its points as columns: `property`,
 `unit`, `value` and the ones you have (`temperature`, `pressure`, `x1`, `x2`, `x3` for the amounts
-of the components, `unc`, `unc_k`, `unc_level`, `group`, `method`, `phase`). A column is a vector
-with one entry per point, or a single value that is repeated.
+of the components, `unc`, `unc_k`, `unc_level`, `group`, `method`, `phase`, and the uncertainties
+of the conditions `unc_temperature`, `unc_pressure`, `unc_x1`, `unc_x2`, `unc_x3`, read as in
+[`add_measurement!`](@ref): a plain number is a standard uncertainty, an `UncertaintyTerm` states its
+coverage, and a percentage is taken of the temperature in K and of the pressure in kPa). A column is
+a vector with one entry per point, or a single value that is repeated.
 `temperature`, `pressure`, `value` and `unc` are converted as in [`add_measurement!`](@ref): a
 plain number, a text with a unit or a quantity, one by one, so a column may mix them.
 
 Everything is checked before anything is added, so a mistake in the fifth experiment leaves the
-database as it was. Returns `(reference, experiments, points)`.
+database as it was; with `dry_run = true` only that check is done and nothing is added. Returns
+`(reference, experiments, points)`.
 
 When the same work (its DOI, or its first author and year) is already in another database, a warning
 says where, how many of the new points repeat points that are there and which calls show both
@@ -961,6 +1125,7 @@ function add_reference_data!(
     database = nothing,
     compounds = nothing,
     warn_duplicates::Bool = true,
+    dry_run::Bool = false,
 )
     m = reference isa ReferenceRef ? reference.member : writable_member(db, database)
     list =
@@ -1010,7 +1175,7 @@ function add_reference_data!(
                     ),
                 )
             end
-            c, comp = try
+            c, comp, terms = try
                 c = convert_point(
                     choices,
                     col(:property, ""),
@@ -1031,16 +1196,37 @@ function add_reference_data!(
                     col(:unc_k, NaN),
                     col(:unc_level, NaN),
                 )
-                (c, comp)
+                for j = (length(specs)+1):MAX_COMPONENTS
+                    input_missing(col(Symbol("unc_x", j), NaN)) || throw(
+                        ArgumentError(
+                            "the column unc_x$j needs $j components, the experiment has $(length(specs))",
+                        ),
+                    )
+                end
+                terms = input_uncertainties(
+                    length(specs),
+                    c.t,
+                    c.p,
+                    comp,
+                    col(:unc_temperature, NaN),
+                    col(:unc_pressure, NaN),
+                    [col(:unc_x1, NaN), col(:unc_x2, NaN), col(:unc_x3, NaN)][1:length(specs)],
+                )
+                (c, comp, terms)
             catch err
                 err isa ArgumentError &&
                     throw(ArgumentError("experiment $n, point $i: $(err.msg)"))
                 rethrow()
             end
-            (; comp, i, c)
+            (; comp, i, c, terms)
         end
         (; exp, specs, scales, points)
     end
+    dry_run && return (;
+        reference = nothing,
+        experiments = ExperimentRef[],
+        points = sum(p -> length(p.points), prepared),
+    )
     # Second pass: add.
     ref =
         fields === nothing ? find_reference(db, m, reference) :
@@ -1056,7 +1242,7 @@ function add_reference_data!(
             number = get(exp, :number, 0),
         )
         push!(experiments_added, e)
-        for (; comp, i, c) in points
+        for (; comp, i, c, terms) in points
             col(k, default) = haskey(exp, k) ? column_at(exp[k], i) : default
             commit_point!(
                 e,
@@ -1072,6 +1258,7 @@ function add_reference_data!(
                 c.unc,
                 col(:unc_k, NaN),
                 col(:unc_level, NaN),
+                terms,
             )
             total += 1
         end

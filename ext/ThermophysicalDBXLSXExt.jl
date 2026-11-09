@@ -1,8 +1,14 @@
 # Writes the sheets that `export_points` builds. Loaded when the user runs `using XLSX`.
 module ThermophysicalDBXLSXExt
 
-using ThermophysicalDB: ThermophysicalDB
+using Dates: Dates
+using ThermophysicalDB: ThermophysicalDB, TemplateInfo, TEMPLATE_FORMAT
 using XLSX: XLSX
+using ZipArchives: ZipArchives
+
+include("xlsx/ooxml.jl")
+include("xlsx/layout.jl")
+include("xlsx/io.jl")
 
 function ThermophysicalDB.write_xlsx(
     path::String,

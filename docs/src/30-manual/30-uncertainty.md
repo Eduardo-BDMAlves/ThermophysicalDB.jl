@@ -257,6 +257,20 @@ An uncertainty is a difference between two values, so it is converted by the sca
 
 A percentage (`"2 %"`, `"500 ppm"`, `2u"percent"`) is that fraction of the value of **the same quantity at the same point**: the property in its unit, the temperature in kelvin, the pressure in kPa, the composition as stored. It is converted into the unit of the database as soon as it is stored, so the table always holds absolute uncertainties. The coverage is applied after the conversion: `UncertaintyTerm("2 %"; k = 2)` is a standard uncertainty of 1 % of the value. A percentage and a quantity of the property need a point (`scope = :measurement`), because an experiment may have several properties and its points have different values; at an experiment you can give the temperature or the pressure with a unit (the specification of a thermometer, for example) but not a percentage.
 
+### A percentage of a temperature is taken of the absolute scale
+
+A relative uncertainty is a fraction *of the value*, and the value of a temperature depends on where the scale has its zero: 1 % of 25 °C is 0.25 K, but 1 % of 298.15 K is 2.98 K. The two are not the same measurement, and only the second means anything, because kelvin (and rankine) start at absolute zero. So the package **always takes a percentage of the temperature in an absolute scale**, whatever unit the temperature was written in:
+
+| Temperature given in | The percentage is taken of | Result |
+| :-- | :-- | :-- |
+| K | the value in K | in K |
+| °C | the value in K (``T / \mathrm{K} = t / {}^\circ\mathrm{C} + 273.15``) | in K |
+| °F | the value in °R (``T / {}^\circ\mathrm{R} = t / {}^\circ\mathrm{F} + 459.67``), which is the same fraction of the value in K | in K (and in °R, ``\mathrm{K} = \tfrac59\,{}^\circ\mathrm{R}``) |
+
+For example, `"0.01 %"` of 25 °C is 0.01 % of 298.15 K, that is 0.0298 K, and the table holds 0.0298 K. The same reasoning applies to the pressure, which is always taken of the absolute pressure in kPa (a gauge pressure is refused). An **absolute** uncertainty written with a unit is a difference and only its scale changes: `"0.05 degC"` is 0.05 K and `"0.09 degF"` is 0.05 K.
+
+The uncertainties of the conditions of a point can be given where the point is added, without `set_uncertainty!`: the keywords `unc_temperature`, `unc_pressure` and `unc_composition` of [`add_measurement!`](@ref), the columns `unc_temperature`, `unc_pressure` and `unc_x1`...`unc_x3` of [`add_reference_data!`](@ref) and the `u(T)`, `u(P)` and `u(x)` columns of the spreadsheet, all with the rules of this section. A plain number is a standard uncertainty (``k = 1``) and `UncertaintyTerm(0.05; k = 2)` states its coverage; the spreadsheet has the coverage factor of each column in its row `k`.
+
 !!! note "What is combined, and what is not"
     The combination above treats the terms of **one quantity**. The combined uncertainty of a property that you derive this way does not include the contribution of the uncertainty of ``T``, ``P`` and composition, which depends on the model: ``u_c^2(y) = u^2_{\text{own}} + \sum_i (\partial y/\partial x_i)^2 u^2(x_i)``. For a liquid density near ambient conditions the term in ``T`` usually dominates, since ``\partial\rho/\partial T`` is large and ``\partial\rho/\partial P`` small. The archive's combined uncertainty is supposed to include these contributions, but only 129,519 of its roughly 2.7 million uncertainties say that they were obtained by propagation. This is why the separate terms are kept: you can propagate them with your own model. In the ThermoML formats only the expanded uncertainty of the property is written, as the standard has it; the separate terms are in the `.json` of [`export_points`](@ref) and in [`uncertainty_table`](@ref).
 
