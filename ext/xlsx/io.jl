@@ -150,12 +150,26 @@ function ThermophysicalDB.read_template_info(path::String)
             )
         end
     end
+    # The menus that the file already has (the values of the databases of the computer that made it).
+    lists = map(TD.TEMPLATE_LIST_KEYS) do key
+        table = named(xf, "list_$key")
+        texts = String[]
+        if table isa AbstractMatrix
+            for i in axes(table, 1)
+                ismissing(table[i, 1]) || push!(texts, text(table[i, 1]))
+            end
+        elseif !(table === nothing || ismissing(table))
+            push!(texts, text(table))
+        end
+        filter!(!isempty, texts)
+    end
     return TD.TemplateInfo(
         string(pkgversion(ThermophysicalDB)),
         TD.TEMPLATE_SCHEMA,
         string(Dates.today()),
         databases,
         properties,
+        NamedTuple{TD.TEMPLATE_LIST_KEYS}(lists),
     )
 end
 

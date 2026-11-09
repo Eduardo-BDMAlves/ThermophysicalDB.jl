@@ -116,6 +116,8 @@ literature = points(db; source = "papers")
 table(literature)
 ```
 
+`source` is the name of the database that holds the reference. If you also give a `component` (or a property or limits) that the database does not have, the answer is that the source exists but nothing in it matches, not that the source is unknown.
+
 The uncertainties of the conditions are in the uncertainty table, one row per term, with the coverage and how each was obtained (given, or derived: the combined standard uncertainty is ``u = U/k``):
 
 ```@example own
@@ -224,25 +226,34 @@ The file has these sheets:
 | `EXP-1`, `EXP-2`... | one experiment each: name, property, phase, method, components, composition scale, and below it the **units** and the **uncertainty type** (absolute or relative in %) of each column |
 | `PTS-1`, `PTS-2`... | the points of the experiment: the amounts, `T`, `P`, the value and the uncertainty of each (`u(x)`, `u(T)`, `u(P)`, `u(value)`), one point per row (up to 200). Under each header, `u given as` chooses *absolute* or *relative (%)* and `k` is the coverage factor of that column |
 
-Only the input cells (the colours are explained in the `Guide`) are for you; the rest is protected. Property, phase, units and scale are menus, filled from your databases and from the units the package knows. Open `template.xlsx`, fill it in and save, or start from one of the examples:
+Only the input cells (the colours are explained in the `Guide`) are for you; the rest is protected. Property, method, phase, sample source, supplier, purity analysis, purification, units and scale are menus: the values that your databases already use come first (most used first), followed by generic choices, so a new point most likely joins what is already there. Method and supplier also accept your own text. Open `template.xlsx`, fill it in and save, or start from one of the examples:
 
 - [`example-literature.xlsx`](../assets/example-literature.xlsx): the hypothetical article above plus a pure-water experiment (nine points), target `literature`, temperatures in K with `u(T)`, `u(P)` and `u(w)` as expanded uncertainties (``k = 2``).
 - [`example-own-measurements.xlsx`](../assets/example-own-measurements.xlsx): the volumetric heat capacity of ethanol and of water (a check of the instrument), temperatures in °C (six points), target `my_lab`. The ethanol sheet gives `u(T)` in °C, which is a difference; the water sheet gives `u(T)` and `u(P)` as relative (`%`), which the package takes of the value in K and kPa.
 
 ### Check before importing
 
-[`import_template`](@ref) with `check = true` reads the file and reports every problem, with the cell it is in, without adding anything. A file with a wrong date, an unknown unit and a missing component gives all three at once, not one per attempt:
+[`import_template`](@ref) with `only_check = true` reads the file and reports every problem, with the cell it is in, **without adding anything**, not even the database named in the file. A file with a wrong date, an unknown unit and a missing component gives all three at once, not one per attempt. The report also says whether the data could be written as a valid ThermoML file and, when they cannot, which criteria fail (the criteria are in the tables at the end of this page):
 
 ```@example own
 example = pkgdir(ThermophysicalDB, "docs", "src", "assets", "example-literature.xlsx")
 
-report = import_template(db, example; check = true)
-(ok = report.ok, target = report.target, points = report.points, problems = report.problems)
+report = import_template(db, example; only_check = true)
+(
+    ok = report.ok,
+    imported = report.imported,
+    points = report.points,
+    problems = report.problems,
+    thermoml_compatible = report.thermoml_compatible,
+    thermoml_failures = report.thermoml_failures,
+)
 ```
+
+`ok = true` means that the file can be imported, not that it was: `imported` is `false` here, and `points(db; source = "literature")` would still say that no such database exists.
 
 ### Import
 
-When the report is clean, the same call without `check` adds the points. The database comes from the sheet `Reference` (it is created if it does not exist yet), and the second file goes into a different one, so a single call can also take several files:
+When the report is clean, the same call without `only_check` adds the points, and its result has the same `thermoml_compatible` and `thermoml_failures`, with `imported = true`. The database comes from the sheet `Reference` (it is created if it does not exist yet), and the second file goes into a different one, so a single call can also take several files:
 
 ```@example own
 result = import_template(db, example; warn_duplicates = false)
@@ -260,7 +271,7 @@ points(db; source = "my_lab")
 
 ### Repeated points
 
-The example file describes the very article that was typed in by hand at the start, so those points are now in two databases, `papers` and `literature`. Nothing is removed or changed when this happens: [`duplicates`](@ref) lists the pairs, [`conflicts`](@ref) those that disagree beyond their uncertainties, and `points(db; duplicate = false)` keeps one copy of each.
+The example file describes the very article that was typed in by hand at the start, so those points are now in two databases, `papers` and `literature`. Nothing is removed or changed when this happens: [`duplicates`](@ref) lists the pairs, [`conflicts`](@ref) those that disagree beyond their uncertainties, and a selection keeps one copy of each by default (`duplicate = true` shows them all). Importing the same file again does the same: the points enter the database, and the later copy is left out of the selections.
 
 ```@example own
 duplicates(db)
@@ -275,3 +286,34 @@ A few things the template accepts and checks:
 
 !!! warning "Not stored yet"
     The note column, the sample data of the `Reference` sheet (purity, supplier...) and the "where in the article" fields are read but **not stored yet**. The import says so with a warning and in `result.ignored`; nothing is lost silently.
+
+## What a reference needs
+
+There are two levels, and they are different questions. The first is what the **package** needs to store a reference: when something here is missing the import refuses and lists the cell, and nothing is added. The second is what **ThermoML** needs to write the same data as a valid ThermoML file: the package stores the data anyway, and the report lists what fails in `thermoml_failures`, so you can fix it now or later. Both apply to the spreadsheet and to the functions (`add_reference!`, `add_experiment!`, `add_measurement!`, `add_reference_data!`).
+
+### Required to add a reference to a database
+
+| Item | Where in the sheet | Rule |
+| :-- | :-- | :-- |
+| Database | `Reference!C5` (or `database = ...`) | A name that starts with a letter or a digit and has letters, digits, `_`, `.`, `-` or a space; it is created if it does not exist; `thermoml` is the archive's. |
+| Kind of data | `Reference!C6` | `Literature` or `User`; it must be the kind of a database that already exists. |
+| Identification of the work | `Reference!C9:C12` | The DOI, or the authors, or the title (at least one). |
+| Year | `Reference!C14` | Required when there is no DOI; a whole number between 1500 and 2200. |
+| Experiments | `EXP-n`, `PTS-n` | At least one experiment with at least one point; each has a name (`EXP-n!C5`) and the property (`C6`). |
+| Components | `EXP-n!C12:E12` | From 1 to 3, filled from the first cell on, each one listed in the compounds of the `Reference` sheet (once) and identified by InChIKey, CAS number or exact name in the compound database. |
+| Composition scale | `EXP-n!C15` | Needed for a mixture: mole fraction, mass fraction, molality or amount concentration; the unit of the amounts has to belong to the scale (mol/kg for a molality, not mol/L). |
+| Value of each point | `PTS-n`, `value` | A finite number, in the unit of its column; a relative uncertainty needs it as a number. |
+| Temperature and pressure | `PTS-n`, `T`, `P` | Optional; if given, ``T > 0`` K and an absolute ``P \ge 0`` (a gauge pressure is refused). |
+| Uncertainties | `PTS-n`, `u(...)` | Optional; if given, a number that is not negative, with its `k` (row 7) as a number greater than zero. |
+
+### Required by ThermoML (reported in `thermoml_failures`)
+
+| Criterion | Rule | Why |
+| :-- | :-- | :-- |
+| Citation | The DOI, or the authors, the title and the year | The ThermoML citation has to identify the work; the file of an article is named by its DOI. |
+| Property | A name in the ThermoML list (as the archive writes it; the sheet `Properties` shows them) | The schema accepts only the names of its list, each with its unit; the package converts the unit. |
+| Phase | One of the ThermoML phases (`Liquid`, `Gas`, `Crystal`, `Glass`, `Solution`, `Ideal gas`...) or empty | The schema enumerates the phases. |
+| Composition of a mixture | In every point, the ``N - 1`` amounts of a system of ``N`` components | Without the composition the state of the mixture is not defined. |
+| Coverage of an uncertainty | A coverage factor ``k`` or a level of confidence with every uncertainty of the value | An expanded uncertainty is meaningless without how it was expanded. |
+
+The package derives the rest when it writes the file, so you do not have to give it: the number of significant digits of every value (counted from the number as written), the free text `method not stated` when the method is empty, the compound numbers of the file, and the units of the schema.

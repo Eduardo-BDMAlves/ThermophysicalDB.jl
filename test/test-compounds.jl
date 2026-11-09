@@ -1513,3 +1513,69 @@ end
         end
     end
 end
+
+@testitem "link_compounds over several databases finds a compound that each one names differently" tags =
+    [:unit] setup = [CompoundFixture] begin
+    using Tables: Tables
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        function dataset(doi, name, inchikey, formula)
+            ds = T.Dataset()
+            mole = T.intern!(ds.kinds, "Mole fraction")
+            source = T.intern!(ds.sources, "fixture")
+            ref = T.add_reference!(ds.references; doi, source)
+            id = T.add_compound!(ds.compounds; inchikey, names = [name], formula)
+            density = T.add_property!(ds.properties, "Mass density", "kg/m3")
+            e = T.add_experiment!(
+                ds.experiments;
+                reference = ref,
+                components = [id],
+                kinds = [mole],
+            )
+            for i = 1:3
+                T.add_measurement!(
+                    ds.measurements;
+                    experiment = e,
+                    property = density,
+                    temperature = 290.0 + i,
+                    pressure = 101.325,
+                    value = 1.0,
+                )
+            end
+            return ds
+        end
+        water = "XLYOFNOQVPJJNP-UHFFFAOYSA-N"
+        a = dataset("10.5555/multi-1", "water", water, "H2O")
+        b = dataset("10.5555/multi-2", "aqua", water, "H2O")
+        c = dataset("10.5555/multi-3", "methane", "VNWKTOKETHGBQD-UHFFFAOYSA-N", "CH4")
+        db = T.Database([
+            T.Member("one"; kind = :thermoml, dataset = a),
+            T.Member("two"; kind = :user, dataset = b),
+            T.Member("three"; kind = :user, dataset = c),
+        ])
+        # a plain name finds the members that use that name only
+        @test length(points(db; component = "aqua")) == 3
+        linked = link_compounds(db, cdb)
+        @test linked isa LinkedDatabase && linked.dataset === db
+        @test length(linked.links) == 3
+        # the synonym, the CAS number and the CID of the compound database reach every member
+        for text in ("oxidane", "7732-18-5", "962", "water", "aqua")
+            view = points(linked; component = text)
+            @test length(view) == 6
+            @test sort!([db.members[i].name for i in view.index]) == ["one", "two"]
+        end
+        @test length(points(linked)) == 9
+        @test length(points(linked; component = "oxidane", source = "fixture")) == 6
+        @test find_compounds(linked, "oxidane").id == find_compounds(db, cdb, "oxidane").id
+        # the table of links has the rows of every member and says which one
+        cols = Tables.columns(linked)
+        @test sort!(unique(cols.database)) == ["one", "three", "two"]
+        @test all(!=(0), cols.record)
+        @test occursin("3 databases", sprint(show, linked))
+        @test_throws ArgumentError prefetch_compounds!(linked; progress = false)
+        # one member still links as before
+        solo = link_compounds(b, cdb)
+        @test solo isa LinkedDatabase && length(points(solo; component = "oxidane")) == 3
+    end
+end

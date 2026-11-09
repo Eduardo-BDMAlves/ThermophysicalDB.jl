@@ -60,6 +60,53 @@ struct TemplateInfo
     generated::String
     databases::Vector{NamedTuple}
     properties::Vector{NamedTuple}
+    lists::NamedTuple
+end
+
+TemplateInfo(version, schema, generated, databases, properties) =
+    TemplateInfo(version, schema, generated, databases, properties, (;))
+
+# Most used first; the menus of the template stay usable.
+const TEMPLATE_LIST_LIMIT = 300
+const TEMPLATE_LIST_KEYS = (:method, :phase, :source, :supplier, :analysis, :purification)
+
+# The values that the databases of this computer already use for the menus of the template (the
+# methods, the phases and, for the samples, the source, the supplier, how the purity was checked
+# and the purification), most used first. A new point is most likely one of them, and using the
+# same text lets it join the points that are already there.
+function template_lists(db::Database)
+    counts = Dict(key => Dict{String,Int}() for key in TEMPLATE_LIST_KEYS)
+    function tally!(key, pool, ids)
+        n = zeros(Int, length(pool))
+        # A column holds one id per row or, for some, a list of ids per row.
+        for entry in ids, id in entry
+            id > 0 && (n[id] += 1)
+        end
+        table = counts[key]
+        for (id, c) in enumerate(n)
+            c == 0 && continue
+            label = strip(pool.strings[id])
+            isempty(label) || (table[label] = get(table, label, 0) + c)
+        end
+    end
+    for m in db.members
+        ds = member_dataset(m)
+        tally!(:method, ds.methods, ds.measurements.method)
+        tally!(:phase, ds.phases, ds.measurements.phase)
+        tally!(:source, ds.origins, ds.samples.origin)
+        tally!(:supplier, ds.suppliers, ds.samples.supplier)
+        tally!(:analysis, ds.analyses, ds.samples.analysis)
+        tally!(:analysis, ds.analyses, ds.purity_steps.analysis)
+        tally!(:purification, ds.purifications, ds.samples.purification)
+        tally!(:purification, ds.purifications, ds.purity_steps.purification)
+    end
+    ordered(table) = first(
+        String[first(p) for p in sort!(collect(table); by = p -> (-last(p), first(p)))],
+        TEMPLATE_LIST_LIMIT,
+    )
+    return NamedTuple{TEMPLATE_LIST_KEYS}(
+        map(key -> ordered(counts[key]), TEMPLATE_LIST_KEYS),
+    )
 end
 
 const TEMPLATE_FORMAT = 1
@@ -138,6 +185,7 @@ function template_info(db::Database)
         string(Dates.today()),
         databases,
         properties,
+        template_lists(db),
     )
 end
 
@@ -735,9 +783,104 @@ function sheet_message(message::AbstractString, where_)
     return string(sheet, ", row ", rows[i], ": ", m[3])
 end
 
-function template_report(args::TemplateArguments, points)
+# The names of phases that the ThermoML schema accepts (`ePhaseName`).
+const THERMOML_PHASES = Set{String}((
+    "Crystal 5",
+    "Crystal 4",
+    "Crystal 3",
+    "Crystal 2",
+    "Crystal 1",
+    "Crystal",
+    "Crystal of unknown type",
+    "Crystal of intercomponent compound 1",
+    "Crystal of intercomponent compound 2",
+    "Crystal of intercomponent compound 3",
+    "Metastable crystal",
+    "Glass",
+    "Smectic liquid crystal",
+    "Smectic liquid crystal 1",
+    "Smectic liquid crystal 2",
+    "Nematic liquid crystal",
+    "Nematic liquid crystal 1",
+    "Nematic liquid crystal 2",
+    "Cholesteric liquid crystal",
+    "Liquid crystal of unknown type",
+    "Liquid",
+    "Liquid mixture 1",
+    "Liquid mixture 2",
+    "Liquid mixture 3",
+    "Solution",
+    "Solution 1",
+    "Solution 2",
+    "Solution 3",
+    "Solution 4",
+    "Fluid (supercritical or subcritical phases)",
+    "Ideal gas",
+    "Gas",
+    "Air at 1 atmosphere",
+))
+
+# The criteria that the data must meet to be written as a valid ThermoML file, beyond what the
+# package needs to store them. Each failure is a text that says what and where.
+function thermoml_failures(args::TemplateArguments, db::Database)
+    failures = String[]
+    r = args.reference
+    if isempty(r.doi) && (isempty(r.authors) || isempty(r.title) || r.year == 0)
+        push!(
+            failures,
+            "Reference: the citation needs the DOI, or the authors, the title and the year",
+        )
+    end
+    known = Set{String}()
+    for m in db.members
+        m.kind === :thermoml || continue
+        for label in member_dataset(m).properties.label
+            push!(known, String(label))
+        end
+    end
+    for (i, e) in enumerate(args.experiments)
+        sheet = args.where_[i][1]
+        (isempty(known) || e.property in known) || push!(
+            failures,
+            "$sheet: the property \"$(e.property)\" is not in the ThermoML list (name it as in the sheet Properties)",
+        )
+        (isempty(e.phase) || e.phase in THERMOML_PHASES) || push!(
+            failures,
+            "$sheet: the phase \"$(e.phase)\" is not a ThermoML phase (for example Liquid, Gas, Crystal, Solution)",
+        )
+        n = length(e.components)
+        if n > 1
+            short = 0
+            for i = 1:length(e.value)
+                given = count(
+                    j -> (v = e[Symbol("x", j)][i]; v isa Real && !isnan(v)),
+                    1:min(n, 3),
+                )
+                given < n - 1 && (short += 1)
+            end
+            short > 0 && push!(
+                failures,
+                "$sheet: $short point(s) of a mixture without the $(n - 1) amount(s) that define its composition",
+            )
+        end
+        if any(u -> u isa Real && isfinite(u), e.unc) &&
+           !any(k -> k isa Real && isfinite(k), e.unc_k) &&
+           !any(l -> l isa Real && isfinite(l), get(e, :unc_level, ()))
+            push!(
+                failures,
+                "$sheet: the uncertainty of the value has no coverage factor or level of confidence",
+            )
+        end
+    end
+    return failures
+end
+
+function template_report(args::TemplateArguments, points, thermoml = String[])
     return (;
         ok = isempty(args.problems),
+        imported = false,
+        thermoml_compatible = isempty(args.problems) && isempty(thermoml),
+        thermoml_failures = thermoml,
         target = args.target,
         reference = args.reference,
         experiments = [
@@ -766,7 +909,7 @@ function problems_error(problems::Vector{String})
 end
 
 """
-    import_template(db, path; database = nothing, check = false, create = true,
+    import_template(db, path; database = nothing, only_check = false, create = true,
                     warn_duplicates = true)
 
 Read a template that you filled in and add its reference, experiments and points to a database of
@@ -777,16 +920,25 @@ follow one another, which is how a work with more compounds than one file holds 
 The database is the one named in the file (`database` overrides it); one that does not exist yet is
 created (`create = false` refuses). Everything is checked before anything is added: all the
 mistakes are listed at once, each with its sheet and cell, and the database stays as it was.
-`check = true` does the same checks and adds nothing, and returns a report (`ok`, `problems`,
-`ignored`, the experiments and the number of points).
+`only_check = true` does the same checks and **adds nothing**, not even the database of the file,
+and returns a report. Both the report and the result of an import have:
 
-Some columns are read but not stored by this version (the uncertainties of the composition,
-temperature and pressure, the data of the samples, the notes); they are listed in `ignored` and in
-a warning. Needs `using XLSX`.
+- `ok` (a report only): there is no problem; `problems` lists them, with their cells;
+- `imported`: whether the points were added (`false` for `only_check = true`);
+- `thermoml_compatible` and `thermoml_failures`: whether the data can be written as a valid ThermoML
+  file, and the criteria that fail when they cannot (a citation that cannot be identified, a property
+  or a phase that is not in the ThermoML lists, a mixture without its composition, an uncertainty
+  without coverage). The package stores the data in either case; see the table of requirements in
+  the tutorial "Adding your own data";
+- `ignored`: what the file holds that this version does not store (the data of the samples, the
+  notes), which is also a warning.
+
+Needs `using XLSX`.
 
 ```julia
-check = import_template(db, "my_article.xlsx"; check = true)
-check.problems
+report = import_template(db, "my_article.xlsx"; only_check = true)
+report.problems
+report.thermoml_failures
 import_template(db, "my_article.xlsx")
 ```
 """
@@ -794,11 +946,12 @@ function import_template(
     db::Database,
     path::Union{AbstractString,AbstractVector{<:AbstractString}};
     database::Union{Nothing,AbstractString} = nothing,
-    check::Bool = false,
+    only_check::Bool = false,
     create::Bool = true,
     warn_duplicates::Bool = true,
     compounds = nothing,
 )
+    check = only_check
     require_template_support()
     paths = path isa AbstractString ? [String(path)] : String.(collect(path))
     isempty(paths) && throw(ArgumentError("give at least one file"))
@@ -849,7 +1002,7 @@ function import_template(
         remove_member!(db, created.name)
     if !isempty(problems)
         cleanup()
-        return finish_problems(args, problems, check)
+        return finish_problems(args, problems, check, thermoml_failures(args, db))
     end
     result = try
         add_reference_data!(
@@ -865,16 +1018,30 @@ function import_template(
         cleanup()
         err isa ArgumentError || rethrow()
         push!(problems, sheet_message(err.msg, args.where_))
-        return finish_problems(args, problems, check)
+        return finish_problems(args, problems, check, thermoml_failures(args, db))
     end
     check && cleanup()
     isempty(args.ignored) ||
         @warn "Some of what the file holds is not stored yet" ignored = args.ignored
-    check && return template_report(args, result.points)
-    return merge(result, (; ignored = args.ignored))
+    failures = thermoml_failures(args, db)
+    check && return template_report(args, result.points, failures)
+    return merge(
+        result,
+        (;
+            imported = true,
+            thermoml_compatible = isempty(failures),
+            thermoml_failures = failures,
+            ignored = args.ignored,
+        ),
+    )
 end
 
-function finish_problems(args::TemplateArguments, problems, check::Bool)
+function finish_problems(
+    args::TemplateArguments,
+    problems,
+    check::Bool,
+    failures = String[],
+)
     check && return template_report(
         TemplateArguments(
             args.target,
@@ -886,6 +1053,7 @@ function finish_problems(args::TemplateArguments, problems, check::Bool)
             args.ignored,
         ),
         0,
+        failures,
     )
     throw(problems_error(problems))
 end

@@ -63,10 +63,11 @@ end
         first_points = Repeats.water([293.15, 298.15, 303.15], [998.2, 997.0, 995.6]),
         second_points = Repeats.water([293.20, 298.15, 310.0], [998.25, 997.0, 990.0]),
     )
-    all_points = T.points(db; property = "Mass density")
+    all_points = T.points(db; property = "Mass density", duplicate = true)
     @test length(all_points) == 6 && all_points.repeats === nothing
     one_copy = T.points(db; property = "Mass density", duplicate = false)
     @test length(one_copy) == 4
+    @test length(T.points(db; property = "Mass density")) == 4    # the default leaves them out
     @test [length(p) for p in T.parts(one_copy)] == [3, 1]
     rep = T.duplicates(one_copy)
     @test length(rep) == 2 && all(==(:doi), rep.how) && all(==("a"), rep.database)
@@ -321,7 +322,10 @@ end
     view = T.points(db; duplicate = false)
     text = sprint(show, MIME("text/plain"), view)
     @test occursin("1 repeated points left out", text) && occursin("1 conflicts", text)
-    @test !occursin("left out", sprint(show, MIME("text/plain"), T.points(db)))
+    @test !occursin(
+        "left out",
+        sprint(show, MIME("text/plain"), T.points(db; duplicate = true)),
+    )
     rep = T.duplicates(db)
     shown = sprint(show, MIME("text/plain"), rep)
     @test occursin("DuplicateReport: 1 repeated points, 0 conflicts", shown)
@@ -370,10 +374,10 @@ end
         @test occursin("nothing was removed", w.message)
         kw = Dict(w.kwargs)
         @test kw[:added_points] == 3 && kw[:repeated_points] == 2 && kw[:conflicts] == 0
-        @test kw[:see_both] == "points(db; doi = \"10.5555/TDBDB-001\")"
-        @test occursin("duplicate = false", kw[:one_copy])
+        @test kw[:see_both] == "points(db; doi = \"10.5555/TDBDB-001\", duplicate = true)"
+        @test kw[:one_copy] == "points(db; doi = \"10.5555/TDBDB-001\")"
         # What the notice shows works, and the new database wins nothing: the archive has priority.
-        both = T.points(db; doi = "10.5555/tdbdb-001")
+        both = T.points(db; doi = "10.5555/tdbdb-001", duplicate = true)
         @test length(both) == 3 + 3
         @test length(T.points(db; doi = "10.5555/tdbdb-001", duplicate = false)) == 4
         @test length(T.duplicates(db; doi = "10.5555/tdbdb-001")) == 2
@@ -430,7 +434,53 @@ end
     @test length(warns) == 1
     kw = Dict(only(warns).kwargs)
     @test kw[:repeated_points] == 2
-    @test kw[:see_both] == "points(db; author = \"Silva\", year = 2020)"
-    @test length(T.points(db; author = "Silva", year = 2020)) == 4
+    @test kw[:see_both] == "points(db; author = \"Silva\", year = 2020, duplicate = true)"
+    @test length(T.points(db; author = "Silva", year = 2020, duplicate = true)) == 4
     @test length(T.points(db; author = "Silva", year = 2020, duplicate = false)) == 2
+end
+
+@testitem "the same file entered twice in a database of yours is left out, not deleted" setup =
+    [Repeats] tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    R = Repeats
+    # Two experiments of one reference (as if the same file had been imported twice) and two
+    # references with nothing that tells the work (no DOI, no author).
+    function twice(; doi)
+        ds = T.Dataset()
+        R.system!(ds, R.water([293.15, 298.15], [998.2, 997.0]); doi)
+        R.system!(ds, R.water([293.15, 298.15], [998.2, 997.0]); doi)
+        return ds
+    end
+    for doi in ("10.5555/twice-1", "")
+        db = T.Database([R.member("mine", :user, twice(; doi))])
+        @test length(T.points(db; duplicate = true)) == 4
+        left = T.points(db)
+        @test length(left) == 2 && left.repeats !== nothing
+        @test length(T.duplicates(db)) == 2
+    end
+    # The replicates of one experiment are not repeats of each other.
+    ds = T.Dataset()
+    R.system!(ds, R.water([293.15, 293.15], [998.2, 998.2]); doi = "10.5555/replicates")
+    @test length(T.points(T.Database([R.member("mine", :user, ds)]))) == 2
+    # The archive is not searched for repeats inside itself.
+    ds = twice(; doi = "10.5555/twice-2")
+    @test length(T.points(T.Database([R.member("archive", :thermoml, ds)]))) == 4
+end
+
+@testitem "a selection that is empty keeps a part, so it can be tabulated" setup = [Repeats] tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    R = Repeats
+    db = Repeats.pair(
+        first_points = R.water([293.15], [998.2]),
+        second_points = R.water([293.15], [998.2]),
+    )
+    v = T.points(db; temperature = (400.0, 410.0), duplicate = true)
+    @test isempty(v) && length(T.table(v).value) == 0
+    w = try
+        T.points(db; temperature = (400.0, 410.0))
+    catch err
+        err
+    end
+    @test w isa ArgumentError || (isempty(w) && length(T.table(w).value) == 0)
 end

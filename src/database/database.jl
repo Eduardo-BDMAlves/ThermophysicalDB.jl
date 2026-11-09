@@ -354,6 +354,22 @@ function select_parts(db::Database, candidates, sources, component, kwargs)
         end
     end
     if isempty(found)
+        # The source exists in a database that the selection leaves out (for example because it
+        # lacks the compound): say that, instead of "unknown source" from a database that never
+        # had it.
+        wanted = get(kwargs, :source, nothing)
+        if wanted !== nothing
+            holders = [
+                db.members[m].name for m in eachindex(db.members) if
+                haskey(member_dataset(db.members[m]).sources.index, wanted)
+            ]
+            isempty(holders) || throw(
+                ArgumentError(
+                    "source \"$wanted\" exists but none of its points matches the selection " *
+                    "(the compound, property or limits are not in it)",
+                ),
+            )
+        end
         failure !== nothing && throw(failure)
         # Every member was left out by the translation of the component: say so with the message
         # of the first one.
@@ -366,15 +382,16 @@ end
     points(db::Database; kwargs...) -> DatabaseView
 
 Select points in every database that can have them, with the keywords of
-[`points`](@ref) over a dataset, and `duplicate`: `true` (the default) keeps every point, `false`
-leaves out the points that another database with a higher priority holds too, and a
-[`DuplicateRules`](@ref) does the same with the tolerances you choose (see [`duplicates`](@ref) for
+[`points`](@ref) over a dataset, and `duplicate`: `false` (the default) leaves out the points
+that another database with a higher priority holds too, and the points that were entered twice in a
+database of yours (the later copy is left out; it stays in the database); `true` keeps every point,
+and a [`DuplicateRules`](@ref) leaves them out with the tolerances you choose (see [`duplicates`](@ref) for
 what a repeated point is, and [`conflicts`](@ref) for the points that disagree, which are never
 left out). A component or property that no database knows is an
 `ArgumentError`; one that some databases lack is not. A component given as the result of
 `find_compounds(db, text)` is translated to the identifiers of each database.
 """
-function points(db::Database; component = nothing, duplicate = true, kwargs...)
+function points(db::Database; component = nothing, duplicate = false, kwargs...)
     isempty(db.members) && throw(ArgumentError("the database has no members"))
     if length(db.members) > 1 &&
        (component isa Integer || component isa AbstractVector{<:Integer})
@@ -400,7 +417,10 @@ function points(db::Database; component = nothing, duplicate = true, kwargs...)
     sources = [member_dataset(db.members[m]) for m in candidates]
     if length(db.members) == 1
         duplicate_rules(duplicate)    # a wrong value is an error whatever the number of databases
-        return DatabaseView(db, [1], [points(sources[1]; component, kwargs...)])
+        return apply_duplicate(
+            DatabaseView(db, [1], [points(sources[1]; component, kwargs...)]),
+            duplicate,
+        )
     end
     return apply_duplicate(
         select_parts(db, candidates, sources, component, kwargs),
@@ -408,7 +428,7 @@ function points(db::Database; component = nothing, duplicate = true, kwargs...)
     )
 end
 
-function points(v::DatabaseView; component = nothing, duplicate = true, kwargs...)
+function points(v::DatabaseView; component = nothing, duplicate = false, kwargs...)
     db = v.database
     return apply_duplicate(select_parts(db, v.index, v.parts, component, kwargs), duplicate)
 end
@@ -422,9 +442,30 @@ several databases is one), with the points that all the databases have of it. Th
 the result are global: use it as `component` of [`points`](@ref).
 """
 function find_compounds(db::Database, text::AbstractString; limit::Int = 10)
+    return joined_matches(ds -> find_compounds(ds, text; limit), db, text, limit)
+end
+
+"""
+    find_compounds(db::Database, compounds::CompoundDB, text; limit = 10) -> CompoundMatches
+
+[`find_compounds`](@ref) over every database that also understands what the compound database
+knows (a CAS number, a synonym, an InChI...): the result has global identifiers, to use as
+`component` of [`points`](@ref).
+"""
+function find_compounds(
+    db::Database,
+    compounds::CompoundDB,
+    text::AbstractString;
+    limit::Int = 10,
+)
+    return joined_matches(ds -> find_compounds(ds, compounds, text; limit), db, text, limit)
+end
+
+# The matches of `finder` in every member, joined by the compounds the registry says are the same.
+function joined_matches(finder, db::Database, text::AbstractString, limit::Int)
     reg = db.registry
     if length(db.members) == 1
-        return find_compounds(member_dataset(db.members[1]), text; limit)
+        return finder(member_dataset(db.members[1]))
     end
     order = Int32[]
     name = Dict{Int32,String}()
@@ -434,7 +475,7 @@ function find_compounds(db::Database, text::AbstractString; limit::Int = 10)
     how = Dict{Int32,Symbol}()
     for (m, member) in enumerate(db.members)
         found = try
-            find_compounds(member_dataset(member), text; limit)
+            finder(member_dataset(member))
         catch err
             err isa ArgumentError || rethrow()
             continue
@@ -512,12 +553,27 @@ for f in (
     :sample_table,
     :purity_step_table,
     :set_uncertainty!,
-    :link_compounds,
     :prefetch_compounds!,
     :bibtex,
     :find_outliers,
 )
     @eval $f(db::Database, args...; kwargs...) = $f(sole_dataset(db), args...; kwargs...)
+end
+
+"""
+    link_compounds(db::Database, compounds::CompoundDB; by_name = true) -> LinkedDatabase
+
+[`link_compounds`](@ref) over every database at once: each member is linked to the compound
+database, and the result searches all of them (`points(linked; component = "oxidane")` finds the
+compound in every database that has it, whatever name that database uses). `linked.links` has one
+table for each member, in the order of `members(db)`; as a Tables.jl table it is the rows of all of
+them with the column `database`. The databases are not modified.
+"""
+function link_compounds(db::Database, compounds::CompoundDB; by_name::Bool = true)
+    links = CompoundLinks[
+        compound_links(member_dataset(m), compounds; by_name) for m in db.members
+    ]
+    return LinkedDatabase(db, compounds, links, Dict{String,CompoundMatches}())
 end
 
 for f in (

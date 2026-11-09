@@ -127,12 +127,12 @@ using ThermophysicalDB, XLSX
 db = database()
 export_template(db, "my_article.xlsx"; experiments = 3)      # a guide, the reference and the compounds, 3 pairs of sheets
 # ... fill in the light blue cells in Excel or LibreOffice, save ...
-report = import_template(db, "my_article.xlsx"; check = true) # the same checks, nothing is added
+report = import_template(db, "my_article.xlsx"; only_check = true) # the same checks, nothing is added
 report.problems                                              # every mistake, with its sheet and cell
 import_template(db, "my_article.xlsx")                        # add the data to the database named in the file
 ```
 
-The workbook has a **Guide**, a **Reference** sheet (the DOI, the authors, and a list of up to 25 compounds with their samples) and, for each experiment, an **EXP-n** sheet (what was measured, the components, the method) and a **PTS-n** sheet (the points: composition, temperature, pressure, value, each with its unit, and the uncertainty). The menus are filled from your databases, so a property you type is the one that already exists. The cells that you do not fill in are not given: nothing is guessed.
+The workbook has a **Guide**, a **Reference** sheet (the DOI, the authors, and a list of up to 25 compounds with their samples) and, for each experiment, an **EXP-n** sheet (what was measured, the components, the method) and a **PTS-n** sheet (the points: composition, temperature, pressure, value, each with its unit, and the uncertainty). The menus (property, method, phase, source, supplier, purity analysis and purification) are filled, when the template is generated, with what your databases already hold, most used first and followed by generic choices, so what you pick is the text that already exists. The cells that you do not fill in are not given: nothing is guessed.
 
 - **Units.** Each column has its unit cell (`degC`, `bar`, `g/cm3`, `%`...): the import converts as [`add_reference_data!`](@ref) does, to the units of the databases. The uncertainty of the value is absolute or relative (`%`), and has its coverage factor `k`.
 - **More experiments.** The number of pairs is chosen when the file is written. [`add_template_experiments!`](@ref) adds more to a file that you have started; what you typed stays where it is. Copying the sheets by hand does not work, because each pair has its own names.
@@ -145,11 +145,11 @@ The workbook has a **Guide**, a **Reference** sheet (the DOI, the authors, and a
 
 ## Repeated points
 
-The same measurement can be in two databases: the archive and the points you copied from the same article, for example. They are kept in both (so you can open just one), and `duplicate` decides what a selection over several databases shows:
+The same measurement can be in two databases: the archive and the points you copied from the same article, for example. They are kept in both (so you can open just one), and `duplicate` decides what a selection shows. **By default the repeated points are left out of the selection** (they stay in the databases); `duplicate = true` shows every point:
 
 ```julia
-points(db; doi = "10.1000/example")                      # every point of every database
-points(db; doi = "10.1000/example", duplicate = false)   # one copy of each, from the database with the highest priority
+points(db; doi = "10.1000/example")                      # one copy of each, from the database with the highest priority
+points(db; doi = "10.1000/example", duplicate = true)    # every point of every database
 duplicates(db; doi = "10.1000/example")                  # the pairs that are the same point
 conflicts(db; doi = "10.1000/example")                   # the pairs that disagree
 ```
@@ -160,11 +160,11 @@ Two points are the same point when they come from the same work and agree:
 2. **Same system and property**, a temperature within 0.1 K and a value within 0.1 %.
 3. **Pressure** within 0.01 bar (1 kPa) and the **amount of each component** within 0.1 %, in the scale the points were given in. A pressure or an amount that one of the points does not have is not compared: if the temperature and the value agree, they are the same point. When the amounts are in different scales they are not compared and both points are kept.
 
-A point without a temperature is never compared. Points of one database are never repeats of each other (a database may measure the same state twice), and no database is changed. The tolerances are those of [`DuplicateRules`](@ref): `points(db; duplicate = DuplicateRules(temperature = 0.05, value = 5e-4))`. They can be written with units, which are converted when the rules are made: `DuplicateRules(temperature = "0.1 degC", pressure = "0.01 bar", value = "0.1 %")` (a plain number is in K, in kPa, or a fraction).
+A point without a temperature is never compared. The points of one experiment are never repeats of each other (replicates are real data). The same work entered twice in a database of yours, for example the same spreadsheet imported again, is a repeat: the points of the experiment that was added later are the ones left out, and they stay in the database. A reference without DOI and authors counts as the same work when every field of it is the same. The archive is not searched for repeats inside itself. No database is changed. The tolerances are those of [`DuplicateRules`](@ref): `points(db; duplicate = DuplicateRules(temperature = 0.05, value = 5e-4))`. They can be written with units, which are converted when the rules are made: `DuplicateRules(temperature = "0.1 degC", pressure = "0.01 bar", value = "0.1 %")` (a plain number is in K, in kPa, or a fraction).
 
-When the same work, with the same conditions (exactly the same temperature, pressure and amounts), has a different value in two databases, the pair is a *conflict*: `duplicate = false` never chooses between them, both points stay, and [`conflicts`](@ref) lists them for you to decide. A selection made with `duplicate = false` says how many points it left out and how many conflicts there are, and `duplicates(view)` is the report of that selection.
+When the same work, with the same conditions (exactly the same temperature, pressure and amounts), has a different value in two databases, the pair is a *conflict*: the default never chooses between them, both points stay, and [`conflicts`](@ref) lists them for you to decide. A selection that left points out says how many points it left out and how many conflicts there are, and `duplicates(view)` is the report of that selection.
 
-[`add_reference_data!`](@ref) warns, after adding the data of an article, when the same work is already in another database: where, how many of the new points repeat points that are there, and the calls that show both (`points(db; doi = ...)`), one copy (`duplicate = false`) and the pairs. Nothing is removed. `warn_duplicates = false` silences it.
+[`add_reference_data!`](@ref) warns, after adding the data of an article, when the same work is already in another database: where, how many of the new points repeat points that are there, and the calls that show both (`points(db; doi = ...)`), the pairs. It also warns when the new points repeat points that were already in the same database. Nothing is removed: a selection leaves the repeated points out unless `duplicate = true`. `warn_duplicates = false` silences it.
 
 ## Checking and updating by hand
 

@@ -17,8 +17,8 @@ converted here, once, and the rules keep plain numbers: `DuplicateRules(temperat
 pressure = "0.01 bar", value = "0.1 %")`. A temperature tolerance is a difference, so `"0.1 degF"`
 is 0.0556 K, not a temperature.
 
-They are given to [`points`](@ref) as `duplicate = DuplicateRules(...)`; `duplicate = false` uses the
-defaults. A point is the same as another only when it is of the same work (see [`duplicates`](@ref)).
+They are given to [`points`](@ref) as `duplicate = DuplicateRules(...)`; `duplicate = false` (the default)
+uses the defaults. A point is the same as another only when it is of the same work (see [`duplicates`](@ref)).
 """
 struct DuplicateRules
     temperature::Float64

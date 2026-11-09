@@ -64,6 +64,7 @@
         k_factor = 2,
         input_type = "absolute",
         input_k = 2,
+        phase = missing,
         first_row = 8,
     )
         units = Any[
@@ -96,7 +97,7 @@
             k,
             name,
             property,
-            missing,
+            phase,
             missing,
             missing,
             Any[components..., (missing for _ = (length(components)+1):3)...],
@@ -197,6 +198,8 @@ end
         # The lists of this computer are in the file.
         info = T.read_template_info(path)
         @test [d.name for d in info.databases] == ["thermoml", "my_lab"]
+        # The menus start with what the databases already use, then the generic choices.
+        @test "Other" in info.lists.method && allunique(lowercase.(info.lists.method))
         # Fill, then add experiments: nothing that was typed is lost.
         e = F.experiment(
             1,
@@ -250,7 +253,7 @@ end
             pressure_unit = "bar",
         )
         path = F.write(dir, "ok.xlsx", F.data(experiments = [e]))
-        report = T.import_template(db, path; check = true, compounds = F.cdb())
+        report = T.import_template(db, path; only_check = true, compounds = F.cdb())
         @test report.ok && report.points == 3 && isempty(report.problems)
         @test length(T.member_dataset(db, "my_lab").measurements) == 0
         result = T.import_template(db, path; warn_duplicates = false, compounds = F.cdb())
@@ -296,7 +299,7 @@ end
             composition_unit = "fraction",
         )
         path = F.write(dir, "bad.xlsx", F.data(year = "nineteen", experiments = [e1, e2]))
-        report = T.import_template(db, path; check = true, compounds = F.cdb())
+        report = T.import_template(db, path; only_check = true, compounds = F.cdb())
         @test !report.ok
         text = join(report.problems, "\n")
         @test contains(text, "Reference!C14") && contains(text, "EXP-1!C12")
@@ -313,7 +316,7 @@ end
         # A mistake that only the package can see (a unit of another quantity) names the sheet row.
         bad_unit = F.experiment(1, [good]; unit = "bar")
         path2 = F.write(dir, "unit.xlsx", F.data(experiments = [bad_unit]))
-        r2 = T.import_template(db, path2; check = true, compounds = F.cdb())
+        r2 = T.import_template(db, path2; only_check = true, compounds = F.cdb())
         @test !r2.ok && any(contains("PTS-1, row 8"), r2.problems)
     end
 end
@@ -327,10 +330,16 @@ end
         db = F.database(dir)
         e = F.experiment(1, [(T = 293.15, value = 998.2)])
         path = F.write(dir, "new.xlsx", F.data(target = "fresh_lab", experiments = [e]))
-        r = T.import_template(db, path; create = false, check = true, compounds = F.cdb())
+        r = T.import_template(
+            db,
+            path;
+            create = false,
+            only_check = true,
+            compounds = F.cdb(),
+        )
         @test !r.ok && any(contains("fresh_lab"), r.problems)
         # A check does not leave the database behind.
-        @test T.import_template(db, path; check = true, compounds = F.cdb()).ok
+        @test T.import_template(db, path; only_check = true, compounds = F.cdb()).ok
         @test !any(m -> m.name == "fresh_lab", T.members(db))
         T.import_template(db, path; warn_duplicates = false, compounds = F.cdb())
         @test any(m -> m.name == "fresh_lab", T.members(db))
@@ -346,7 +355,7 @@ end
                 experiments = [e],
             ),
         )
-        @test !T.import_template(db, other; check = true, compounds = F.cdb()).ok
+        @test !T.import_template(db, other; only_check = true, compounds = F.cdb()).ok
     end
 end
 
@@ -464,11 +473,11 @@ end
             "inputs.xlsx",
             F.data(experiments = [absolute, relative, fahrenheit]),
         )
-        report = T.import_template(db, path; check = true, compounds = F.cdb())
+        report = T.import_template(db, path; only_check = true, compounds = F.cdb())
         @test report.ok
         @test !any(contains("u(T)"), report.ignored)
         T.import_template(db, path; warn_duplicates = false, compounds = F.cdb())
-        part = only(T.parts(T.points(db; source = "my_lab")))
+        part = only(T.parts(T.points(db; source = "my_lab", duplicate = true)))
         u = T.uncertainty_table(part)
         function expanded(row, quantity)
             i = findfirst(
@@ -502,7 +511,7 @@ end
         @test any(contains("PTS-1!I7"), args.problems)
         e = F.experiment(1, [(T = 293.15, uT = -0.05, value = 998.2)])
         path = F.write(dir, "neg.xlsx", F.data(experiments = [e]))
-        report = T.import_template(db, path; check = true, compounds = F.cdb())
+        report = T.import_template(db, path; only_check = true, compounds = F.cdb())
         @test any(contains("PTS-1!I8"), report.problems)
     end
 end
@@ -621,4 +630,131 @@ end
         @test "exp$(k)_$key" in defined
     end
     @test "pts3_table" in defined && "template_format" in defined && "ref_doi" in defined
+end
+
+@testitem "only_check adds nothing and the report says whether the data are ThermoML compatible" setup =
+    [TwoDatabases, OwnData, TemplateFixtures] tags = [:unit, :fast] begin
+    using XLSX
+    T = ThermophysicalDB
+    F = TemplateFixtures
+    mktempdir() do dir
+        db = F.database(dir)
+        e = F.experiment(1, [(T = 293.15, value = 998.2)]; phase = "Liquid")
+        path = F.write(dir, "good.xlsx", F.data(experiments = [e]))
+        report = T.import_template(db, path; only_check = true, compounds = F.cdb())
+        @test report.ok
+        @test !report.imported
+        @test report.thermoml_compatible
+        @test isempty(report.thermoml_failures)
+        @test sum(m.name == "my_lab" ? T.member_points(m) : 0 for m in db.members) == 0   # nothing was added
+        result = T.import_template(db, path; compounds = F.cdb(), warn_duplicates = false)
+        @test result.imported
+        @test result.thermoml_compatible
+
+        # a phase that ThermoML does not have, a citation that cannot be identified, a mixture
+        # without its composition and an unknown property: all listed, the data are still storable
+        bad = F.experiment(
+            1,
+            [(T = 293.15, value = 998.2)];
+            phase = "Not specified",
+            property = "Mass density",
+        )
+        td = F.data(experiments = [bad], doi = "", authors = Any[missing for _ = 1:8])
+        path = F.write(dir, "bad.xlsx", td)
+        report = T.import_template(db, path; only_check = true, compounds = F.cdb())
+        @test !report.thermoml_compatible
+        @test any(contains("citation"), report.thermoml_failures)
+        @test any(contains("phase"), report.thermoml_failures)
+    end
+end
+
+@testitem "the menus of the template start with what the databases already use" setup =
+    [TwoDatabases, OwnData, TemplateFixtures] tags = [:unit, :fast] begin
+    using XLSX
+    T = ThermophysicalDB
+    F = TemplateFixtures
+    mktempdir() do dir
+        db = F.database(dir)
+        ref = T.add_reference!(
+            db;
+            database = "my_lab",
+            title = "t",
+            year = 2026,
+            authors = ["A"],
+        )
+        e = T.add_experiment!(ref; components = ["water"], compounds = F.cdb())
+        for (method, n) in (("Invented rheometer", 3), ("Pycnometer", 1))
+            for i = 1:n
+                T.add_measurement!(
+                    e;
+                    property = "Mass density",
+                    unit = "kg/m3",
+                    value = 990.0 + i,
+                    temperature = 290.0 + i + 10n,
+                    pressure = 101.325,
+                    method,
+                    phase = "Liquid",
+                )
+            end
+        end
+        used = T.template_info(db).lists
+        @test used.method[1] == "Invented rheometer"
+        @test "Pycnometer" in used.method && "Liquid" in used.phase
+        path = T.export_template(db, joinpath(dir, "menus.xlsx"); experiments = 1)
+        info = T.read_template_info(path)
+        @test info.lists.method[1:length(used.method)] == used.method
+        @test "Other" in info.lists.method && allunique(lowercase.(info.lists.method))
+        @test count(==("Pycnometer"), info.lists.method) == 1
+        # A file without a database keeps the menus when experiments are added.
+        @test T.add_template_experiments!(path; count = 1) == 2
+        @test T.read_template_info(path).lists.method == info.lists.method
+    end
+end
+
+@testitem "the menus count samples whose analyses and purifications are lists" setup =
+    [Fixtures, ThermoMLFixture, SampleData] tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    db = T.Database([T.Member("samples"; kind = :thermoml, dataset = SampleData.build())])
+    used = T.template_info(db).lists
+    @test "Commercial source" in used.source
+    @test "Gas chromatography" in used.analysis && "Stated by supplier" in used.analysis
+    @test "Fractional distillation" in used.purification
+end
+
+@testitem "a source without a match says so instead of calling itself unknown" setup =
+    [TwoDatabases, OwnData, TemplateFixtures] tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    F = TemplateFixtures
+    mktempdir() do dir
+        db = F.database(dir)
+        ref = T.add_reference!(
+            db;
+            database = "my_lab",
+            title = "t",
+            year = 2026,
+            authors = ["A"],
+        )
+        e = T.add_experiment!(ref; components = ["water"], compounds = F.cdb())
+        T.add_measurement!(
+            e;
+            property = "Mass density",
+            unit = "kg/m3",
+            value = 998.0,
+            temperature = 293.15,
+            pressure = 101.325,
+        )
+        @test length(T.points(db; source = "my_lab")) == 1
+        err = try
+            T.points(db; component = "ethanol", source = "my_lab")
+        catch e
+            e
+        end
+        @test err isa ArgumentError && contains(err.msg, "exists but none")
+        err = try
+            T.points(db; source = "nowhere")
+        catch e
+            e
+        end
+        @test err isa ArgumentError && contains(err.msg, "unknown source")
+    end
 end

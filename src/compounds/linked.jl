@@ -53,26 +53,53 @@ written. The answers given are kept in `choices` and used again for the same tex
 [`forget_choices!`](@ref) to clear them. The candidates are ordered by number of points and
 then by name, so a number means the same thing every time on the same data.
 """
-struct LinkedDatabase
-    dataset::Dataset
+struct LinkedDatabase{D,L}
+    dataset::D
     compounds::CompoundDB
-    links::CompoundLinks
+    links::L
     choices::Dict{String,CompoundMatches}
 end
 
-Tables.istable(::Type{LinkedDatabase}) = true
-Tables.columnaccess(::Type{LinkedDatabase}) = true
-Tables.columns(l::LinkedDatabase) = Tables.columns(l.links)
-Tables.schema(l::LinkedDatabase) = Tables.schema(l.links)
+# A `LinkedDatabase` over a `Database` (see `link_compounds(db::Database, ...)`) has one table of
+# links for each member.
+const LinkedMembers = LinkedDatabase{D,Vector{CompoundLinks}} where {D}
+
+# The table of links as Tables.jl sees it: the table itself, or the rows of every member with the
+# column `database`.
+function links_table(l::LinkedDatabase)
+    l.links isa CompoundLinks && return Tables.columns(l.links)
+    cols = [Tables.columns(x) for x in l.links]
+    names = keys(first(cols))
+    merged = NamedTuple{names}(map(k -> reduce(vcat, (c[k] for c in cols)), names))
+    database = reduce(
+        vcat,
+        [fill(m.name, length(x)) for (m, x) in zip(l.dataset.members, l.links)],
+    )
+    return merge(merged, (; database))
+end
+
+Tables.istable(::Type{<:LinkedDatabase}) = true
+Tables.columnaccess(::Type{<:LinkedDatabase}) = true
+Tables.columns(l::LinkedDatabase) = links_table(l)
+Tables.schema(l::LinkedDatabase) = Tables.schema(links_table(l))
 
 function Base.show(io::IO, l::LinkedDatabase)
-    n = length(l.dataset.compounds)
-    linked = length(unique(l.links.compound[l.links.record .!= 0]))
+    if l.links isa CompoundLinks
+        n = length(l.dataset.compounds)
+        linked = length(unique(l.links.compound[l.links.record .!= 0]))
+        where_ = "compounds of the dataset"
+    else
+        n = sum(x -> length(unique(x.compound)), l.links)
+        linked = sum(x -> length(unique(x.compound[x.record .!= 0])), l.links)
+        where_ = "compounds of $(length(l.links)) databases"
+    end
     return print(
         io,
         "LinkedDatabase: ",
         n,
-        " compounds of the dataset, ",
+        " ",
+        where_,
+        ", ",
         linked,
         " found in the compound database (",
         length(l.compounds),
@@ -86,7 +113,7 @@ end
 Join the ThermoML dataset `ds` with the compound database `db` (see
 [`LinkedDatabase`](@ref) for what the result can do). Every compound of the dataset is matched
 with the database: the InChIKey is tried first, then the InChI, then the names (with the
-usual spelling variants). The table of links is `linked.links`, with one row for each
+usual spelling variants). Given a `Database` with several members instead of a dataset, every member is linked and the result searches all of them (the table of links then has one table for each member). The table of links is `linked.links`, with one row for each
 candidate of each compound. A compound found only by name is marked `via = :name`, because a
 name can describe more than one species: trust such a link only when `formula_check` and
 `inchi_check` are `:same`, and treat `:stereo` (the same skeleton with other stereochemistry
@@ -124,6 +151,12 @@ end
 
 prefetch_compounds!(l::LinkedDatabase; kwargs...) =
     prefetch_compounds!(l.dataset, l.compounds; kwargs...)
+prefetch_compounds!(l::LinkedMembers; kwargs...) = throw(
+    ArgumentError(
+        "prefetch_compounds! works on one database; use it on `member_dataset(db, name)` and " *
+        "link again",
+    ),
+)
 
 find_compounds(l::LinkedDatabase, text::AbstractString; limit::Int = 10) =
     find_compounds(l.dataset, l.compounds, text; limit)
@@ -196,7 +229,7 @@ function candidate_compounds(
     if isempty(found)
         records = lookup_compounds(l.compounds, text; limit = 1)
         known = !isempty(records) && records.match[1] ∉ (:contains, :similar)
-        known || resolve_group(l.dataset, text)    # throws with the usual spelling hints
+        known || no_such_compound(l.dataset, text)    # throws with the usual spelling hints
         throw(
             ArgumentError(
                 "\"$text\" is in the compound database (as \"$(records.name[1])\") but no " *
@@ -210,11 +243,30 @@ function candidate_compounds(
     return subset(found, idx)
 end
 
-# First link of a compound of the dataset to the compound database, or `nothing`.
-function first_link(l::LinkedDatabase, id::Integer)
-    c = l.links.compound
+no_such_compound(ds::Dataset, text) = resolve_group(ds, text)
+no_such_compound(::Any, text) =
+    throw(ArgumentError("no compound matches \"$text\" in any database"))
+
+# First link of a compound of the dataset to the compound database, as the table of links that
+# has it and the row, or `nothing`. The identifier of a `Database` is global: the first member
+# that has the compound answers.
+function first_link(links::CompoundLinks, id::Integer)
+    c = links.compound
     i = searchsortedfirst(c, Int32(id))
-    return i <= length(c) && c[i] == id && l.links.record[i] != 0 ? i : nothing
+    return i <= length(c) && c[i] == id && links.record[i] != 0 ? (links, i) : nothing
+end
+first_link(l::LinkedDatabase{<:Dataset}, id::Integer) = first_link(l.links, id)
+
+# The names that the dataset (or the first member that has it) gives to a compound.
+function member_view(l::LinkedDatabase, id::Integer)
+    l.links isa CompoundLinks && return (l.dataset, l.links, Int32(id))
+    for (m, member) in enumerate(l.dataset.members)
+        map = l.dataset.registry.compound[m]
+        local_id = findfirst(==(Int32(id)), map)
+        local_id === nothing && continue
+        return (member_dataset(member), l.links[m], Int32(local_id))
+    end
+    return nothing
 end
 
 function describe_candidates(l::LinkedDatabase, found::CompoundMatches)
@@ -223,17 +275,18 @@ function describe_candidates(l::LinkedDatabase, found::CompoundMatches)
         parts = String[found.name[n]]
         isempty(found.formula[n]) || push!(parts, found.formula[n])
         isempty(found.inchikey[n]) || push!(parts, found.inchikey[n])
-        i = first_link(l, id)
-        if i !== nothing
-            isempty(l.links.record_cas[i]) || push!(parts, "CAS " * l.links.record_cas[i])
-            if l.links.via[i] == :name && (
-                l.links.formula_check[i] == :different ||
-                l.links.inchi_check[i] == :different
-            )
-                push!(parts, "name link to \"$(l.links.record_name[i])\" disagrees")
+        view = member_view(l, id)
+        ds, links, local_id = view === nothing ? (nothing, nothing, Int32(0)) : view
+        hit = links === nothing ? nothing : first_link(links, local_id)
+        if hit !== nothing
+            links, i = hit
+            isempty(links.record_cas[i]) || push!(parts, "CAS " * links.record_cas[i])
+            if links.via[i] == :name &&
+               (links.formula_check[i] == :different || links.inchi_check[i] == :different)
+                push!(parts, "name link to \"$(links.record_name[i])\" disagrees")
             end
         end
-        names = l.dataset.compounds.names[id]
+        names = ds === nothing ? String[] : ds.compounds.names[local_id]
         others = [x for x in names if x != found.name[n]]
         isempty(others) || push!(parts, "also " * join(first(others, 3), ", "))
         push!(parts, "$(found.points[n]) points")

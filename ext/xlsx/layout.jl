@@ -53,6 +53,7 @@ const LIST_VALUES = (
         "Not known",
         "Other",
     ],
+    supplier = String[],
     purification = [
         "None used",
         "Fractional distillation",
@@ -74,9 +75,10 @@ const LIST_VALUES = (
         "Liquid",
         "Gas",
         "Crystal",
-        "Fluid (supercritical)",
-        "Liquid + gas (saturation)",
-        "Not specified",
+        "Glass",
+        "Solution",
+        "Ideal gas",
+        "Fluid (supercritical or subcritical phases)",
     ],
     method = [
         "Vibrating-tube densimeter",
@@ -300,11 +302,25 @@ end
 # The sheets
 # ---------------------------------------------------------------------------------------------
 
-function lists_sheet!(p::Painter)
+# What the databases already use first, then the generic choices that they do not have yet.
+function merged_list(key::Symbol, info::TemplateInfo)
+    used = haskey(info.lists, key) ? String.(info.lists[key]) : String[]
+    seen = Set(lowercase.(used))
+    out = copy(used)
+    for v in LIST_VALUES[key]
+        lowercase(v) in seen && continue
+        push!(out, v)
+        push!(seen, lowercase(v))
+    end
+    return out
+end
+
+function lists_sheet!(p::Painter, info::TemplateInfo)
     sh = add_sheet!(p.book, "Lists"; tab = MUTE)
     sh.hidden = true
     bold = sid(p; bold = true)
-    for (j, (key, values)) in enumerate(pairs(LIST_VALUES))
+    for (j, key) in enumerate(keys(LIST_VALUES))
+        values = merged_list(key, info)
         setcell!(sh, 1, j, String(key), bold)
         sh.widths[j] = 28
         for (i, v) in enumerate(values)
@@ -313,7 +329,7 @@ function lists_sheet!(p::Painter)
         define_name!(
             p.book,
             "list_$key",
-            "Lists!\$$(column_letters(j))\$2:\$$(column_letters(j))\$$(length(values) + 1)",
+            "Lists!\$$(column_letters(j))\$2:\$$(column_letters(j))\$$(max(length(values), 1) + 1)",
         )
     end
     return sh
@@ -778,6 +794,13 @@ function reference_sheet!(p::Painter, experiments::Int)
         "Used to identify the compound when the InChIKey is unknown.",
     )
     hint!(sh, span("D"), "InChIKey", "The identity of the compound when you have it.")
+    list_check!(
+        sh,
+        span("E"),
+        "list_supplier";
+        strict = false,
+        hint = "Pick a supplier that the databases already have, or write yours.",
+    )
     list_check!(sh, span("F"), "list_source")
     list_check!(sh, span("H"), "list_basis")
     list_check!(sh, span("K"), "list_analysis")
@@ -883,7 +906,7 @@ function experiment_sheets!(p::Painter, k::Int)
     )
     label!(p, e, 7, 2, "Phase")
     input!(p, e, 7, 3, 5)
-    list_check!(e, "C7", "list_phase")
+    list_check!(e, "C7", "list_phase"; hint = "The phases that the databases already use.")
     label!(p, e, 8, 2, "Measurement method")
     input!(p, e, 8, 3, 5)
     list_check!(e, "C8", "list_method"; strict = false, hint = "Pick or type your own.")
@@ -915,17 +938,17 @@ function experiment_sheets!(p::Painter, k::Int)
     section!(p, e, 17, 2, 5, "Coverage of the data (calculated from the points)")
     pts = "'PTS-$k'"
     rg(col) = "$(pts)!\$$col\$$POINTS_FIRST:\$$col\$$POINTS_LAST"
-    function range_text(col, unit_cell, fmt)
+    function range_text(col, unit_cell, digits)
         return formula(
-            "IF(COUNT($(rg(col)))=0,\"\",TEXT(MIN($(rg(col))),\"$fmt\")&\" to \"&TEXT(MAX($(rg(col))),\"$fmt\")&IF($(pts)!\$$unit_cell=\"\",\"\",\" \"&$(pts)!\$$unit_cell))",
+            "IF(COUNT($(rg(col)))=0,\"\",ROUND(MIN($(rg(col))),$digits)&\" to \"&ROUND(MAX($(rg(col))),$digits)&IF($(pts)!\$$unit_cell=\"\",\"\",\" \"&$(pts)!\$$unit_cell))",
         )
     end
     label!(p, e, 18, 2, "Temperature range")
-    calc!(p, e, 18, 3, 5, range_text("H", "H\$5", "0.##"))
+    calc!(p, e, 18, 3, 5, range_text("H", "H\$5", 6))
     label!(p, e, 19, 2, "Pressure range")
-    calc!(p, e, 19, 3, 5, range_text("J", "J\$5", "0.##"))
+    calc!(p, e, 19, 3, 5, range_text("J", "J\$5", 6))
     label!(p, e, 20, 2, "Value range")
-    calc!(p, e, 20, 3, 5, range_text("L", "L\$5", "0.####"))
+    calc!(p, e, 20, 3, 5, range_text("L", "L\$5", 6))
     label!(p, e, 21, 2, "Number of points")
     calc!(p, e, 21, 3, 3, formula("COUNT($(rg("A")))"); numfmt = "0")
     label!(p, e, 22, 2, "Status")
@@ -1079,7 +1102,7 @@ function points_sheet!(p::Painter, k::Int)
             )
             input!(p, q, 6, j; value = "absolute", halign = :center)
             list_check!(q, "$(letter)6", "list_unctype")
-            input!(p, q, 7, j; value = 2, halign = :center, numfmt = "0.##")
+            input!(p, q, 7, j; value = 2, halign = :center)
         end
     end
     hint!(
@@ -1169,6 +1192,6 @@ function build_template(experiments::Int, info::TemplateInfo, logo::Vector{UInt8
         experiment_sheets!(p, k)
     end
     properties_sheet!(p, info)
-    lists_sheet!(p)
+    lists_sheet!(p, info)
     return book
 end

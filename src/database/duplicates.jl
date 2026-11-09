@@ -56,6 +56,7 @@ end
 
 struct Point
     part::Int32                    # the position of its database in the selection (priority order)
+    experiment::Int32              # the points of one experiment are never repeats of each other
     row::Int32
     comp::NTuple{3,Int32}          # global compounds, in ascending order, 0 when absent
     prop::Int32                    # global property
@@ -203,8 +204,11 @@ function find_repeats(
     np = length(parts)
     removed = [Set{Int32}() for _ = 1:np]
     report = DuplicateReport(rules)
-    np < 2 && return (report, removed)
     reg = db.registry
+    # The archive is curated and never holds the same work twice; the databases of the user can
+    # (the same file imported again), so their experiments are also compared with each other.
+    inside = [db.members[i].kind !== :thermoml for i in index]
+    (np < 2 && !any(inside)) && return (report, removed)
 
     # The references that the selected points belong to, with what tells them apart.
     entries = Tuple{Int,Int32,WorkKey}[]    # (part, reference, key)
@@ -234,18 +238,38 @@ function find_repeats(
         end
     end
     for list in values(by_doi), a = 1:length(list), b = (a+1):length(list)
-        entries[list[a]][1] != entries[list[b]][1] && union!(parent, list[a], list[b])
+        p, q = entries[list[a]][1], entries[list[b]][1]
+        (p != q || inside[p]) && union!(parent, list[a], list[b])
     end
     for list in values(by_author), a = 1:length(list), b = (a+1):length(list)
         i, j = list[a], list[b]
-        entries[i][1] == entries[j][1] && continue
+        entries[i][1] == entries[j][1] && !inside[entries[i][1]] && continue
         same_work(entries[i][3], entries[j][3]) && union!(parent, i, j)
+    end
+    # A reference entered twice with nothing that tells the work (no DOI, no author) is the same
+    # one when every field is the same.
+    by_record = Dict{Tuple{Int,Tuple},Int}()
+    for (i, (p, ref, _)) in enumerate(entries)
+        inside[p] || continue
+        rf = view_references(parts[p])
+        record = (
+            lowercase(strip(rf.doi[ref])),
+            normalize_name(rf.title[ref]),
+            normalize_name(rf.journal[ref]),
+            Int(rf.year[ref]),
+            strip(rf.volume[ref]),
+            strip(rf.pages[ref]),
+            [normalize_name(a) for a in rf.authors[ref]],
+        )
+        first_one = get!(by_record, (p, record), i)
+        first_one == i || union!(parent, first_one, i)
     end
     group_parts = Dict{Int,Set{Int}}()
     for (i, (p, _, _)) in enumerate(entries)
         push!(get!(Set{Int}, group_parts, find_root!(parent, i)), p)
     end
-    shared = Set(root for (root, ps) in group_parts if length(ps) > 1)
+    shared =
+        Set(root for (root, ps) in group_parts if length(ps) > 1 || any(p -> inside[p], ps))
     isempty(shared) && return (report, removed)
     group_id = Dict(root => g for (g, root) in enumerate(sort!(collect(shared))))
     ngroups = length(group_id)
@@ -287,6 +311,7 @@ function find_repeats(
                 groups[g],
                 Point(
                     p,
+                    e,
                     r,
                     info.comp,
                     reg.property[mi][Int(m.property[r])],
@@ -321,11 +346,14 @@ function find_repeats(
                     pb = pts[j]
                     pb.temperature - pa.temperature >
                     rules.temperature + 8 * eps(pb.temperature) && break
-                    pa.part == pb.part && continue
+                    pa.part == pb.part && pa.experiment == pb.experiment && continue
                     kind, ignored = compare_points(pa, pb, ncomp, rules)
                     kind === nothing && continue
-                    # The first of the pair is the one of the database that wins.
-                    first_pt, other = pa.part < pb.part ? (pa, pb) : (pb, pa)
+                    # The first of the pair is the one of the database that wins; in one database
+                    # the first experiment that was added.
+                    first_pt, other =
+                        (pa.part, pa.experiment) < (pb.part, pb.experiment) ? (pa, pb) :
+                        (pb, pa)
                     kind === :duplicate && push!(removed[other.part], other.row)
                     ds_first = parts[first_pt.part].dataset
                     prop = reg.property_keys[first_pt.prop]
@@ -388,12 +416,14 @@ end
 # What the user calls
 # ----------------------------------------------------------------------------------
 
+view_references(view::DataView) = view.dataset.references
+
 duplicate_rules(::Bool) = DEFAULT_DUPLICATE_RULES
 duplicate_rules(rules::DuplicateRules) = rules
 function duplicate_rules(x)
     throw(
         ArgumentError(
-            "duplicate must be true (keep every point), false (leave out the repeated ones) or a DuplicateRules, got $(repr(x))",
+            "duplicate must be false (leave out the repeated points, the default), true (keep every point) or a DuplicateRules, got $(repr(x))",
         ),
     )
 end
@@ -401,7 +431,6 @@ end
 # The selection without the points that another database holds too (the one with the higher
 # priority is kept), with the report that says which ones they are.
 function leave_out_repeats(v::DatabaseView, rules::DuplicateRules)
-    length(v.parts) < 2 && return v
     report, removed = find_repeats(v.database, v.index, v.parts, rules)
     index, parts = Int[], DataView[]
     for (i, part, gone) in zip(v.index, v.parts, removed)
@@ -409,6 +438,11 @@ function leave_out_repeats(v::DatabaseView, rules::DuplicateRules)
         isempty(rows) && continue
         push!(index, i)
         push!(parts, DataView(part.dataset, rows))
+    end
+    # A selection always has a part, even when nothing is left: the first one, empty.
+    if isempty(parts) && !isempty(v.parts)
+        push!(index, v.index[1])
+        push!(parts, DataView(v.parts[1].dataset, Int32[]))
     end
     return DatabaseView(v.database, index, parts, report)
 end
@@ -449,8 +483,10 @@ Two points are the same when
    compared**: if the temperature and the value agree, the points are the same. When the amounts
    are written in different scales they are not compared and both points are kept.
 
-A point without temperature is never compared. Points of one database are never repeats of each
-other, and no database is changed. See [`DuplicateRules`](@ref) and [`conflicts`](@ref).
+A point without temperature is never compared. The points of one experiment are never repeats of
+each other (a database may measure the same state twice), but the same work entered twice in a
+database of yours (the same file imported again) is: the points of the later experiment are the
+repeats. No database is changed. See [`DuplicateRules`](@ref) and [`conflicts`](@ref).
 """
 function duplicates(v::DatabaseView; rules::Union{Nothing,DuplicateRules} = nothing)
     r = report_of(v, rules)
@@ -458,7 +494,7 @@ function duplicates(v::DatabaseView; rules::Union{Nothing,DuplicateRules} = noth
 end
 
 duplicates(db::Database; rules::Union{Nothing,DuplicateRules} = nothing, kwargs...) =
-    duplicates(points(db; kwargs...); rules)
+    duplicates(points(db; duplicate = true, kwargs...); rules)
 
 """
     conflicts(view; rules = nothing) -> DuplicateReport
@@ -467,8 +503,8 @@ duplicates(db::Database; rules::Union{Nothing,DuplicateRules} = nothing, kwargs.
 The points of two databases that come from the same work, with exactly the same temperature,
 pressure and composition, and a different value (beyond `rules.value`): the work reports two values
 for one state, or two databases disagree on it. Both points are always kept, even with
-`duplicate = false`: look at them with this report and choose. Points of one database are not
-compared with each other. See [`duplicates`](@ref) for how a work is told.
+the default `duplicate = false`: look at them with this report and choose. The points of one
+experiment are not compared with each other. See [`duplicates`](@ref) for how a work is told.
 """
 function conflicts(v::DatabaseView; rules::Union{Nothing,DuplicateRules} = nothing)
     r = report_of(v, rules)
@@ -476,11 +512,32 @@ function conflicts(v::DatabaseView; rules::Union{Nothing,DuplicateRules} = nothi
 end
 
 conflicts(db::Database; rules::Union{Nothing,DuplicateRules} = nothing, kwargs...) =
-    conflicts(points(db; kwargs...); rules)
+    conflicts(points(db; duplicate = true, kwargs...); rules)
 
 # ----------------------------------------------------------------------------------
 # The notice of the data that were just added
 # ----------------------------------------------------------------------------------
+
+# The references of `ds` that are the reference `ref` entered again: the same work, or every field
+# the same (a file without DOI or authors imported twice).
+function references_alike(ds::Dataset, ref::Integer)
+    rf = ds.references
+    key = work_key(ds, ref)
+    record(r) = (
+        lowercase(strip(rf.doi[r])),
+        normalize_name(rf.title[r]),
+        normalize_name(rf.journal[r]),
+        Int(rf.year[r]),
+        strip(rf.volume[r]),
+        strip(rf.pages[r]),
+        [normalize_name(a) for a in rf.authors[r]],
+    )
+    mine = record(ref)
+    return Int32[
+        Int32(r) for r in eachindex(rf.doi) if
+        r == ref || record(r) == mine || same_work(key, work_key(ds, r))
+    ]
+end
 
 # The references of `ds` that are the work `key`.
 function references_of_work(ds::Dataset, key::WorkKey)
@@ -524,8 +581,12 @@ function notify_repeats(
 )
     ds = member_dataset(member)
     key = work_key(ds, ref)
-    mine = rows_of_references(ds, [ref])
+    alike = references_alike(ds, ref)
+    mine = rows_of_references(ds, alike)
     isempty(mine) && return nothing
+    # The points that were just added are the last ones of the table.
+    n = length(ds.measurements)
+    fresh = Set(Int32.((n-added+1):n))
     index, parts, where = Int[], DataView[], String[]
     for (i, other) in enumerate(db.members)
         if other === member
@@ -542,19 +603,27 @@ function notify_repeats(
         push!(parts, DataView(other_ds, rows))
         push!(where, "\"$(other.name)\" ($(length(rows)) points)")
     end
-    isempty(where) && return nothing
     report, _ = find_repeats(db, index, parts, rules)
     # How many of the new points are in a repeated pair, whichever side they are on.
     mine_rows = Set{Int32}()
     for k in eachindex(report.kind)
         report.kind[k] === :duplicate || continue
-        report.database[k] == member.name && push!(mine_rows, report.row[k])
-        report.other_database[k] == member.name && push!(mine_rows, report.other_row[k])
+        report.database[k] == member.name &&
+            report.row[k] in fresh &&
+            push!(mine_rows, report.row[k])
+        report.other_database[k] == member.name &&
+            report.other_row[k] in fresh &&
+            push!(mine_rows, report.other_row[k])
     end
     n_conflicts = count(==(:conflict), report.kind)
+    # Only this database: say it when the new points repeat points that were already there.
+    if isempty(where)
+        isempty(mine_rows) && n_conflicts == 0 && return nothing
+        push!(where, "\"$(member.name)\" (earlier points, entered before)")
+    end
     filter = work_filter_text(ds, ref)
     work = isempty(key.label) ? "reference $ref" : key.label
     @warn "The data of this work are also in $(join(where, ", ")); nothing was removed or changed" work added_points =
-        added repeated_points = length(mine_rows) conflicts = n_conflicts see_both = "points(db; $filter)" one_copy = "points(db; $filter, duplicate = false)" pairs = "duplicates(db; $filter)" disagreements = "conflicts(db; $filter)"
+        added repeated_points = length(mine_rows) conflicts = n_conflicts see_both = "points(db; $filter, duplicate = true)" one_copy = "points(db; $filter)" pairs = "duplicates(db; $filter)" disagreements = "conflicts(db; $filter)"
     return nothing
 end
