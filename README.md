@@ -17,7 +17,9 @@
 [![Coverage](https://codecov.io/gh/Eduardo-BDMAlves/ThermophysicalDB.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Eduardo-BDMAlves/ThermophysicalDB.jl)
 [![Lint workflow Status](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Lint.yml/badge.svg?branch=main)](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Lint.yml?query=branch%3Amain)
 [![Docs workflow Status](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Docs.yml/badge.svg?branch=main)](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Docs.yml?query=branch%3Amain)
-<!-- [![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME) -->
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![JET](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
+[![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![All Contributors](https://img.shields.io/github/all-contributors/Eduardo-BDMAlves/ThermophysicalDB.jl?labelColor=5e1ec7&color=c0ffee&style=flat-square)](#contributors)
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
