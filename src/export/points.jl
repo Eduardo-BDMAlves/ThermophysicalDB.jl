@@ -202,6 +202,13 @@ function build_export_data(
     units::Symbol = :native,
     policy::Symbol = :nominal,
     details::Bool = false,
+    composition::Union{Nothing,Symbol} = nothing,
+    solvent = nothing,
+    molar_mass = nothing,
+    compounds = nothing,
+    density = nothing,
+    fetch_molar_mass::Bool = false,
+    strict::Bool = false,
     kwargs...,
 )
     reference in REFERENCE_STYLES || throw(
@@ -213,7 +220,18 @@ function build_export_data(
 
     summary = reference_summary(view; policy, kwargs...)
     bib = getfield(summary, :bibliography)
-    t = table(view; units, policy)
+    t = table(
+        view;
+        units,
+        policy,
+        composition,
+        solvent,
+        molar_mass,
+        compounds,
+        density,
+        fetch_molar_mass,
+        strict,
+    )
 
     label = fill("", length(rf))
     for (k, id) in enumerate(bib.ids)
@@ -239,7 +257,9 @@ function build_export_data(
         mixed ? "see unit" :
         (isempty(value_units) || isempty(value_units[1]) ? "-" : value_units[1])
     pressure_unit = units === :si ? "Pa" : "kPa"
-    x_units = composition_units(view)
+    x_units =
+        composition === nothing ? composition_units(view) :
+        fill(SCALE_UNITS[composition], MAX_COMPONENTS)
 
     # What the references table already tells (method, phase), and what is the same for the
     # whole selection (the system when there is one, the property when there is one), is not
@@ -453,7 +473,7 @@ add!(o::JObject, name::AbstractString, value) = (push!(o.pairs, String(name) => 
 
 function json_string(io::IO, s::AbstractString)
     write(io, '"')
-    for c in s
+    for c in String(s)
         if c == '"'
             write(io, "\\\"")
         elseif c == '\\'
@@ -464,7 +484,7 @@ function json_string(io::IO, s::AbstractString)
             write(io, "\\r")
         elseif c == '\t'
             write(io, "\\t")
-        elseif c < ' '
+        elseif UInt32(c) < 0x20
             write(io, "\\u", string(UInt16(c); base = 16, pad = 4))
         else
             write(io, c)
@@ -647,9 +667,10 @@ end
 function write_points_json(path::AbstractString, data::ExportData)
     open(path, "w") do io
         write(io, "{\n")
-        if data.origin !== nothing
+        origin = data.origin
+        if origin !== nothing
             write(io, "  \"origin\": ")
-            write_json(io, origin_object(data.origin), 1, 2)
+            write_json(io, origin_object(origin), 1, 2)
             write(io, ",\n")
         end
         write(io, "  \"metadata\": ")
@@ -872,6 +893,11 @@ function write_points_xlsx(path::AbstractString, data::ExportData; sheets::Symbo
     return nothing
 end
 
+function export_data(data::Union{Nothing,ExportData})
+    data === nothing && throw(ArgumentError("this format needs the data of the export"))
+    return data
+end
+
 function write_point_file(
     format::Symbol,
     path::AbstractString,
@@ -886,17 +912,17 @@ function write_point_file(
         origin = data === nothing ? origin_note(view) : data.origin
         write_points_thermoml_xml(path, view; origin)
     elseif format === :csv
-        write_points_csv(path, data)
+        write_points_csv(path, export_data(data))
     elseif format === :md
-        write_points_md(path, data)
+        write_points_md(path, export_data(data))
     elseif format === :json
-        write_points_json(path, data)
+        write_points_json(path, export_data(data))
     elseif format === :jld2
-        write_points_jld2(path, data)
+        write_points_jld2(path, export_data(data))
     elseif format === :tex
-        write_points_tex(path, data)
+        write_points_tex(path, export_data(data))
     elseif format === :xlsx
-        write_points_xlsx(path, data; sheets)
+        write_points_xlsx(path, export_data(data); sheets)
     else
         throw(ArgumentError("unknown format :$format; choose from $(POINT_FORMATS)"))
     end
@@ -975,7 +1001,11 @@ and that the articles must be credited. With `references = false` and `reference
 table keeps no way back to the DOIs, and a warning says so.
 
 `units = :si` converts values, uncertainties and pressure to SI (see [`table`](@ref)); the
-ThermoML formats always keep the units of the archive. The uncertainty columns are `unc`
+ThermoML formats always keep the units of the archive and the composition as the source gave it.
+`composition` converts the amounts `x1..x3` of the tables to another scale of
+[`COMPOSITION_SCALES`](@ref), with `solvent`, `molar_mass`, `compounds`, `density`,
+`fetch_molar_mass` and `strict` of [`convert_composition`](@ref); the header of the column then
+tells the unit of the new scale. The uncertainty columns are `unc`
 (as reported) and `unc_k2` (at ``k = 2``, see `policy` in [`table`](@ref)). `online`,
 `cache`, `refresh` and `progress` act as in [`bibtex`](@ref).
 
@@ -1005,6 +1035,13 @@ function export_points(
     reference::Symbol = :key,
     units::Symbol = :native,
     policy::Symbol = :nominal,
+    composition::Union{Nothing,Symbol} = nothing,
+    solvent = nothing,
+    molar_mass = nothing,
+    compounds = nothing,
+    density = nothing,
+    fetch_molar_mass::Bool = false,
+    strict::Bool = false,
     kwargs...,
 )
     sheets in SHEET_LAYOUTS ||
@@ -1025,7 +1062,20 @@ function export_points(
     # A ThermoML-only export reads nothing but the dataset: no references, no network.
     data =
         all(in((:thermoml, :thermoml_xml)), chosen) ? nothing :
-        build_export_data(view; reference, units, policy, kwargs...)
+        build_export_data(
+            view;
+            reference,
+            units,
+            policy,
+            composition,
+            solvent,
+            molar_mass,
+            compounds,
+            density,
+            fetch_molar_mass,
+            strict,
+            kwargs...,
+        )
 
     mkpath(directory)
     name = basename(directory)

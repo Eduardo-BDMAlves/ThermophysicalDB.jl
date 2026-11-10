@@ -85,15 +85,27 @@ function ThermomlContext(view::DataView)
         end
     end
     t = ds.extras
+    # the extras shared by the points of a block are stored once, on its first point
+    wanted_block = Set{Int32}(m.block[r] for r in eachindex(wanted_row) if wanted_row[r])
+    block_extras = Dict{Int32,ExtraPairs}()
     for i in eachindex(t.row)
         code, row = t.scope[i], t.row[i]
         target =
             code == 1 ? (wanted_reference[row] ? context.reference_extras : nothing) :
             code == 3 ? (wanted_experiment[row] ? context.experiment_extras : nothing) :
-            code == 4 ? (wanted_row[row] ? context.row_extras : nothing) : nothing
+            code == 4 ? (wanted_row[row] ? context.row_extras : nothing) :
+            code == 5 ? (row in wanted_block ? block_extras : nothing) : nothing
         target === nothing && continue
         value = t.text[i] == NO_ID ? t.number[i] : pool_string(ds.extra_texts, t.text[i])
         push!(get!(ExtraPairs, target, row), pool_string(ds.extra_keys, t.key[i]) => value)
+    end
+    # a point's own extras come after those of its block, so they win
+    for r in eachindex(wanted_row)
+        wanted_row[r] || continue
+        pairs = get(block_extras, m.block[r], nothing)
+        pairs === nothing && continue
+        context.row_extras[Int32(r)] =
+            vcat(pairs, get(context.row_extras, Int32(r), ExtraPairs()))
     end
     ps = ds.purity_steps
     for i in eachindex(ps.sample)
@@ -129,12 +141,14 @@ count used when the source did not give one.
 """
 function significant_digits(x::Real)
     (isfinite(x) && x != 0) || return 1
-    text = lowercase(string(Float64(abs(x))))
-    mantissa = first(split(text, 'e'))
+    text = lowercase(string(Float64(abs(x))))::String
+    mantissa = String(first(split(text, 'e')))
     if occursin('.', mantissa)
-        whole, fraction = split(mantissa, '.')
+        parts = split(mantissa, '.')
+        whole = String(parts[1])
+        fraction = String(parts[2])
         fraction == "0" && (fraction = "")
-        digits = lstrip(whole * fraction, '0')
+        digits::String = lstrip(whole * fraction, '0')
         isempty(whole) || whole == "0" || (digits = whole * fraction)
         whole == "0" && (digits = lstrip(fraction, '0'))
         isempty(fraction) && (digits = rstrip(digits, '0'))
@@ -330,6 +344,9 @@ function phase_object(name, phase, text, local_number)
     return o
 end
 
+# The assessment number of the source; 1 when it gave none.
+assessment_number(x::Real) = isnan(x) ? 1 : round(Int, x)
+
 function thermoml_property(
     context::ThermomlContext,
     e::Integer,
@@ -395,12 +412,11 @@ function thermoml_property(
         isnan(variant.level) && isnan(variant.coverage) ||
             (context.levels_without_method += 1)
     else
-        assessment = extra_value(extras, "uncertainty_assessment")
         u = JObject(
             "nCombUncertAssessNum" =>
-                assessment isa Float64 ? round(Int, assessment) : 1,
+                assessment_number(ds.measurements.assessment[variant.row]),
         )
-        evaluator = extra_string(extras, "uncertainty_evaluator")
+        evaluator = pool_string(ds.evaluators, ds.measurements.evaluator[variant.row])
         isempty(evaluator) || add!(u, "sCombUncertEvaluator", evaluator)
         add!(u, "eCombUncertEvalMethod", unc_method)
         text = extra_string(extras, "uncertainty_evaluation_text")
@@ -753,14 +769,11 @@ function thermoml_experiment(
             "nPropDigits" => digits_or_derived!(context, m.digits[r], m.value[r]),
         )
         if !isnan(m.unc[r])
-            extras_row = get(context.row_extras, variant.row, nothing)
-            assessment = extra_value(extras_row, "uncertainty_assessment")
             add!(
                 pv,
                 "CombinedUncertainty",
                 JObject(
-                    "nCombUncertAssessNum" =>
-                        assessment isa Float64 ? round(Int, assessment) : 1,
+                    "nCombUncertAssessNum" => assessment_number(m.assessment[variant.row]),
                     "nCombExpandUncertValue" => m.unc[r],
                 ),
             )
@@ -903,7 +916,7 @@ end
 # ----------------------------------------------------------------------------------
 
 function xml_escape(io::IO, s::AbstractString)
-    for c in s
+    for c in String(s)
         if c == '&'
             write(io, "&amp;")
         elseif c == '<'
@@ -912,7 +925,7 @@ function xml_escape(io::IO, s::AbstractString)
             write(io, "&gt;")
         elseif c == '"'
             write(io, "&quot;")
-        elseif c < ' ' && c != '\n' && c != '\t' && c != '\r'
+        elseif UInt32(c) < 0x20 && c != '\n' && c != '\t' && c != '\r'
             write(io, ' ')
         else
             write(io, c)

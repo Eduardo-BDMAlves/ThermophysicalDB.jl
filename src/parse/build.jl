@@ -1,3 +1,30 @@
+# Growing a column with `push!` leaves spare capacity (the backing array can be 50 % larger
+# than the data). A dataset that is built once and then only read gives that memory back.
+shrink!(v::Vector) = (sizehint!(v, length(v); shrink = true); v)
+shrink!(v::PooledFloats) = (shrink!(v.codes); shrink!(v.pool); v)
+shrink!(::Any) = nothing
+
+function shrink!(table::Union{MeasurementTable,ExtraTable,ConditionTable,UncertaintyTable})
+    for name in fieldnames(typeof(table))
+        value = getfield(table, name)
+        value isa Tuple ? foreach(shrink!, value) : shrink!(value)
+    end
+    return table
+end
+
+"""
+    compact!(ds::Dataset) -> ds
+
+Release the spare capacity of the large columns (measurements, extras, conditions,
+uncertainties) after the dataset is complete. The values do not change.
+"""
+function compact!(ds::Dataset)
+    for table in (ds.measurements, ds.extras, ds.conditions, ds.uncertainties)
+        shrink!(table)
+    end
+    return ds
+end
+
 """
     build_dataset(archive; source = "thermoml", chunk_size = 128, progress = true)
         -> (dataset, report)
@@ -52,6 +79,7 @@ function build_dataset(
         "ReactionData blocks are not supported yet and were ignored",
         blocks = report.reaction_blocks,
     )
+    compact!(ds)
     validate(ds)
     return ds, report
 end

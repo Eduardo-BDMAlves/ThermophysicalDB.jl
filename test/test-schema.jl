@@ -128,7 +128,7 @@ end
         :conditions,
         :uncertainties,
     ]
-    @test length(pools) == 17
+    @test length(pools) == 18
 
     # every column of every table is described, apart from the lookup dictionary
     ds = T.Dataset()
@@ -156,4 +156,119 @@ end
     @test experiment.role === :table && experiment.target === :experiments
     references = only(t for t in tables if t.name === :references)
     @test [c.name for c in references.columns if c.role === :unique] == [:doi]
+end
+
+@testitem "compact columns return the same numbers as plain vectors" tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    v = T.PooledFloats{UInt8}()
+    values = [0.95, NaN, 0.8, 0.95, -0.0, 0.0, NaN, 0.95]
+    for x in values
+        push!(v, x)
+    end
+    @test isequal(v, values)
+    @test length(v) == 8 && v.codes isa Vector{UInt8}
+    @test length(v.pool) == 4                       # 0.95, 0.8, -0.0 and 0.0 are distinct
+    @test sign(v[5]) == -1 && sign(v[6]) == 1 || signbit(v[5]) && !signbit(v[6])
+    v[2] = 2.0
+    v[1] = NaN
+    @test v[2] == 2.0 && isnan(v[1])
+    @test sum(skipmissing(ifelse.(isnan.(v), missing, v))) ≈ 2.0 + 0.8 + 0.95 + 0.95
+    # a column filled from disk gets its lookup back
+    copy = T.PooledFloats{UInt8}()
+    append!(copy.codes, v.codes)
+    append!(copy.pool, v.pool)
+    T.rebuild_lookup!(copy)
+    push!(copy, 0.8)
+    @test copy[end] == 0.8 && length(copy.pool) == length(v.pool)
+    # too many distinct values is explained, not an InexactError
+    full = T.PooledFloats{UInt8}()
+    for x = 1:255
+        push!(full, Float64(x))
+    end
+    @test_throws ArgumentError push!(full, 256.0)
+    push!(full, 255.0)                               # a known value still fits
+    # narrow identifiers
+    @test T.narrow(UInt8, 255, "property") === 0xff
+    err = try
+        T.narrow(UInt8, 256, "property")
+    catch e
+        e
+    end
+    @test err isa ArgumentError && occursin("property 256", err.msg)
+    @test_throws ArgumentError T.narrow(UInt8, -1, "phase")
+end
+
+@testitem "the evaluator and the assessment live in columns and survive the cache" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-compact")
+    comp = T.add_compound!(ds.compounds; names = ["water"])
+    experiment = T.add_experiment!(ds.experiments; reference = ref, components = [comp])
+    prop = T.add_property!(ds.properties, "Mass density", "kg/m3")
+    who = T.intern!(ds.evaluators, "A. Evaluator")
+    T.add_measurement!(
+        ds.measurements;
+        experiment,
+        property = prop,
+        value = 998.0,
+        unc = 0.1,
+        unc_k = 2,
+        unc_level = 0.95,
+        evaluator = who,
+        assessment = 2,
+    )
+    T.add_measurement!(ds.measurements; experiment, property = prop, value = 997.0)
+    m = ds.measurements
+    @test T.pool_string(ds.evaluators, m.evaluator[1]) == "A. Evaluator"
+    @test m.evaluator[2] == T.NO_ID && m.assessment[1] == 2.0 && isnan(m.assessment[2])
+    @test isequal(m.unc_k, [2.0, NaN]) && isequal(m.unc_level, [0.95, NaN])
+    @test T.validate(ds)
+    store = Dict{String,Any}()
+    T.write_dataset((key, array) -> store[key] = array, ds)
+    back = T.restore_dataset(key -> store[key])
+    @test isequal(back.measurements.assessment, m.assessment)
+    @test isequal(back.measurements.unc_level, m.unc_level)
+    @test back.measurements.evaluator == m.evaluator
+    @test T.pool_string(back.evaluators, back.measurements.evaluator[1]) == "A. Evaluator"
+    push!(back.measurements.unc_level, 0.95)         # the lookup was rebuilt: no new value
+    @test length(back.measurements.unc_level.pool) == 1
+    # an identifier that does not fit is explained
+    @test_throws ArgumentError T.add_measurement!(
+        ds.measurements;
+        experiment,
+        property = 300,
+        value = 1.0,
+    )
+end
+
+@testitem "compact! keeps every value" tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-shrink")
+    comp = T.add_compound!(ds.compounds; names = ["water"])
+    experiment = T.add_experiment!(ds.experiments; reference = ref, components = [comp])
+    prop = T.add_property!(ds.properties, "Mass density", "kg/m3")
+    for i = 1:100
+        T.add_measurement!(
+            ds.measurements;
+            experiment,
+            property = prop,
+            value = 990.0 + i,
+            unc_level = isodd(i) ? 0.95 : NaN,
+        )
+    end
+    before = copy(ds.measurements.value)
+    levels = copy(ds.measurements.unc_level)
+    @test T.compact!(ds) === ds
+    @test ds.measurements.value == before && isequal(ds.measurements.unc_level, levels)
+    @test T.validate(ds)
+    T.add_measurement!(
+        ds.measurements;
+        experiment,
+        property = prop,
+        value = 1.0,
+        unc_level = 0.5,
+    )
+    @test length(ds.measurements) == 101 && ds.measurements.unc_level[end] == 0.5
 end

@@ -33,7 +33,7 @@ Accepts a bare digest (the format NIST publishes) as well as `sha256sum` output 
 function parse_sha256(text::AbstractString)::String
     m = match(SHA256_REGEX, text)
     m === nothing && throw(ArgumentError("no SHA-256 digest found in the given text"))
-    return lowercase(String(m.captures[1]))
+    return lowercase(captured(m, 1))
 end
 
 """

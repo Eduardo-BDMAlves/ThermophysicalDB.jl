@@ -35,6 +35,7 @@ include("units/catalog.jl")
 include("units/backend.jl")
 include("uncertainty/coverage.jl")
 include("schema/pool.jl")
+include("schema/pooled.jl")
 include("schema/tables.jl")
 include("schema/dataset.jl")
 include("schema/relations.jl")
@@ -50,6 +51,14 @@ include("uncertainty/budget.jl")
 include("store/serialize.jl")
 include("store/cache.jl")
 include("store/database.jl")
+include("compounds/seed.jl")
+include("compounds/table.jl")
+include("compounds/store.jl")
+include("compounds/pubchem.jl")
+include("compounds/link.jl")
+include("compounds/linked.jl")
+include("composition/scales.jl")
+include("composition/convert.jl")
 include("references.jl")
 include("notice.jl")
 include("export/bibtex.jl")
@@ -69,33 +78,84 @@ include("outliers/trend.jl")
 include("outliers/surface.jl")
 include("outliers/detect.jl")
 include("outliers/pipeline.jl")
+include("database/members.jl")
+include("database/registry.jl")
+include("database/inputs.jl")
+include("database/repeats.jl")
+include("database/database.jl")
+include("database/duplicates.jl")
+include("database/user.jl")
+include("database/template.jl")
 include("precompile.jl")
 
-export DataView,
+export COMPOSITION_SCALES,
+    Database,
+    DatabaseView,
+    DuplicateReport,
+    DuplicateRules,
+    ExperimentRef,
+    Member,
+    ReferenceRef,
+    add_database!,
+    add_template_experiments!,
+    add_experiment!,
+    add_measurement!,
+    add_member!,
+    add_reference!,
+    add_reference_data!,
+    databases_dir,
+    member_dataset,
+    members,
+    parts,
+    remove_member!,
+    resolve_compound,
+    save_database,
+    created_at,
+    modified_at,
+    set_priority!,
+    CompositionConversion,
+    CompoundDB,
+    convert_composition,
+    LinkedDatabase,
+    DataView,
     UncertaintyTerm,
     bibtex,
     check_update,
+    compound_database,
+    compound_record,
+    conflicts,
     condition_table,
     csv_table,
     database_dir,
     database,
     diagnostics,
+    duplicates,
     ensure_archive,
     esd,
     expanded_uncertainty,
     export_points,
+    export_template,
+    fetch_pubchem!,
     find_compounds,
     find_outliers,
+    import_template,
+    forget_choices!,
     install_archive!,
     latex_table,
+    link_compounds,
+    lookup_compounds,
     markdown_table,
     mixture,
     points,
+    prefetch_compounds!,
+    pubchem_rate!,
     purity_step_table,
     reasons,
+    register_compound!,
     reference_summary,
     reset_database_dir!,
     sample_table,
+    save_compounds,
     set_database_dir!,
     set_uncertainty!,
     table,

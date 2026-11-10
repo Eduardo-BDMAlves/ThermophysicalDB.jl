@@ -235,6 +235,42 @@ uncertainty_table(view)                                # every term, with its co
 
 When the combined or the expanded uncertainty is missing it is derived, and the derived rows are marked as such and say how: a `combined` term you give is used as it is to compute the expanded one (the coverage of the call, ``k = 2`` by default); an `expanded` term gives the combined one by ``u_c = U/k``; otherwise the combined uncertainty is the root sum of squares of the `statistical` and `device` terms of the point and of its experiment. For the property, the expanded uncertainty also fills the `unc`, `unc_k` and `unc_level` columns, so everything on this page works on your data like on the archive. The numbers you give are taken as they are, and so is their consistency: the package does not check a combined term against its parts.
 
+### Units and percentages
+
+A number is in the unit that the database keeps: kelvin, kPa, the composition as stored and, for the property, the unit of its name. You do not have to convert what you have. A term may be a quantity of a units package, a text with a number and a unit, or a percentage, and it is converted for the point where it is stored:
+
+```julia
+using ThermophysicalDB, Unitful
+
+# the same 0.5 kg/m3 (the property is a density in kg/m3)
+set_uncertainty!(ds; scope = :measurement, row = 17, quantity = :property,
+                 statistical = 0.0005u"g/cm^3")
+set_uncertainty!(ds; scope = :measurement, row = 17, quantity = :pressure,
+                 statistical = "5 mbar")                # no package of units needed
+set_uncertainty!(ds; scope = :measurement, row = 17, quantity = :temperature,
+                 device = 0.01u"°C")                     # 0.01 K: a difference has no offset
+set_uncertainty!(ds; scope = :measurement, row = 18, quantity = :property,
+                 expanded = UncertaintyTerm("0.1 %"; k = 2))   # of the value at that point
+```
+
+An uncertainty is a difference between two values, so it is converted by the scale of the unit only: ``0.01\,^\circ\mathrm{C}`` is ``0.01\,\mathrm{K}``, not ``273.16\,\mathrm{K}``. The conversion uses the exact arithmetic of the package (see [Tables, units and Unitful](@ref tables_units)); a unit whose symbol the package does not know is converted by your units package, and a quantity of the wrong dimension is an `ArgumentError`.
+
+A percentage (`"2 %"`, `"500 ppm"`, `2u"percent"`) is that fraction of the value of **the same quantity at the same point**: the property in its unit, the temperature in kelvin, the pressure in kPa, the composition as stored. It is converted into the unit of the database as soon as it is stored, so the table always holds absolute uncertainties. The coverage is applied after the conversion: `UncertaintyTerm("2 %"; k = 2)` is a standard uncertainty of 1 % of the value. A percentage and a quantity of the property need a point (`scope = :measurement`), because an experiment may have several properties and its points have different values; at an experiment you can give the temperature or the pressure with a unit (the specification of a thermometer, for example) but not a percentage.
+
+### A percentage of a temperature is taken of the absolute scale
+
+A relative uncertainty is a fraction *of the value*, and the value of a temperature depends on where the scale has its zero: 1 % of 25 °C is 0.25 K, but 1 % of 298.15 K is 2.98 K. The two are not the same measurement, and only the second means anything, because kelvin (and rankine) start at absolute zero. So the package **always takes a percentage of the temperature in an absolute scale**, whatever unit the temperature was written in:
+
+| Temperature given in | The percentage is taken of | Result |
+| :-- | :-- | :-- |
+| K | the value in K | in K |
+| °C | the value in K (``T / \mathrm{K} = t / {}^\circ\mathrm{C} + 273.15``) | in K |
+| °F | the value in °R (``T / {}^\circ\mathrm{R} = t / {}^\circ\mathrm{F} + 459.67``), which is the same fraction of the value in K | in K (and in °R, ``\mathrm{K} = \tfrac59\,{}^\circ\mathrm{R}``) |
+
+For example, `"0.01 %"` of 25 °C is 0.01 % of 298.15 K, that is 0.0298 K, and the table holds 0.0298 K. The same reasoning applies to the pressure, which is always taken of the absolute pressure in kPa (a gauge pressure is refused). An **absolute** uncertainty written with a unit is a difference and only its scale changes: `"0.05 degC"` is 0.05 K and `"0.09 degF"` is 0.05 K.
+
+The uncertainties of the conditions of a point can be given where the point is added, without `set_uncertainty!`: the keywords `unc_temperature`, `unc_pressure` and `unc_composition` of [`add_measurement!`](@ref), the columns `unc_temperature`, `unc_pressure` and `unc_x1`...`unc_x3` of [`add_reference_data!`](@ref) and the `u(T)`, `u(P)` and `u(x)` columns of the spreadsheet, all with the rules of this section. A plain number is a standard uncertainty (``k = 1``) and `UncertaintyTerm(0.05; k = 2)` states its coverage; the spreadsheet has the coverage factor of each column in its row `k`.
+
 !!! note "What is combined, and what is not"
     The combination above treats the terms of **one quantity**. The combined uncertainty of a property that you derive this way does not include the contribution of the uncertainty of ``T``, ``P`` and composition, which depends on the model: ``u_c^2(y) = u^2_{\text{own}} + \sum_i (\partial y/\partial x_i)^2 u^2(x_i)``. For a liquid density near ambient conditions the term in ``T`` usually dominates, since ``\partial\rho/\partial T`` is large and ``\partial\rho/\partial P`` small. The archive's combined uncertainty is supposed to include these contributions, but only 129,519 of its roughly 2.7 million uncertainties say that they were obtained by propagation. This is why the separate terms are kept: you can propagate them with your own model. In the ThermoML formats only the expanded uncertainty of the property is written, as the standard has it; the separate terms are in the `.json` of [`export_points`](@ref) and in [`uncertainty_table`](@ref).
 

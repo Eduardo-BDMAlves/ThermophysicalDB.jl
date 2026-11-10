@@ -51,7 +51,11 @@ for each component `i`, `purityi`, `purity_kindi` and `purity_basisi` from its s
 `value`, `unc`, `unc_k2` and `pressure` (to Pa) and reports the SI unit in `unit`.
 `unc_k2` is the uncertainty at `k = 2` (see `coverage_factor` for `policy`); it is `NaN`
 where it cannot be derived without inventing data, and a warning counts such rows.
-Compositions `x1..x3` are never converted: `xkind` tells what they express.
+Compositions `x1..x3` are as the source gave them: `xkind` tells what they express. With
+`composition = :mass_fraction` (or any other of [`COMPOSITION_SCALES`](@ref)) they are
+converted to that scale; `solvent`, `molar_mass`, `compounds`, `density`, `fetch_molar_mass` and `strict`
+are those of [`convert_composition`](@ref), `NaN` marks a point that could not be converted
+(`details = true` adds `composition_status` with the reason, and a warning counts them).
 
 With `quantities = Unitful` (or the module of another units package that has an extension,
 such as DynamicQuantities) the columns `temperature`, `pressure`, `value`, `unc` and
@@ -87,6 +91,13 @@ function table(
     temperature_unit = nothing,
     pressure_unit = nothing,
     details::Bool = false,
+    composition::Union{Nothing,Symbol} = nothing,
+    solvent = nothing,
+    molar_mass = nothing,
+    compounds = nothing,
+    density = nothing,
+    fetch_molar_mass::Bool = false,
+    strict::Bool = false,
 )
     units in TABLE_UNITS ||
         throw(ArgumentError("units must be one of $(TABLE_UNITS), got :$units"))
@@ -210,6 +221,29 @@ function table(
         unc_k2,
     )
     details && (columns = merge(columns, detail_columns(ds, rows)))
+    if composition !== nothing
+        converted = convert_composition(
+            view,
+            composition;
+            solvent,
+            molar_mass,
+            compounds,
+            density,
+            fetch_molar_mass,
+            strict,
+        )
+        warn_unconverted(converted)
+        columns = merge(
+            columns,
+            (;
+                xkind = converted.xkind,
+                x1 = converted.x1,
+                x2 = converted.x2,
+                x3 = converted.x3,
+            ),
+        )
+        details && (columns = merge(columns, (; composition_status = converted.status)))
+    end
     if t_choice !== nothing
         columns = merge(
             columns,
@@ -420,22 +454,30 @@ function Base.show(io::IO, ::MIME"text/plain", view::DataView; maxrows::Int = 12
     println(io, "DataView: ", length(view), " of ", total, " points")
     isempty(view.rows) && return nothing
     shown = DataView(view.dataset, view.rows[1:min(end, maxrows)])
-    cols = table(shown)
-    names = first.(DISPLAY_COLUMNS)
-    cells = [[display_cell(cols[name][i]) for i = 1:length(shown)] for name in names]
+    print_points(io, table(shown), length(shown), length(view) - length(shown))
+    return nothing
+end
+
+# Prints `n` rows of a point table (the columns of `DISPLAY_COLUMNS`, plus `database` when the table
+# has it) and the number of points left out.
+function print_points(io::IO, cols, n::Integer, hidden::Integer)
+    display =
+        haskey(cols, :database) ? ((:database => "database"), DISPLAY_COLUMNS...) :
+        DISPLAY_COLUMNS
+    names = first.(display)
+    cells = [[display_cell(cols[name][i]) for i = 1:n] for name in names]
     # Columns that are entirely empty (e.g. x3 for binaries) are not worth the width.
     keep = [j for j in eachindex(names) if any(!isempty, cells[j])]
-    headers = [last(DISPLAY_COLUMNS[j]) for j in keep]
+    headers = [last(display[j]) for j in keep]
     widths =
         [max(length(headers[k]), maximum(length, cells[keep[k]])) for k in eachindex(keep)]
     numeric = [cols[names[j]] isa Vector{Float64} for j in keep]
     pad(text, k) = numeric[k] ? lpad(text, widths[k]) : rpad(text, widths[k])
     println(io, join((pad(headers[k], k) for k in eachindex(keep)), "  "))
     println(io, join((repeat("─", widths[k]) for k in eachindex(keep)), "  "))
-    for i = 1:length(shown)
+    for i = 1:n
         println(io, join((pad(cells[keep[k]][i], k) for k in eachindex(keep)), "  "))
     end
-    hidden = length(view) - length(shown)
     hidden > 0 && println(io, "… and ", hidden, " more points")
     return nothing
 end

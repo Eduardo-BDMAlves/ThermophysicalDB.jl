@@ -45,6 +45,7 @@ const FOREIGN_KEYS = Dict{Tuple{Symbol,Symbol},Symbol}(
     (:conditions, :phase) => :phases,
     (:conditions, :component) => :compounds,
     (:conditions, :phase_component) => :compounds,
+    (:measurements, :block) => :measurements,
     (:uncertainties, :row) => :any,
     (:uncertainties, :method) => :unc_methods,
 )
@@ -111,7 +112,9 @@ The tables of a `Dataset`, with the role of each column, read from the type defi
 """
 function schema_tables()
     pools = schema_pools()
-    names = Symbol[n for n in fieldnames(Dataset) if !(n in pools)]
+    names = Symbol[
+        n for n in fieldnames(Dataset) if !(n in pools) && n !== :lazy && n !== :stamps
+    ]
     tables = SchemaTable[]
     for tname in names
         columns = SchemaColumn[]

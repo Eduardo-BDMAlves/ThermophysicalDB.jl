@@ -25,6 +25,8 @@ Inside it, each data source has its own folder. The NIST archive lives in `therm
 | `dataset.jld2` | the parsed database as flat arrays (the binary cache) |
 | `dataset.toml` | which archive and schema version the cache was built from. Written last, so a cache without it is ignored. |
 
+The list of compounds (see [Compounds and their identifiers](@ref compounds)) lives next to it, in `compounds/`, and is downloaded the first time `compound_database()` is called.
+
 To keep the data somewhere else (a larger disk, a shared folder), use either of these. The environment variable wins when both are set:
 
 ```julia
@@ -57,6 +59,112 @@ The keywords change this behaviour:
 | `reload = true` | Repeat the update check and reload, even within the same session. |
 | `rebuild = true` | Also ignore the cache and parse the archive again. |
 | `progress = false` | No progress bars, useful in scripts and in CI. |
+
+## Several databases that look like one
+
+[`database`](@ref) returns a [`Database`](@ref): a list of independent databases, the *members*. Today it holds the ThermoML archive (`:thermoml`); points you measure (`:user`) or take from the literature (`:literature`) are separate members with the same tables and the same fields, so nothing of the archive is ever changed by what you add. Every member lives in its own file and is read only when a query can find something in it.
+
+```julia
+db = database()
+members(db)                            # the databases, first the one that wins on a repeated point
+view = points(db; component = "methane")
+parts(view)                            # one DataView for each database that has points
+table(view)                            # all the points, with a column `database` when there are several
+```
+
+What makes this fast is a small index that is always in memory (the *registry*): it gives each compound, property and reference one number in all the members, and says which member has what. A question about a compound that only one member knows reads only that member. The tables of a member that are rarely needed (samples, purity, conditions and extra fields) are read the first time something asks for them; [`loaded_tables`](@ref) shows what is in memory.
+
+- A compound is the same in two members when its key is: the InChIKey, or `name:...` for a compound that the archive knows only by name. Nothing is merged by guessing. A compound that has only a name is listed in `db.registry.unkeyed`, so you can give it an InChIKey.
+- A property is the pair (label, unit) and a reference is a DOI.
+- [`add_member!`](@ref) and [`remove_member!`](@ref) manage the members; `priority` (smaller first) decides which database wins when the same point is in several.
+- `find_compounds(db, text)` joins the databases: one row for each compound, with the points of all of them, and its result can be given as the `component` of `points`.
+- Functions that join the points of several databases (export, outliers, references) work on one database for now: use `parts(view)`.
+
+## Your own databases
+
+What you measure, or take from an article, goes into a database of your own: a member that starts empty, has the same tables as the archive and never touches it (the functions below refuse the archive). Nothing is written to disk until you call [`save_database`](@ref).
+
+```julia
+db = database()
+add_database!(db, "my_lab")                       # kind = :user; use kind = :literature for points from articles
+
+ref = add_reference!(db; doi = "10.1000/example", authors = ["Silva, A."], year = 2024)
+exp = add_experiment!(ref; components = ["water", "7647-14-5"], composition_scale = :molality)
+add_measurement!(exp; property = "Mass density", unit = "kg/m3", value = 1038.1,
+                 temperature = 293.15, pressure = 101.325, composition = [NaN, 1.0])
+
+save_database(db, "my_lab")                       # from now on database() opens it in every session
+```
+
+A reference is an article; an experiment is the part of it that measured one system, so an article can have several. [`add_reference_data!`](@ref) adds everything an article measured at once, from columns, and checks all of it before adding anything:
+
+```julia
+add_reference_data!(db;
+    reference = (doi = "10.1000/example", authors = ["Silva, A.", "Souza, B."], year = 2024),
+    experiments = [
+        (components = ["water", "7647-14-5"], composition_scale = :molality,
+         property = "Mass density", unit = "kg/m3",
+         temperature = [293.15, 298.15, 303.15], pressure = 101.325,
+         x2 = [1.0, 1.0, 1.0], value = [1038.1, 1036.4, 1034.5]),
+    ])
+```
+
+- **Compounds must be identified.** A component is an InChIKey, a CAS number, a name that the compound database knows exactly, or `(inchikey = ..., cas = ..., name = ...)`. A name that nobody knows is refused, never turned into a new compound. A CAS number that the compound database does not know is kept as the key `cas:<number>` until you give the InChIKey. The first CAS number or name may download the compound database once; pass `compounds =` a `CompoundDB` to avoid that.
+- **Units.** The tables hold plain numbers: temperature in K, pressure in kPa, and each property in the unit its database already uses for it. What you give is converted on the way in, once, so a number can be plain, a text with a unit or a quantity of a units package (Unitful, DynamicQuantities, FlexUnits): `temperature = "20 degC"`, `pressure = 1u"atm"`, `value = "0.9982 g/cm3"`. A plain temperature is in K and a plain pressure in kPa.
+  `unit` is the unit of a plain `value` and `unc`; if the databases already have that property (`"Mass density"` is in kg/m3 in the archive), the point is stored in their unit (`unit = "g/cm3", value = 0.9982` is stored as 998.2 kg/m3); a property that no database has is stored in the SI (`"cP"` becomes `"Pa*s"`, `"bar"` becomes `"Pa"`), and a unit that is already SI is kept as you wrote it. An uncertainty is converted as a difference (`unc = "0.5 kg/m3"`, or `"0.1 %"` of the value), so `"0.5 degC"` is 0.5 K. A unit of another quantity, a gauge pressure or a unit that cannot be read is refused, and with no `unit` and a plain number nothing is converted. The units are not kept in any struct: what is stored is always `Float64`.
+- **Nothing is filled in.** What you do not give is `NaN` (a pure compound has no composition), and a point without a value, with a temperature that is not positive or with more amounts than components is refused with a message.
+- **The order of the databases** decides which one wins when a point is in several; [`set_priority!`](@ref) changes it, and a saved database remembers it.
+- **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. Removing the folder removes the database.
+- Functions that join the points of several databases (export, outliers, references) work on one database for now: select with `parts(view)`, or open the archive alone.
+
+## Filling in a spreadsheet
+
+Typing the points of an article as columns in code is exact but tedious. With XLSX.jl loaded, the package writes a spreadsheet that you fill in, and imports it:
+
+```julia
+using ThermophysicalDB, XLSX
+
+db = database()
+export_template(db, "my_article.xlsx"; experiments = 3)      # a guide, the reference and the compounds, 3 pairs of sheets
+# ... fill in the light blue cells in Excel or LibreOffice, save ...
+report = import_template(db, "my_article.xlsx"; only_check = true) # the same checks, nothing is added
+report.problems                                              # every mistake, with its sheet and cell
+import_template(db, "my_article.xlsx")                        # add the data to the database named in the file
+```
+
+The workbook has a **Guide**, a **Reference** sheet (the DOI, the authors, and a list of up to 25 compounds with their samples) and, for each experiment, an **EXP-n** sheet (what was measured, the components, the method) and a **PTS-n** sheet (the points: composition, temperature, pressure, value, each with its unit, and the uncertainty). The menus (property, method, phase, source, supplier, purity analysis and purification) are filled, when the template is generated, with what your databases already hold, most used first and followed by generic choices, so what you pick is the text that already exists. The cells that you do not fill in are not given: nothing is guessed.
+
+- **Units.** Each column has its unit cell (`degC`, `bar`, `g/cm3`, `%`...): the import converts as [`add_reference_data!`](@ref) does, to the units of the databases. The uncertainty of the value is absolute or relative (`%`), and has its coverage factor `k`.
+- **More experiments.** The number of pairs is chosen when the file is written. [`add_template_experiments!`](@ref) adds more to a file that you have started; what you typed stays where it is. Copying the sheets by hand does not work, because each pair has its own names.
+- **A work with more than 25 compounds.** Fill a second file with the same reference (the same DOI) and import both: `import_template(db, ["part1.xlsx", "part2.xlsx"])` joins the compounds by name and the experiments follow one another. Files of different works are refused.
+- **The database** is the one named on the Reference sheet (`database = "name"` overrides it); one that does not exist is created (`create = false` refuses). Everything is checked before anything is added, and all the mistakes come at once.
+- **Uncertainties of the conditions.** The columns `u(x1)`, `u(x2)`, `u(x3)`, `u(T)` and `u(P)` are stored in the uncertainty table ([`uncertainty_table`](@ref)), each with its coverage factor `k`. An absolute value is in the unit of its column and is a difference (0.05 degC is 0.05 K); a relative one (`%`) is taken of the temperature in K (also for degC and degF) and of the pressure in kPa, see [A percentage of a temperature is taken of the absolute scale](@ref).
+- **What is not stored yet.** The data of the samples (purity, supplier), the notes and the place in the article are read but not kept; the import lists them in `ignored` and in a warning, and never drops them in silence.
+- **Names, not addresses.** The importer finds each cell by a name defined in the workbook (`ref_doi`, `exp1_property`, `pts1_table`...), so a file that you filled in stays readable when the layout of the template changes.
+- Paste values only (Paste Special > Values) into the template: a normal paste replaces the menus and the checks of the cells.
+
+## Repeated points
+
+The same measurement can be in two databases: the archive and the points you copied from the same article, for example. They are kept in both (so you can open just one), and `duplicate` decides what a selection shows. **By default the repeated points are left out of the selection** (they stay in the databases); `duplicate = true` shows every point:
+
+```julia
+points(db; doi = "10.1000/example")                      # one copy of each, from the database with the highest priority
+points(db; doi = "10.1000/example", duplicate = true)    # every point of every database
+duplicates(db; doi = "10.1000/example")                  # the pairs that are the same point
+conflicts(db; doi = "10.1000/example")                   # the pairs that disagree
+```
+
+Two points are the same point when they come from the same work and agree:
+
+1. **Same work.** The DOI is the same. When one reference has no DOI, the first author and the year are the same (and the titles agree, if both have one). Two different DOIs are two works. If nothing tells where a point comes from, it is **never** taken for a repeated one, however close it is to another: two independent measurements can agree by chance.
+2. **Same system and property**, a temperature within 0.1 K and a value within 0.1 %.
+3. **Pressure** within 0.01 bar (1 kPa) and the **amount of each component** within 0.1 %, in the scale the points were given in. A pressure or an amount that one of the points does not have is not compared: if the temperature and the value agree, they are the same point. When the amounts are in different scales they are not compared and both points are kept.
+
+A point without a temperature is never compared. The points of one experiment are never repeats of each other (replicates are real data). The same work entered twice in a database of yours, for example the same spreadsheet imported again, is a repeat: the points of the experiment that was added later are the ones left out, and they stay in the database. A reference without DOI and authors counts as the same work when every field of it is the same. The archive is not searched for repeats inside itself. No database is changed. The tolerances are those of [`DuplicateRules`](@ref): `points(db; duplicate = DuplicateRules(temperature = 0.05, value = 5e-4))`. They can be written with units, which are converted when the rules are made: `DuplicateRules(temperature = "0.1 degC", pressure = "0.01 bar", value = "0.1 %")` (a plain number is in K, in kPa, or a fraction).
+
+When the same work, with the same conditions (exactly the same temperature, pressure and amounts), has a different value in two databases, the pair is a *conflict*: the default never chooses between them, both points stay, and [`conflicts`](@ref) lists them for you to decide. A selection that left points out says how many points it left out and how many conflicts there are, and `duplicates(view)` is the report of that selection.
+
+[`add_reference_data!`](@ref) warns, after adding the data of an article, when the same work is already in another database: where, how many of the new points repeat points that are there, and the calls that show both (`points(db; doi = ...)`), the pairs. It also warns when the new points repeat points that were already in the same database. Nothing is removed: a selection leaves the repeated points out unless `duplicate = true`. `warn_duplicates = false` silences it.
 
 ## Checking and updating by hand
 

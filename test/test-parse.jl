@@ -149,11 +149,8 @@ end
     @test p.level ≈ 0.95
     @test p.coverage == 2 &&
           p.unc_method == "Propagation of evaluated standard uncertainties"
-    @test p.extras == [
-        "property_component" => "carbon dioxide",
-        "uncertainty_evaluator" => "Fictitious evaluator",
-        "uncertainty_assessment" => 1.0,
-    ]
+    @test p.extras == ["property_component" => "carbon dioxide"]
+    @test p.evaluator == "Fictitious evaluator" && p.assessment == 1.0
     @test e1.purpose == "Principal objective of the work"
     @test e1.samples == [1, 1]
     m1, m2 = e1.measurements

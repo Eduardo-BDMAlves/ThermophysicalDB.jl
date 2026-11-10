@@ -210,6 +210,38 @@ The conversions that the core does by itself are in `src/units/exact.jl`: `Exact
 
 Do not call `uparse` at the top level of an extension: it evaluates code, which breaks precompilation. Use the `u"..."` macro or parse at run time. `ext/ThermophysicalDBUnitfulExt.jl` is the shortest model to copy, and `test/test-units-backends.jl` has the tests that a backend has to pass.
 
+## Benchmarks
+
+The folder `benchmark/` measures what a change costs, with [AirspeedVelocity.jl](https://github.com/MilesCranmer/AirspeedVelocity.jl). Every pull request that touches `src/`, `ext/` or `benchmark/` runs the workflow `.github/workflows/Benchmark.yml`, which compares the pull request with the latest release (the latest tag `v*`; until there is a release, with `main`) and comments the result on the pull request. It marks a benchmark when the time or the allocated memory changes by more than 15 %; it never fails the pull request. A runner of GitHub varies by some per cent from one run to the next, so read a single marked line with care and a pattern (several related benchmarks) with more trust; the allocated memory does not vary between runs.
+
+What is measured, in `benchmark/benchmarks.jl`:
+
+| Group | What it measures |
+|---|---|
+| `load` | opening a database that is stored (the registry alone, then the dataset), the first query, `link_compounds` |
+| `add` | `add_reference_data!` of one article (about 90 points) in an empty and in a large database, with and without the check of repeated points, ten articles, and 100 points added one by one |
+| `filter` | the filters by compound, property, temperature and pressure: each stage alone (starting from the result of the stage before), the four calls one after the other, and the four filters in one call; over the database and over the database linked to the compound database, by a name |
+| `units` | `table` and `points` with plain numbers, then with Unitful, DynamicQuantities and FlexUnits |
+| `template` | writing the spreadsheet with 2 and with 20 experiments, and reading and checking the two example files of `docs/src/assets/` |
+| `outliers` | `find_outliers` over a standard set of points |
+
+The data are synthetic and the same for every revision (`benchmark/synthetic.jl`, built only with the public functions of the package and a fixed seed), so a difference is a difference of the code. `TDB_BENCH_SCALE` sets the size: `small` (20 thousand points), `medium` (200 thousand, the default) or `full` (2.8 million, as many as the archive); `full` is run by hand (Actions, Benchmark, Run workflow). The file of the database is stored between runs by `TDB_BENCH_CACHE`, in a folder whose name is a hash of the files of the schema, of `src/store/serialize.jl` and of the generator: a revision with another structure writes its own file and never reads one that another structure wrote. The synthetic database has no sample, purity, condition or extra-field tables, because `add_reference_data!` does not store them yet; the memory of those tables is not in the report until it does.
+
+Besides the benchmarks, `benchmark/memory_report.jl` loads the database in a process of its own for each revision and reports what stays in memory, table by table (`Base.summarysize`) and for the process. The allocations that AirspeedVelocity compares are what a call allocates; this is what remains, which is where the structures of the data are judged.
+
+To run it on your machine, from the repository folder:
+
+```bash
+# the benchmarks of this working copy against the latest release (needs AirspeedVelocity: pkg> add AirspeedVelocity)
+TDB_BENCH_SCALE=small benchpkg --rev=v0.1.0,dirty --output-dir=benchmark-results
+benchpkgtable --rev=v0.1.0,dirty --input-dir=benchmark-results --mode=time,memory --ratio
+
+# the retained memory of two checkouts
+julia benchmark/memory_report.jl base=/path/to/release head=.
+```
+
+To add a benchmark, define it in `benchmark/benchmarks.jl` with `register!(group, name, @benchmarkable(...))`. A benchmark that writes or loads starts from a clean state in `setup` with `evals = 1`. `register!` runs it once, so a benchmark that cannot run on an older revision (the function did not exist yet) is left out with a warning instead of stopping the others. The script is the one of the pull request for both revisions, so use only the public functions in the generator and in the setup. Change `benchmark/synthetic.jl` only when needed: it changes the data of every comparison.
+
 ## Making a new release
 
 To create a new release, you can follow these simple steps:

@@ -171,8 +171,10 @@ function lookup_symbol(name::AbstractString)
     if !isempty(name)
         prefix = get(PREFIXES, first(name), nothing)
         rest = SubString(name, nextind(name, 1))
-        unit = prefix === nothing ? nothing : get(SYMBOLS, rest, nothing)
-        unit === nothing || return prefix * unit
+        if prefix !== nothing
+            unit = get(SYMBOLS, rest, nothing)
+            unit === nothing || return prefix * unit
+        end
     end
     throw(ArgumentError("unknown unit symbol \"$name\""))
 end

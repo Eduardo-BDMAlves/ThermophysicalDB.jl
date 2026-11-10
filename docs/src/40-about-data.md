@@ -33,6 +33,10 @@ The archive is published as a dataset with the DOI [10.18434/mds2-2422](https://
 !!! warning "Experimental data, as published"
     The archive is a collection of *published* experimental results. It is not a critically evaluated database: points from different articles can disagree, some are wrong, and the same measurement may appear in more than one article. Judging the quality of a point is your task, and the tutorials show ways to do it (for instance, [comparing water densities with a reference equation](@ref tutorial_water)).
 
+## The compound database
+
+Besides the archive, the package keeps a second database, **kept apart from the archive**, for the nomenclature and the base properties of the compounds: names, CAS number, PubChem CID, formula, molar mass, SMILES, InChI and InChIKey. It is built from lists of the [chemicals](https://github.com/CalebBell/chemicals) repository (MIT license), which its authors derive from PubChem, fixed at one commit and checked against SHA-256 digests; the lists are downloaded to your computer and are not redistributed by this package. The origin and the licenses are in `NOTICE.md`. The compounds that you add are stored apart from the lists. This database never changes the ThermoML data: it only records which of its compounds describes each compound of the archive, and where the two disagree both are shown and you choose. See [Compounds and their identifiers](@ref compounds).
+
 ## What is not included
 
 - **Reaction data.** The archive also contains reaction and equilibrium-constant blocks; this version of the package reads property data of pure compounds and mixtures only.

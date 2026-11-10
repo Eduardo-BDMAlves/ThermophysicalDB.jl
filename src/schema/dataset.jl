@@ -1,3 +1,54 @@
+# The tables and the pool that a dataset read from its cache file leaves on disk until they are
+# used: together about a quarter of the memory of the archive, and only needed for the details
+# of the points (samples, purity, conditions, extra fields). A bit of `LazyState.loaded` says
+# that the field is in memory; a dataset that was built, not read, has every bit set.
+"""
+    LAZY_FIELDS
+
+The fields of a `Dataset` that are read from the cache file on first use: `samples`,
+`purity_steps`, `extras`, `conditions` and the pool `extra_texts`.
+"""
+const LAZY_FIELDS = (:samples, :purity_steps, :extras, :conditions, :extra_texts)
+
+@inline function lazy_bit(name::Symbol)
+    return name === :samples ? 0x00000001 :
+           name === :purity_steps ? 0x00000002 :
+           name === :extras ? 0x00000004 :
+           name === :conditions ? 0x00000008 :
+           name === :extra_texts ? 0x00000010 : 0x00000000
+end
+
+# Where the lazy fields come from and which of them are in memory. `size` and `mtime` describe
+# the file when the dataset was read: a lazy read refuses a file that was replaced since.
+mutable struct LazyState
+    path::String
+    size::Int64
+    mtime::Float64
+    loaded::Threads.Atomic{UInt32}
+    lock::ReentrantLock
+end
+
+LazyState() =
+    LazyState("", 0, 0.0, Threads.Atomic{UInt32}(typemax(UInt32)), ReentrantLock())
+
+"""
+    Stamps
+
+When a dataset was created and last edited, as seconds since 1970-01-01 UTC. It is written to the
+file (`meta/created`, `meta/modified`) so that it travels with the data; a file written before the
+stamps existed has none and takes the modification time of the file. Reading the data never changes
+them, adding data does ([`touch!`](@ref)).
+"""
+mutable struct Stamps
+    created::Float64
+    modified::Float64
+end
+
+function Stamps()
+    t = time()
+    return Stamps(t, t)
+end
+
 """
     Dataset()
 
@@ -20,6 +71,7 @@ struct Dataset
     purifications::StringPool
     purposes::StringPool
     unc_methods::StringPool
+    evaluators::StringPool
     method_texts::StringPool
     condition_groups::StringPool
     condition_labels::StringPool
@@ -33,10 +85,13 @@ struct Dataset
     extras::ExtraTable
     conditions::ConditionTable
     uncertainties::UncertaintyTable
+    stamps::Stamps
+    lazy::LazyState
 end
 
 function Dataset()
     return Dataset(
+        StringPool(),
         StringPool(),
         StringPool(),
         StringPool(),
@@ -64,7 +119,38 @@ function Dataset()
         ExtraTable(),
         ConditionTable(),
         UncertaintyTable(),
+        Stamps(),
+        LazyState(),
     )
+end
+
+# The dataset was edited now (a few nanoseconds: the text is made only when it is shown or saved).
+@inline function touch!(ds::Dataset)
+    getfield(ds, :stamps).modified = time()
+    return nothing
+end
+
+# Reading a dataset from its cache file loads the large tables only when something asks for
+# them (see `load_lazy!`); this is how the field of a table is read, and for every other field
+# it is the plain `getfield`, which the compiler resolves from the constant name.
+@inline function Base.getproperty(ds::Dataset, name::Symbol)
+    bit = lazy_bit(name)
+    if bit != 0x00000000
+        state = getfield(ds, :lazy)
+        (state.loaded[] & bit) == 0x00000000 && load_lazy!(ds, name)
+    end
+    return getfield(ds, name)
+end
+
+"""
+    loaded_tables(ds) -> Vector{Symbol}
+
+The tables and pools of `ds` that are in memory. A dataset read from the cache holds the core
+tables only; the tables of [`LAZY_FIELDS`](@ref) are read the first time something uses them.
+"""
+function loaded_tables(ds::Dataset)
+    state = getfield(ds, :lazy)
+    return Symbol[name for name in LAZY_FIELDS if (state.loaded[] & lazy_bit(name)) != 0]
 end
 
 Base.length(ds::Dataset) = length(ds.measurements)
@@ -170,6 +256,9 @@ function column_lengths(t::MeasurementTable)
                 t.temperature,
                 t.pressure,
                 t.unc_method,
+                t.evaluator,
+                t.assessment,
+                t.block,
                 t.digits,
                 t.temperature_digits,
                 t.pressure_digits,
@@ -210,7 +299,7 @@ function column_lengths(t::ExtraTable)
 end
 
 # True when every identifier in `ids` is `NO_ID` or a valid position in `1:n`.
-in_range(ids::AbstractVector{Int32}, n::Integer) = all(id -> 0 <= id <= n, ids)
+in_range(ids::AbstractVector{<:Integer}, n::Integer) = all(id -> 0 <= id <= n, ids)
 in_range(lists::AbstractVector{Vector{Int32}}, n::Integer) =
     all(ids -> in_range(ids, n), lists)
 
@@ -222,16 +311,19 @@ identifiers that point at existing rows. Throws an `ArgumentError` naming the fi
 violation. Run after loading a cache or importing user data.
 """
 function validate(ds::Dataset)
+    validate_core(ds)
+    validate_lazy(ds)
+    return true
+end
+
+# The checks that need only what a dataset read from its cache keeps in memory.
+function validate_core(ds::Dataset)
     tables = (
         :references => ds.references,
         :compounds => ds.compounds,
-        :samples => ds.samples,
-        :purity_steps => ds.purity_steps,
         :properties => ds.properties,
         :experiments => ds.experiments,
         :measurements => ds.measurements,
-        :extras => ds.extras,
-        :conditions => ds.conditions,
         :uncertainties => ds.uncertainties,
     )
     for (name, table) in tables
@@ -244,17 +336,41 @@ function validate(ds::Dataset)
         "component of an experiment" =>
             all(c -> in_range(c, length(ds.compounds)), ex.components),
         "composition kind" => all(k -> in_range(k, length(ds.kinds)), ex.kinds),
-        "sample of an experiment" =>
-            all(c -> in_range(c, length(ds.samples)), ex.samples),
         "purpose of an experiment" => in_range(ex.purpose, length(ds.purposes)),
         "uncertainty method of a measurement" =>
             in_range(me.unc_method, length(ds.unc_methods)),
+        "uncertainty evaluator of a measurement" =>
+            in_range(me.evaluator, length(ds.evaluators)),
+        "property block of a measurement" => in_range(me.block, length(me)),
         "experiment of a measurement" => in_range(me.experiment, length(ex)),
         "property of a measurement" => in_range(me.property, length(ds.properties)),
         "method of a measurement" => in_range(me.method, length(ds.methods)),
         "phase of a measurement" => in_range(me.phase, length(ds.phases)),
         "group of a property" => in_range(ds.properties.group, length(ds.groups)),
         "source of a reference" => in_range(ds.references.source, length(ds.sources)),
+    )
+    for (what, ok) in checks
+        ok || throw(ArgumentError("invalid identifier: $what points outside its table"))
+    end
+    validate_uncertainties(ds)
+    return nothing
+end
+
+# The checks of the tables that are read from the cache file on first use; they read them.
+function validate_lazy(ds::Dataset)
+    for (name, table) in (
+        :samples => ds.samples,
+        :purity_steps => ds.purity_steps,
+        :extras => ds.extras,
+        :conditions => ds.conditions,
+    )
+        allequal(column_lengths(table)) ||
+            throw(ArgumentError("columns of the $name table have different lengths"))
+    end
+    ex = ds.experiments
+    checks = (
+        "sample of an experiment" =>
+            all(c -> in_range(c, length(ds.samples)), ex.samples),
         "reference of a sample" =>
             in_range(ds.samples.reference, length(ds.references)),
         "compound of a sample" => in_range(ds.samples.compound, length(ds.compounds)),
@@ -279,8 +395,7 @@ function validate(ds::Dataset)
     end
     validate_extras(ds)
     validate_conditions(ds)
-    validate_uncertainties(ds)
-    return true
+    return nothing
 end
 
 function validate_extras(ds::Dataset)
@@ -324,15 +439,21 @@ function scope_length(ds::Dataset, code::Integer)
     code == 1 && return length(ds.references)
     code == 2 && return length(ds.compounds)
     code == 3 && return length(ds.experiments)
-    return length(ds.measurements)
+    return length(ds.measurements)   # a measurement, or the first point of a block
 end
+
+# The identifier of an extra key, which must fit the one-byte column of the extras table.
+extra_key_code(ds::Dataset, key::AbstractString) =
+    narrow(UInt8, intern!(ds.extra_keys, key), "extra key")
 
 """
     add_extra!(ds, scope, row, key, value)
 
 Attach the field `key` with a number or a string `value` to row `row` of the table named
-by `scope` (`:reference`, `:compound`, `:experiment` or `:measurement`). Adding the same
-key to the same row twice keeps both entries; readers use the last one.
+by `scope` (`:reference`, `:compound`, `:experiment` or `:measurement`; `:block` is the
+scope the parser uses for the fields that all the points of a measured property share, see
+[`MeasurementTable`](@ref)). Adding the same key to the same row twice keeps both entries;
+readers use the last one.
 """
 function add_extra!(
     ds::Dataset,
@@ -348,7 +469,7 @@ function add_extra!(
     ex = ds.extras
     push!(ex.scope, code)
     push!(ex.row, Int32(row))
-    push!(ex.key, intern!(ds.extra_keys, key))
+    push!(ex.key, extra_key_code(ds, key))
     if value isa AbstractString
         push!(ex.number, NaN)
         push!(ex.text, intern!(ds.extra_texts, value))
@@ -367,7 +488,11 @@ Sorted names of the extra fields present for `scope`.
 function extra_keys(ds::Dataset, scope::Symbol)
     code = scope_code(scope)
     ex = ds.extras
-    ids = unique(ex.key[i] for i in eachindex(ex.key) if ex.scope[i] == code)
+    block = scope_code(:block)
+    ids = unique(
+        ex.key[i] for i in eachindex(ex.key) if
+        ex.scope[i] == code || (scope == :measurement && ex.scope[i] == block)
+    )
     return sort!([pool_string(ds.extra_keys, id) for id in ids])
 end
 
@@ -378,17 +503,7 @@ Dense column with one entry per row of the `scope` table: the numeric extra `key
 `NaN` where the row has none.
 """
 function extra_numbers(ds::Dataset, scope::Symbol, key::AbstractString)
-    code = scope_code(scope)
-    column = fill(NaN, scope_length(ds, code))
-    key_id = get(ds.extra_keys.index, key, NO_ID)
-    key_id == NO_ID && return column
-    ex = ds.extras
-    for i in eachindex(ex.row)
-        if ex.scope[i] == code && ex.key[i] == key_id && ex.text[i] == NO_ID
-            column[ex.row[i]] = ex.number[i]
-        end
-    end
-    return column
+    return extra_column(ds, scope, key, false)
 end
 
 """
@@ -398,15 +513,45 @@ Dense column with one entry per row of the `scope` table: the text extra `key`, 
 where the row has none.
 """
 function extra_texts(ds::Dataset, scope::Symbol, key::AbstractString)
+    return extra_column(ds, scope, key, true)
+end
+
+# The extras that are the same for every point of a block are stored once, on the first
+# point of the block (`:block`); for `:measurement` they are spread over the points of the
+# block, and an extra attached to a single point wins over the one of its block.
+function extra_column(ds::Dataset, scope::Symbol, key::AbstractString, text::Bool)
     code = scope_code(scope)
-    column = fill("", scope_length(ds, code))
+    n = scope_length(ds, code)
+    column = text ? fill("", n) : fill(NaN, n)
     key_id = get(ds.extra_keys.index, key, NO_ID)
     key_id == NO_ID && return column
     ex = ds.extras
-    for i in eachindex(ex.row)
-        if ex.scope[i] == code && ex.key[i] == key_id && ex.text[i] != NO_ID
-            column[ex.row[i]] = pool_string(ds.extra_texts, ex.text[i])
+    wanted(i) = ex.key[i] == key_id && (ex.text[i] != NO_ID) == text
+    value(i) = text ? pool_string(ds.extra_texts, ex.text[i]) : ex.number[i]
+    if scope != :measurement
+        for i in eachindex(ex.row)
+            ex.scope[i] == code && wanted(i) && (column[ex.row[i]] = value(i))
         end
+        return column
+    end
+    block_code = scope_code(:block)
+    at_block = Dict{Int32,eltype(column)}()
+    explicit = falses(n)
+    for i in eachindex(ex.row)
+        wanted(i) || continue
+        if ex.scope[i] == code
+            column[ex.row[i]] = value(i)
+            explicit[ex.row[i]] = true
+        elseif ex.scope[i] == block_code
+            at_block[ex.row[i]] = value(i)
+        end
+    end
+    isempty(at_block) && return column
+    blocks = ds.measurements.block
+    for r = 1:n
+        (explicit[r] || blocks[r] == NO_ID) && continue
+        found = get(at_block, blocks[r], nothing)
+        found === nothing || (column[r] = found)
     end
     return column
 end

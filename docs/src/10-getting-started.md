@@ -45,7 +45,7 @@ What that call does depends on what is already on your machine:
 | Later sessions | Checks whether a new version of the database was published (it warns you if so, see [Updates](@ref updates)), then loads the binary cache, which is much faster than parsing. |
 | Same session | Returns the object it already built, immediately. |
 
-The result is a [`Dataset`](@ref): the whole archive in memory, organized as a few relational tables (see the [data model](@ref data_model)). You rarely touch it directly; you hand it to [`points`](@ref).
+The result is a [`Database`](@ref): the ThermoML archive and, when you add them, your own databases and the points you take from the literature, each independent and read from its own file only when a query needs it. The archive is a [`Dataset`](@ref), organized as a few relational tables (see the [data model](@ref data_model)). You rarely touch either directly; you hand the database to [`points`](@ref).
 
 !!! info "Where do the files go?"
     `database_dir()` tells you. On Windows it is `%LOCALAPPDATA%\ThermophysicalDB`, on macOS `~/Library/Application Support/ThermophysicalDB` and on Linux `~/.local/share/ThermophysicalDB`. You can move it with [`set_database_dir!`](@ref) or with the environment variable `THERMOPHYSICALDB_DATA_DIR`.
@@ -114,6 +114,19 @@ fig
     - The [tutorials](20-tutorials/10-hexane-conductivity.md) walk through complete analyses with real data.
     - The [manual](30-manual/10-selecting.md) documents every function and the reasoning behind its behaviour.
     - If the download does not work on your network, see [Downloads, updates and cache](@ref updates).
+
+## Name a compound in any way
+
+The archive names a compound as each article did. The package also keeps a second, separate database of the compounds, with all their names, CAS numbers, PubChem CIDs, SMILES and InChIs. Joining the two lets you search the archive with any of them (the first call downloads the lists, about 47 MB):
+
+```julia
+cdb = compound_database()
+linked = link_compounds(db, cdb)
+
+points(linked; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true)   # ethanol + water
+```
+
+When a text fits more than one compound, such as the formula `"C2H6O"`, you are asked which one you mean. See [Compounds and their identifiers](@ref compounds) and the [binary mixtures tutorial](@ref tutorial_mixtures).
 
 ## Sources of the data
 

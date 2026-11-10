@@ -22,20 +22,29 @@ end
 """
     UncertaintyTerm(value; k, level)
 
-An uncertainty with its coverage: `value` is the uncertainty in the unit of the quantity,
-stated with the coverage factor `k` (a standard uncertainty has `k = 1`) or with the level
-of confidence `level` as a fraction (for example `0.95`), from which `k` follows as in
-[`coverage_factor`](@ref). One of the two is required, so a term never lacks its coverage.
-Where a term is expected, a plain number means a standard uncertainty (`k = 1`).
+An uncertainty with its coverage: `value` is the uncertainty, stated with the coverage
+factor `k` (a standard uncertainty has `k = 1`) or with the level of confidence `level` as a
+fraction (for example `0.95`), from which `k` follows as in [`coverage_factor`](@ref). One of
+the two is required, so a term never lacks its coverage. Where a term is expected, a plain
+number means a standard uncertainty (`k = 1`).
+
+`value` is a number in the unit of the quantity (kelvin, kPa, the unit of the property, the
+composition as stored), or what [`set_uncertainty!`](@ref) converts into it for the point it
+is stored at, so the unit does not have to be the one of the measurement:
+
+- a quantity of a units package (`0.5u"mW/m/K"`, `0.01u"°C"`, `5u"mbar"`), converted with the
+  exact arithmetic of the package as a difference, never with the offset of `°C`;
+- a text with a number and a unit (`"0.5 mW/m/K"`, `"0.01 degC"`, `"5 mbar"`), which needs no
+  package of units;
+- a relative uncertainty (`"2 %"`, `"500 ppm"`, `2u"percent"`): that fraction of the value of the
+  same quantity at the point (the temperature in K, the pressure in kPa, the property in its
+  unit, the composition as stored).
 """
-struct UncertaintyTerm
-    value::Float64
+struct UncertaintyTerm{V}
+    value::V
     k::Float64
     level::Float64
-    function UncertaintyTerm(value::Real; k::Real = NaN, level::Real = NaN)
-        isfinite(value) && value >= 0 || throw(
-            ArgumentError("an uncertainty must be finite and not negative, got $value"),
-        )
+    function UncertaintyTerm(value; k::Real = NaN, level::Real = NaN)
         isnan(k) &&
             isnan(level) &&
             throw(
@@ -48,15 +57,137 @@ struct UncertaintyTerm
         isfinite(kk) && kk > 0 ||
             throw(ArgumentError("the coverage factor must be finite and positive, got $k"))
         lv = isnan(level) ? level_of_coverage(kk) : Float64(level)
-        return new(Float64(value), kk, lv)
+        if value isa Real
+            isfinite(value) && value >= 0 || throw(
+                ArgumentError("an uncertainty must be finite and not negative, got $value"),
+            )
+            return new{Float64}(Float64(value), kk, lv)
+        end
+        return new{typeof(value)}(value, kk, lv)
     end
 end
 
 as_term(::Nothing) = nothing
 as_term(t::UncertaintyTerm) = t
-as_term(x::Real) = UncertaintyTerm(x; k = 1.0)
+as_term(x) = UncertaintyTerm(x; k = 1.0)
 
 standard_value(t::UncertaintyTerm) = t.value / t.k
+
+# ----------------------------------------------------------------------------------
+# Terms given with a unit or as a percentage
+# ----------------------------------------------------------------------------------
+
+# Relative units: the fraction of the value that the unit stands for.
+const RELATIVE_UNITS = Dict{String,Float64}(
+    "%" => 1.0e-2,
+    "percent" => 1.0e-2,
+    "ppm" => 1.0e-6,
+    "ppb" => 1.0e-9,
+    "‰" => 1.0e-3,
+)
+
+"""
+What an uncertainty of one quantity of a point or of an experiment is converted against:
+`kind` (`NativeTemperature()`, `NativePressure()`, a `UnitSpec`, or `nothing` when the
+quantity has no unit that can be given), the stored `reference` value for a relative term
+(`NaN` when there is none) and the words for an error message.
+"""
+function uncertainty_context(ds::Dataset, scope::Symbol, row::Int, quantity::Symbol)
+    if scope === :experiment
+        kind =
+            quantity === :temperature ? NativeTemperature() :
+            quantity === :pressure ? NativePressure() : nothing
+        why =
+            quantity === :property ?
+            "the experiment may have several properties; store it at a point" :
+            "the composition has no unit that can be given"
+        return (;
+            kind,
+            reference = NaN,
+            where = "experiment $row",
+            why = kind === nothing ? why : "",
+            relative_why = "a percentage needs the value of a point; store it at the point",
+        )
+    end
+    m = ds.measurements
+    if quantity === :temperature
+        kind, reference, why = NativeTemperature(), m.temperature[row], ""
+    elseif quantity === :pressure
+        kind, reference, why = NativePressure(), m.pressure[row], ""
+    elseif quantity === :property
+        spec = unit_spec(ds.properties.unit[m.property[row]])
+        kind, reference = spec, m.value[row]
+        why = spec === nothing ? "the property has no unit" : ""
+    else
+        j = parse(Int, String(quantity)[end:end])
+        kind, reference = nothing, m.composition[j][row]
+        why = "the composition has no unit that can be given"
+    end
+    return (; kind, reference, where = "measurement $row", why, relative_why = "")
+end
+
+# `number unit` written as text. The unit may be empty (a plain number).
+function split_number_unit(text::AbstractString)
+    m = match(r"^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*(.*?)\s*$", text)
+    m === nothing && throw(
+        ArgumentError(
+            "cannot read \"$text\" as a number with a unit (for example \"0.5 mW/m/K\" or \"2 %\")",
+        ),
+    )
+    return parse(Float64, m.captures[1]), String(m.captures[2])
+end
+
+# The value of an uncertainty in the native unit of the quantity. `number` is in the unit
+# written as `unit_text`; a relative unit is a fraction of `reference`.
+function uncertainty_in_native(number::Real, unit_text::AbstractString, ctx, quantity)
+    isempty(unit_text) && return Float64(number)
+    fraction = get(RELATIVE_UNITS, unit_text, nothing)
+    if fraction !== nothing
+        isempty(ctx.relative_why) || throw(ArgumentError(ctx.relative_why))
+        isfinite(ctx.reference) || throw(
+            ArgumentError(
+                "$(quantity) of $(ctx.where) has no value to take a percentage of",
+            ),
+        )
+        return Float64(number) * fraction * abs(ctx.reference)
+    end
+    ctx.kind === nothing && throw(
+        ArgumentError(
+            "cannot give $(quantity) of $(ctx.where) with the unit \"$unit_text\": $(ctx.why)",
+        ),
+    )
+    affine = quantity_affine(ctx.kind, unit_text)
+    affine === nothing && throw(
+        ArgumentError(
+            "cannot read \"$unit_text\" as a unit; the manual lists the symbols the package knows",
+        ),
+    )
+    return apply_exact(difference_of(affine), number)
+end
+
+uncertainty_native(x::Real, ctx, quantity) = Float64(x)
+function uncertainty_native(x::AbstractString, ctx, quantity)
+    number, unit_text = split_number_unit(x)
+    return uncertainty_in_native(number, unit_text, ctx, quantity)
+end
+function uncertainty_native(x, ctx, quantity)
+    backend = backend_of(x)
+    parts = quantity_parts(backend, x)
+    if parts !== nothing && parts[2] !== nothing && haskey(RELATIVE_UNITS, parts[2])
+        return uncertainty_in_native(parts[1], parts[2], ctx, quantity)
+    end
+    ctx.kind === nothing && throw(
+        ArgumentError("cannot give $(quantity) of $(ctx.where) as a quantity: $(ctx.why)"),
+    )
+    return native_difference(x, ctx.kind)
+end
+
+resolve_term(::Nothing, ctx, quantity) = nothing
+resolve_term(term::UncertaintyTerm{Float64}, ctx, quantity) = term
+function resolve_term(term::UncertaintyTerm, ctx, quantity)
+    value = uncertainty_native(term.value, ctx, quantity)
+    return UncertaintyTerm(value; k = term.k, level = term.level)
+end
 
 function uncertainty_scope(scope::Symbol)
     symbol_code("scope", UNCERTAINTY_SCOPES, scope)
@@ -70,9 +201,15 @@ Store the uncertainty terms of one quantity of a point (`scope = :measurement`, 
 row of `ds.measurements`) or of an experiment (`scope = :experiment`, a term shared by all
 its points, such as the specification of a thermometer). `quantity` is one of
 `$(UNCERTAINTY_QUANTITIES)`. Each term is optional: a plain number (a standard
-uncertainty) or an [`UncertaintyTerm`](@ref) (value with its `k` or `level`), in the unit
-of the quantity: kelvin, the pressure unit of the archive (kPa), the composition as stored
-and, for the property, its unit.
+uncertainty) or an [`UncertaintyTerm`](@ref) (value with its `k` or `level`). A number is in
+the unit the database keeps for the quantity: kelvin, the pressure unit of the archive (kPa),
+the composition as stored and, for the property, its unit. The value of a term may also be a
+quantity of a units package, a text with a number and a unit (`"0.5 mW/m/K"`) or a
+percentage (`"2 %"`, a fraction of the value of that quantity at the point); it is converted
+into the unit of the database with the exact arithmetic of the package, as a difference, so
+the unit does not have to be the one of the measurement and `0.01u"°C"` is 0.01 K. A
+quantity of the property or a percentage needs a point (`scope = :measurement`): an
+experiment may have several properties and its points have different values.
 
 For a point, the combined and the expanded uncertainty are derived when not given, in this
 order of precedence:
@@ -116,11 +253,12 @@ function set_uncertainty!(
     t = ds.uncertainties
     nrows = scope === :experiment ? length(ds.experiments) : length(ds.measurements)
     1 <= row <= nrows || throw(ArgumentError("row $row is not a row of the $(scope) table"))
+    ctx = uncertainty_context(ds, scope, Int(row), quantity)
     terms = (
-        statistical = as_term(statistical),
-        device = as_term(device),
-        combined = as_term(combined),
-        expanded = as_term(expanded),
+        statistical = resolve_term(as_term(statistical), ctx, quantity),
+        device = resolve_term(as_term(device), ctx, quantity),
+        combined = resolve_term(as_term(combined), ctx, quantity),
+        expanded = resolve_term(as_term(expanded), ctx, quantity),
     )
     isnan(level) ||
         0 < level < 1 ||

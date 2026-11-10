@@ -98,7 +98,8 @@ const DERIVED_FIELDS = (:index, :lookup)
 
 One row per distinct chemical species, shared by every source. The identity key is the
 standard InChIKey; when a record has none, the lower-cased first name is used instead
-(prefixed with `"name:"` so the two kinds of key cannot collide).
+(prefixed with `"name:"` so the two kinds of key cannot collide). Data of the user may give
+a CAS number instead, which makes the key `"cas:<number>"`.
 """
 struct CompoundTable
     key::Vector{String}
@@ -124,8 +125,14 @@ end
 
 Base.length(t::CompoundTable) = length(t.key)
 
-function compound_key(inchikey::AbstractString, names::AbstractVector{<:AbstractString})
+function compound_key(
+    inchikey::AbstractString,
+    names::AbstractVector{<:AbstractString};
+    cas::AbstractString = "",
+)
     isempty(inchikey) || return String(inchikey)
+    # A compound given by its CAS number only (the user's data, until an InChIKey is known).
+    isempty(cas) || return "cas:" * String(cas)
     isempty(names) &&
         throw(ArgumentError("a compound needs an InChIKey or at least one name"))
     return "name:" * lowercase(strip(first(names)))
@@ -137,8 +144,9 @@ function add_compound!(
     inchi::AbstractString = "",
     formula::AbstractString = "",
     names::AbstractVector{<:AbstractString} = String[],
+    cas::AbstractString = "",
 )
-    key = compound_key(inchikey, names)
+    key = compound_key(inchikey, names; cas)
     id = get(t.index, key, NO_ID)
     if id != NO_ID
         # Keep the first record but enrich it with what the new one adds.
@@ -491,7 +499,20 @@ unit the source used (see [`PropertyTable`](@ref)); `NaN` marks an absent number
   (level of confidence as a fraction) when the source gave them. The `k = 2` version is
   derived on demand, so changing the policy never leaves stale data on disk.
   `unc_method` is how the uncertainty was evaluated (pool `unc_methods`), and `unc_k` the
-  coverage factor when the source states it.
+  coverage factor when the source states it. `evaluator` (pool `evaluators`) names who
+  evaluated it and `assessment` is the assessment number of the source (`NaN` when absent).
+- `block`: the measured property of an experiment that the point belongs to, given as the
+  row of the first point of that block (`0` when the point has no block). The extras that
+  are the same for every point of the block (the solvent, the component a property refers
+  to, ...) are stored once, with the scope `:block` and that row, instead of once per
+  point; [`extra_numbers`](@ref) and [`extra_texts`](@ref) still return them for every
+  point, and an extra attached to one point (`:measurement`) takes precedence.
+- To keep the table small, `property`, `phase`, `unc_method` and `method` use the narrowest
+  unsigned integer that holds their pool (`UInt8`, or `UInt16` for the methods), and
+  `unc_k`, `unc_level` and `assessment` are [`PooledFloats`](@ref): a byte per row that
+  points into the few distinct values. Reading them gives the same numbers as a plain
+  `Vector{Float64}`; adding more distinct values than the code can hold throws an
+  `ArgumentError`.
 - `digits`, `temperature_digits`, `pressure_digits` and `composition_digits[i]` are the
   numbers of significant digits the source gave for the value, the temperature, the
   pressure and the amount of component `i` ([`NO_DIGITS`](@ref) when not given).
@@ -501,17 +522,20 @@ unit the source used (see [`PropertyTable`](@ref)); `NaN` marks an absent number
 """
 struct MeasurementTable
     experiment::Vector{Int32}
-    property::Vector{Int32}
-    method::Vector{Int32}
-    phase::Vector{Int32}
+    property::Vector{UInt8}
+    method::Vector{UInt16}
+    phase::Vector{UInt8}
     value::Vector{Float64}
     unc::Vector{Float64}
-    unc_k::Vector{Float64}
-    unc_level::Vector{Float64}
+    unc_k::PooledFloats{UInt8}
+    unc_level::PooledFloats{UInt8}
     temperature::Vector{Float64}
     pressure::Vector{Float64}
     composition::NTuple{MAX_COMPONENTS,Vector{Float64}}
-    unc_method::Vector{Int32}
+    unc_method::Vector{UInt8}
+    evaluator::Vector{UInt16}
+    assessment::PooledFloats{UInt8}
+    block::Vector{Int32}
     digits::Vector{UInt8}
     temperature_digits::Vector{UInt8}
     pressure_digits::Vector{UInt8}
@@ -521,16 +545,19 @@ end
 function MeasurementTable()
     return MeasurementTable(
         Int32[],
-        Int32[],
-        Int32[],
-        Int32[],
+        UInt8[],
+        UInt16[],
+        UInt8[],
         Float64[],
         Float64[],
-        Float64[],
-        Float64[],
+        PooledFloats{UInt8}(),
+        PooledFloats{UInt8}(),
         Float64[],
         Float64[],
         ntuple(_ -> Float64[], MAX_COMPONENTS),
+        UInt8[],
+        UInt16[],
+        PooledFloats{UInt8}(),
         Int32[],
         UInt8[],
         UInt8[],
@@ -555,6 +582,9 @@ function add_measurement!(
     pressure::Real = NaN,
     composition::NTuple{MAX_COMPONENTS,<:Real} = (NaN, NaN, NaN),
     unc_method::Integer = NO_ID,
+    evaluator::Integer = NO_ID,
+    assessment::Real = NaN,
+    block::Integer = NO_ID,
     digits::Integer = NO_DIGITS,
     temperature_digits::Integer = NO_DIGITS,
     pressure_digits::Integer = NO_DIGITS,
@@ -565,9 +595,9 @@ function add_measurement!(
     ),
 )
     push!(t.experiment, Int32(experiment))
-    push!(t.property, Int32(property))
-    push!(t.method, Int32(method))
-    push!(t.phase, Int32(phase))
+    push!(t.property, narrow(UInt8, property, "property"))
+    push!(t.method, narrow(UInt16, method, "method"))
+    push!(t.phase, narrow(UInt8, phase, "phase"))
     push!(t.value, Float64(value))
     push!(t.unc, Float64(unc))
     push!(t.unc_k, Float64(unc_k))
@@ -577,7 +607,10 @@ function add_measurement!(
     for i = 1:MAX_COMPONENTS
         push!(t.composition[i], Float64(composition[i]))
     end
-    push!(t.unc_method, Int32(unc_method))
+    push!(t.unc_method, narrow(UInt8, unc_method, "uncertainty method"))
+    push!(t.evaluator, narrow(UInt16, evaluator, "uncertainty evaluator"))
+    push!(t.assessment, assessment)
+    push!(t.block, Int32(block))
     push!(t.digits, UInt8(digits))
     push!(t.temperature_digits, UInt8(temperature_digits))
     push!(t.pressure_digits, UInt8(pressure_digits))
@@ -592,7 +625,7 @@ end
 # ----------------------------------------------------------------------------------
 
 "Tables an extra field can be attached to; the position is the code stored on disk."
-const EXTRA_SCOPES = (:reference, :compound, :experiment, :measurement)
+const EXTRA_SCOPES = (:reference, :compound, :experiment, :measurement, :block)
 
 function scope_code(scope::Symbol)
     code = findfirst(==(scope), EXTRA_SCOPES)
@@ -608,17 +641,17 @@ Sparse key-value store (long format) for fields that have no column in the core 
 Row `i` says: in the table given by `scope[i]`, row `row[i]` has the field `key[i]` with
 the numeric value `number[i]` (`NaN` for text) or the text `text[i]` (`NO_ID` for a
 number). Keys and texts are identifiers into the dataset's `extra_keys` and
-`extra_texts` pools. Core queries never touch this table.
+`extra_texts` pools (there are at most 255 distinct keys, which keeps `key` to one byte). Core queries never touch this table.
 """
 struct ExtraTable
     scope::Vector{UInt8}
     row::Vector{Int32}
-    key::Vector{Int32}
+    key::Vector{UInt8}
     number::Vector{Float64}
     text::Vector{Int32}
 end
 
-ExtraTable() = ExtraTable(UInt8[], Int32[], Int32[], Float64[], Int32[])
+ExtraTable() = ExtraTable(UInt8[], Int32[], UInt8[], Float64[], Int32[])
 
 Base.length(t::ExtraTable) = length(t.row)
 

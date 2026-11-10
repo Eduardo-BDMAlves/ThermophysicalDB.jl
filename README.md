@@ -17,7 +17,9 @@
 [![Coverage](https://codecov.io/gh/Eduardo-BDMAlves/ThermophysicalDB.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Eduardo-BDMAlves/ThermophysicalDB.jl)
 [![Lint workflow Status](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Lint.yml/badge.svg?branch=main)](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Lint.yml?query=branch%3Amain)
 [![Docs workflow Status](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Docs.yml/badge.svg?branch=main)](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Docs.yml?query=branch%3Amain)
-<!-- [![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME) -->
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![JET](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
+[![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![All Contributors](https://img.shields.io/github/all-contributors/Eduardo-BDMAlves/ThermophysicalDB.jl?labelColor=5e1ec7&color=c0ffee&style=flat-square)](#contributors)
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
@@ -33,6 +35,7 @@ Experimental data on density, viscosity, thermal conductivity, vapor pressure, h
 - **Units that mean something.** Limits accept [Unitful.jl](https://github.com/PainterQubits/Unitful.jl) quantities such as `25u"°C"` or `1u"atm"`, and tables can return Unitful columns.
 - **Uncertainty on one footing.** Every expanded uncertainty is also restated at *k* = 2 by an explicit, documented rule, so points from different laboratories can be weighted somewhat consistently.
 - **Tables.jl all the way.** A selection is a Tables.jl table made of plain vectors: plot it with Makie, hand it to a DataFrame, or write it to disk.
+- **Two databases.** The experimental points (ThermoML) and the nomenclature and base properties of the compounds (names, CAS number, PubChem CID, SMILES, InChI, molar mass) are two separate databases, linked on demand. A compound can be named by any of them, and when a name is ambiguous the user chooses; the ThermoML data are never changed.
 - **Cite what you use.** A selection exports its BibTeX file and a summary table of the articles behind it (LaTeX, Markdown or CSV).
 - **Extensible.** The same schema is meant to hold other databases, including your own local data.
 
@@ -64,6 +67,11 @@ t = table(v; quantities = Unitful)   # Tables.jl columns: temperature, pressure,
 ```
 
 The [documentation](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev) has a getting-started guide and tutorials that go from a plot of hexane conductivity to comparing the measured density of water with IAPWS-95, and hexane and CO₂ data with the equations of state of [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl).
+
+> [!NOTE]
+> The author of the package would like to state that he has made extensive use of AI in order to develop the initial implementation of the package. Any problems with the implementation will be corrected in the future.
+> This package is a personal project being developed in parallel to my Doctorate thesis, therefore, it was developed using tools to minimize the time required for the first version release. However, at every step of the implementation, extensive functionalities tests were conducted as this package will be used to facilitate the planning of several experiments in the Thesis.
+> Any collaboration and suggestions are more than welcome! Fill free to open an issue.
 
 ## Data source
 
@@ -99,3 +107,7 @@ If you want to make contributions of any kind, please first that a look into our
 <!-- prettier-ignore-end -->
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
+
+### Acknowledgments
+
+The authors would like to acknowledge Petrobras for the financial and technical support via the Cooperation Agreement ANP No 23424-5. We would also like to acknowledge ANP and FAPESP for the financial support through the Programa de Recursos humanos da Agência Nacional do Petróleo, Gás Natural e Biocombustíveis – PRH- ANP, managed by Fundação de Amparo à Pesquisa do Estado de São Paulo (FAPESP), Brazil. Process n° 2025/19596-8.

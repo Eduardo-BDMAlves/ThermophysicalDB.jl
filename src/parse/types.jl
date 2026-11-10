@@ -72,6 +72,8 @@ struct ParsedProperty
     level::Float64          # level of confidence as a fraction, NaN when not given
     coverage::Float64       # coverage factor, NaN when not given
     unc_method::String      # how the uncertainty was evaluated, "" when not given
+    evaluator::String       # who evaluated the uncertainty, "" when not given
+    assessment::Float64     # assessment number of the uncertainty, NaN when not given
     extras::ExtraPairs      # constant for every point of this property
     solvent_orgs::Vector{Int}           # components of the solvent, as numbered in the article
     phase_orgs::Vector{Int}             # components the phase of the property is stated for

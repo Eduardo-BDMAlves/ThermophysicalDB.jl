@@ -1,0 +1,11 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
+FlexUnits = "76e01b6b-c995-4ce6-8559-91e72a3d4e95"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
+ZipArchives = "49080126-0e18-4c2a-b176-c102e4b3760c"
