@@ -98,14 +98,15 @@ function relative_input(x::AbstractString)
     return number * fraction
 end
 function relative_input(x)
+    bad() =
+        ArgumentError("a relative tolerance is a fraction or a percentage, got $(repr(x))")
     parts = quantity_parts(backend_of(x), x)
-    (parts !== nothing && parts[2] !== nothing && haskey(RELATIVE_UNITS, parts[2])) ||
-        throw(
-            ArgumentError(
-                "a relative tolerance is a fraction or a percentage, got $(repr(x))",
-            ),
-        )
-    return Float64(parts[1]) * RELATIVE_UNITS[parts[2]]
+    parts === nothing && throw(bad())
+    number, unit = parts
+    unit === nothing && throw(bad())
+    fraction = get(RELATIVE_UNITS, unit, nothing)
+    fraction === nothing && throw(bad())
+    return Float64(number) * fraction
 end
 
 function relative_named(name::AbstractString, x)

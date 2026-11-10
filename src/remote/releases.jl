@@ -82,7 +82,7 @@ function parse_releases(text::AbstractString)::Vector{Release}
     normalized = replace(text, "\\/" => "/")
     found = Dict{String,Release}()
     for m in eachmatch(RELEASE_URL_REGEX, normalized)
-        name, version = String(m.captures[1]), String(m.captures[2])
+        name, version = captured(m, 1), captured(m, 2)
         url = String(m.match)
         found[version] = Release(version, name, url, url * ".sha256", nothing)
     end

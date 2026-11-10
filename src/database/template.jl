@@ -182,7 +182,7 @@ function template_info(db::Database)
     return TemplateInfo(
         string(pkgversion(@__MODULE__)),
         TEMPLATE_SCHEMA,
-        string(Dates.today()),
+        utc_timestamp(),
         databases,
         properties,
         template_lists(db),
@@ -712,16 +712,18 @@ function template_arguments(td::TemplateData; many::Bool = false)
     )
 end
 
+function first_author_text(d::TemplateData)
+    given = filter(isgiven, collect(d.reference.authors))
+    return isempty(given) ? "" : text_of(first(given))
+end
+
 # Joins the files of one work: the reference must be the same, the compounds are joined by name and
 # the experiments follow one another.
 function join_templates(datas::Vector{TemplateData})
     first_data = datas[1]
     identity(d) = (
         normalize_doi(text_of(d.reference.doi)),
-        isempty(text_of(d.reference.doi)) ?
-        lowercase(
-            text_of(first(filter(isgiven, collect(d.reference.authors)); init = "")),
-        ) : "",
+        isempty(text_of(d.reference.doi)) ? lowercase(first_author_text(d)) : "",
         isempty(text_of(d.reference.doi)) ? text_of(d.reference.year) : "",
     )
     for d in datas[2:end]

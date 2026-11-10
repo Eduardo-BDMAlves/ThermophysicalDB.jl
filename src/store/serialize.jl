@@ -43,6 +43,7 @@ function store_columns!(sink, table, prefix::AbstractString)
     for name in fieldnames(typeof(table))
         name in DERIVED_FIELDS && continue
         value = getfield(table, name)
+        value isa Base.RefValue && continue
         if value isa Tuple
             for (i, column) in enumerate(value)
                 sink("$prefix/$name/$i", column)
@@ -84,6 +85,9 @@ cache, or a `Dict` setter in tests.
 """
 function write_dataset(sink, ds::Dataset)
     sink("schema_version", SCHEMA_VERSION)
+    stamps = getfield(ds, :stamps)
+    sink("meta/created", stamps.created)
+    sink("meta/modified", stamps.modified)
     for name in POOL_NAMES
         sink("pool/$name", getproperty(ds, name).strings)
     end
@@ -111,7 +115,7 @@ end
 function rebuild_indices!(ds::Dataset; lazy::Bool = false)
     for name in POOL_NAMES
         lazy && lazy_bit(name) != 0 && continue
-        rebuild_pool_index!(getfield(ds, name))
+        rebuild_pool_index!(getfield(ds, name)::StringPool)
     end
     for (i, doi) in enumerate(ds.references.doi)
         isempty(doi) || (ds.references.index[doi] = Int32(i))
@@ -124,6 +128,22 @@ function rebuild_indices!(ds::Dataset; lazy::Bool = false)
     for i = 1:length(pt)
         pt.index[(pt.label[i], pt.unit[i])] = Int32(i)
     end
+    return nothing
+end
+
+# The stamps of the file; one written before they existed (no keys) takes the time of the file.
+function restore_stamps!(ds::Dataset, source, path::AbstractString)
+    stamps = getfield(ds, :stamps)
+    fallback = isempty(path) || !isfile(path) ? time() : mtime(path)
+    read_stamp(key) =
+        try
+            Float64(source(key))
+        catch err
+            err isa KeyError || err isa ArgumentError || rethrow()
+            fallback
+        end
+    stamps.created = read_stamp("meta/created")
+    stamps.modified = read_stamp("meta/modified")
     return nothing
 end
 
@@ -148,6 +168,7 @@ function restore_dataset(source; lazy_path::AbstractString = "")
         fill_columns!(getfield(ds, name), source, String(name))
     end
     rebuild_indices!(ds; lazy)
+    restore_stamps!(ds, source, lazy_path)
     if lazy
         info = stat(lazy_path)
         state = getfield(ds, :lazy)
@@ -169,11 +190,13 @@ function clear_columns!(table)
         value = getfield(table, name)
         if value isa Tuple
             foreach(empty!, value)
+        elseif value isa Base.RefValue
+            nothing
         elseif value isa PooledFloats
             empty!(value.codes)
             empty!(value.pool)
             empty!(value.lookup)
-        else
+        elseif value isa Union{AbstractVector,AbstractDict,AbstractSet}
             empty!(value)
         end
     end
@@ -207,7 +230,7 @@ function load_lazy!(ds::Dataset, name::Symbol)
             JLD2.jldopen(state.path, "r") do file
                 if name === :extra_texts
                     append!(target.strings, file["pool/extra_texts"])
-                    rebuild_pool_index!(target)
+                    rebuild_pool_index!(target::StringPool)
                 else
                     fill_columns!(target, key -> file[key], String(name))
                     name === :samples && rebuild_sample_index!(target)

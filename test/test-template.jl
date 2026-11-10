@@ -758,3 +758,31 @@ end
         @test err isa ArgumentError && contains(err.msg, "unknown source")
     end
 end
+
+@testitem "the template says which versions made it and when" setup =
+    [TwoDatabases, OwnData] tags = [:unit, :fast] begin
+    using XLSX
+    T = ThermophysicalDB
+    ext = Base.get_extension(T, :ThermophysicalDBXLSXExt)
+    mktempdir() do dir
+        db = OwnData.archive_only(joinpath(dir, "thermoml"))
+        before = T.utc_timestamp()
+        path = T.export_template(db, joinpath(dir, "versions.xlsx"); experiments = 1)
+        xf = XLSX.readxlsx(path)
+        @test xf["xlsx_version"] == string(pkgversion(XLSX))
+        @test xf["julia_version"] == string(VERSION)
+        @test xf["package_version"] == string(pkgversion(T))
+        @test xf["template_format"] == T.TEMPLATE_FORMAT
+        stamp = xf["generated_at"]
+        @test occursin(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", stamp) && stamp >= before
+        # The properties of the file itself, which Excel shows under File > Info.
+        zip = ext.ZipArchives.ZipReader(read(path))
+        names =
+            [ext.ZipArchives.zip_name(zip, i) for i = 1:ext.ZipArchives.zip_nentries(zip)]
+        @test "docProps/core.xml" in names && "docProps/app.xml" in names
+        core = String(ext.ZipArchives.zip_readentry(zip, "docProps/core.xml"))
+        @test occursin("XLSX.jl $(pkgversion(XLSX))", core) && occursin(stamp, core)
+        # Still readable, and the databases table moved with the new rows.
+        @test T.read_template_info(path).databases[1].name == "thermoml"
+    end
+end

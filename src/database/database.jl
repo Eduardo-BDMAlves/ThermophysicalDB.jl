@@ -107,10 +107,13 @@ function Base.show(io::IO, ::MIME"text/plain", db::Database)
         "references",
         "compounds",
         "properties",
+        "created",
+        "modified",
         "state",
     ]
     rows = map(db.members) do m
         cat = member_catalog(m)
+        created, modified = member_stamps(m)
         [
             m.name,
             String(m.kind),
@@ -119,10 +122,12 @@ function Base.show(io::IO, ::MIME"text/plain", db::Database)
             group_digits(length(cat.doi)),
             group_digits(length(cat.compound_key)),
             group_digits(length(cat.property_label)),
+            first(stamp_text(created), 10),
+            first(stamp_text(modified), 10),
             is_open(m) ? "read" : "not read",
         ]
     end
-    left = Set([1, 2, 8])
+    left = Set([1, 2, 9])
     widths = [
         max(length(headers[j]), maximum(length(r[j]) for r in rows)) for
         j in eachindex(headers)

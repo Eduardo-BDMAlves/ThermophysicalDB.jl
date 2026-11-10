@@ -6,17 +6,17 @@ const ARCHIVE_NAME_REGEX = r"^ThermoML\.v(\d{4}-\d{2}-\d{2})\.tgz$"
 
 function archive_version(name::AbstractString)
     m = match(ARCHIVE_NAME_REGEX, name)
-    return m === nothing ? nothing : String(m.captures[1])
+    return m === nothing ? nothing : captured(m, 1)
 end
 
 # Digest to verify a local file against, in order: given explicitly, the `.sha256` file
 # kept next to it, or the digest of a release this package knows.
-function local_expected_sha256(path::AbstractString, name::AbstractString, given)
+function local_expected_sha256(path::AbstractString, name::AbstractString, given)::String
     given !== nothing && return parse_sha256(given)
     sidecar = path * ".sha256"
     isfile(sidecar) && return parse_sha256(read(sidecar, String))
     i = findfirst(r -> r.archive_name == name && r.sha256 !== nothing, BUILTIN_RELEASES)
-    i === nothing || return BUILTIN_RELEASES[i].sha256
+    i === nothing || return BUILTIN_RELEASES[i].sha256::String
     throw(
         ArgumentError(
             "no SHA-256 to verify \"$name\" against; pass `sha256 = \"...\"` or keep " *

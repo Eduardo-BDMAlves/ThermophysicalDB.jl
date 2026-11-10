@@ -341,9 +341,8 @@ bibtex(s::ReferenceSummary) = render_bibliography(getfield(s, :bibliography))
 "A number with at most `digits` significant digits and no trailing `.0`; `--` for NaN."
 function format_number(x::Real, digits::Integer)
     isnan(x) && return "--"
-    s = string(round(Float64(x); sigdigits = digits))
-    endswith(s, ".0") && (s = chop(s; tail = 2))
-    return s
+    s = string(round(Float64(x); sigdigits = digits))::String
+    return endswith(s, ".0") ? String(chop(s; tail = 2)) : s
 end
 
 function format_range(lo::Real, hi::Real, digits::Integer, dash::AbstractString)
@@ -563,7 +562,7 @@ function latex_table(
     println(io, "% Requires: \\usepackage{booktabs} and \\usepackage{longtable}")
     println(io, "\\begin{longtable}{", align, "}")
     println(io, "\\caption{", caption, "}\\label{", label, "}\\\\")
-    head = join(header, " & ") * " \\\\"
+    head = join(header, " & ")::String * " \\\\"
     println(io, "\\toprule\n", head, "\n\\midrule\n\\endfirsthead")
     println(io, "\\toprule\n", head, "\n\\midrule\n\\endhead")
     println(

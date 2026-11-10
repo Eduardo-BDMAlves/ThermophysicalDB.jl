@@ -32,6 +32,24 @@ LazyState() =
     LazyState("", 0, 0.0, Threads.Atomic{UInt32}(typemax(UInt32)), ReentrantLock())
 
 """
+    Stamps
+
+When a dataset was created and last edited, as seconds since 1970-01-01 UTC. It is written to the
+file (`meta/created`, `meta/modified`) so that it travels with the data; a file written before the
+stamps existed has none and takes the modification time of the file. Reading the data never changes
+them, adding data does ([`touch!`](@ref)).
+"""
+mutable struct Stamps
+    created::Float64
+    modified::Float64
+end
+
+function Stamps()
+    t = time()
+    return Stamps(t, t)
+end
+
+"""
     Dataset()
 
 The complete in-memory database: the relational tables plus the string pools they
@@ -67,6 +85,7 @@ struct Dataset
     extras::ExtraTable
     conditions::ConditionTable
     uncertainties::UncertaintyTable
+    stamps::Stamps
     lazy::LazyState
 end
 
@@ -100,8 +119,15 @@ function Dataset()
         ExtraTable(),
         ConditionTable(),
         UncertaintyTable(),
+        Stamps(),
         LazyState(),
     )
+end
+
+# The dataset was edited now (a few nanoseconds: the text is made only when it is shown or saved).
+@inline function touch!(ds::Dataset)
+    getfield(ds, :stamps).modified = time()
+    return nothing
 end
 
 # Reading a dataset from its cache file loads the large tables only when something asks for

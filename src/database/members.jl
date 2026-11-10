@@ -112,12 +112,12 @@ end
 
 The dataset of a database, read from its file the first time it is asked for.
 """
-function member_dataset(m::Member)
+function member_dataset(m::Member)::Dataset
     ds = m.dataset
     ds === nothing || return ds
     return lock(m.lock) do
         m.dataset === nothing && (m.dataset = open_member_file(m.path))
-        return m.dataset
+        return m.dataset::Dataset
     end
 end
 
@@ -126,7 +126,7 @@ function member_catalog(m::Member)
     cat === nothing || return cat
     return lock(m.lock) do
         if m.catalog === nothing
-            m.catalog = is_open(m) ? catalog_of(m.dataset) : read_catalog(m.path)
+            m.catalog = is_open(m) ? catalog_of(m.dataset::Dataset) : read_catalog(m.path)
         end
         return m.catalog
     end

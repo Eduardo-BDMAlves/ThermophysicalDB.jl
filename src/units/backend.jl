@@ -249,6 +249,10 @@ function convert_native(x::Float64, kind::Union{NativeTemperature,NativePressure
     return FloatAffine(inv(affine))(x)
 end
 convert_native(x::Float64, kind, to::Symbol) = convert_native(x, kind, String(to))
+# A name written as a symbol means the text, also for the two native kinds (this settles the
+# ambiguity of the two methods above).
+convert_native(x::Float64, kind::Union{NativeTemperature,NativePressure}, to::Symbol) =
+    convert_native(x, kind, String(to))
 function convert_native(
     x::Float64,
     kind::Union{NativeTemperature,NativePressure},
@@ -262,6 +266,7 @@ native_name(::NativePressure) = "kPa"
 
 native_dimension(::NativeTemperature) = KELVIN_UNIT.dim
 native_dimension(::NativePressure) = PASCAL.dim
+quantity_name(spec::UnitSpec) = spec.native
 quantity_name(::NativeTemperature) = "temperature"
 quantity_name(::NativePressure) = "pressure"
 native_scale(::NativeTemperature) = Exact(1)

@@ -614,9 +614,10 @@ mutable struct Book
     sheets::Vector{Sheet}
     names::Vector{Tuple{String,String}}     # defined names: (name, reference)
     styles::StyleBook
+    meta::Dict{String,String}               # title, creator, description, created (document properties)
 end
 
-Book() = Book(Sheet[], Tuple{String,String}[], StyleBook())
+Book() = Book(Sheet[], Tuple{String,String}[], StyleBook(), Dict{String,String}())
 
 function add_sheet!(book::Book, name::AbstractString; tab::AbstractString = "")
     sheet = Sheet(name; tab)
@@ -651,6 +652,16 @@ function package_parts(book::Book; title::AbstractString = "")
     )
     print(content, "<Default Extension=\"xml\" ContentType=\"application/xml\"/>")
     print(content, "<Default Extension=\"png\" ContentType=\"image/png\"/>")
+    if !isempty(book.meta)
+        print(
+            content,
+            "<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>",
+        )
+        print(
+            content,
+            "<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/>",
+        )
+    end
     print(
         content,
         "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>",
@@ -673,6 +684,14 @@ function package_parts(book::Book; title::AbstractString = "")
     end
     print(content, "</Types>")
     push!(parts, "[Content_Types].xml" => take!(content))
+    docs =
+        isempty(book.meta) ? "" :
+        string(
+            "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\"/>",
+            "<Relationship Id=\"rId3\" Type=\"",
+            NS_REL,
+            "/extended-properties\" Target=\"docProps/app.xml\"/>",
+        )
     push!(
         parts,
         "_rels/.rels" => bytes(
@@ -683,10 +702,51 @@ function package_parts(book::Book; title::AbstractString = "")
                 "\">",
                 "<Relationship Id=\"rId1\" Type=\"",
                 NS_REL,
-                "/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>",
+                "/officeDocument\" Target=\"xl/workbook.xml\"/>",
+                docs,
+                "</Relationships>",
             ),
         ),
     )
+    if !isempty(book.meta)
+        get_meta(k) = xml_escape(get(book.meta, k, ""))
+        when = get_meta("created")
+        push!(
+            parts,
+            "docProps/core.xml" => bytes(
+                string(
+                    XML_HEAD,
+                    "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" ",
+                    "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dcterms=\"http://purl.org/dc/terms/\" ",
+                    "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">",
+                    "<dc:title>",
+                    get_meta("title"),
+                    "</dc:title><dc:creator>",
+                    get_meta("creator"),
+                    "</dc:creator>",
+                    "<dc:description>",
+                    get_meta("description"),
+                    "</dc:description>",
+                    "<dcterms:created xsi:type=\"dcterms:W3CDTF\">",
+                    when,
+                    "</dcterms:created>",
+                    "<dcterms:modified xsi:type=\"dcterms:W3CDTF\">",
+                    when,
+                    "</dcterms:modified></cp:coreProperties>",
+                ),
+            ),
+        )
+        push!(
+            parts,
+            "docProps/app.xml" => bytes(
+                string(
+                    XML_HEAD,
+                    "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">",
+                    "<Application>ThermophysicalDB.jl</Application></Properties>",
+                ),
+            ),
+        )
+    end
     wb = IOBuffer()
     print(wb, XML_HEAD, "<workbook xmlns=\"", NS_MAIN, "\" xmlns:r=\"", NS_REL, "\">")
     print(wb, "<bookViews><workbookView activeTab=\"0\"/></bookViews><sheets>")

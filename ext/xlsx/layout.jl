@@ -571,26 +571,27 @@ function guide_sheet!(p::Painter, experiments::Int, info::TemplateInfo, logo::Ve
     end
     section!(p, sh, 26, 2, 6, "This template"; color = MERCURY)
     rows = (
-        ("Package version", info.package_version, ""),
-        ("ThermoML schema", info.schema, ""),
-        ("Template format", TEMPLATE_FORMAT, "0"),
-        ("Generated on", info.generated, ""),
-        ("Experiments", experiments, "0"),
+        ("package_version", "Package version", info.package_version, ""),
+        ("xlsx_version", "XLSX.jl version", string(pkgversion(XLSX)), ""),
+        ("julia_version", "Julia version", string(VERSION), ""),
+        ("", "ThermoML schema", info.schema, ""),
+        ("template_format", "Template format", TEMPLATE_FORMAT, "0"),
+        ("generated_at", "Generated at (UTC)", info.generated, ""),
+        ("experiment_count", "Experiments", experiments, "0"),
     )
-    for (i, (name, value, fmt)) in enumerate(rows)
+    for (i, (key, name, value, fmt)) in enumerate(rows)
         label!(p, sh, 26 + i, 2, name)
         calc!(p, sh, 26 + i, 3, 4, value; numfmt = fmt, halign = :left)
+        isempty(key) || define_name!(p.book, key, "Guide!\$C\$$(26 + i)")
     end
-    define_name!(p.book, "package_version", "Guide!\$C\$27")
-    define_name!(p.book, "template_format", "Guide!\$C\$29")
-    define_name!(p.book, "experiment_count", "Guide!\$C\$31")
-    section!(p, sh, 33, 2, 6, "Databases on this computer"; color = SODIUM, ink = NAVY)
+    top = 26 + length(rows) + 2
+    section!(p, sh, top, 2, 6, "Databases on this computer"; color = SODIUM, ink = NAVY)
     for (j, h) in enumerate(("Name", "Kind", "Priority", "Points", "Saved"))
-        setcell!(sh, 34, j + 1, h, header_style(p))
+        setcell!(sh, top + 1, j + 1, h, header_style(p))
     end
     slots = max(length(info.databases), 6)
     for i = 1:slots
-        row = 34 + i
+        row = top + 1 + i
         band = isodd(row) ? BAND_FILL : "FFFFFF"
         for (j, fmt) in enumerate(("", "", "", "#,##0", ""))
             setcell!(
@@ -615,12 +616,12 @@ function guide_sheet!(p::Painter, experiments::Int, info::TemplateInfo, logo::Ve
             end
         end
     end
-    define_name!(p.book, "list_database", "Guide!\$B\$35:\$B\$$(34 + slots)")
-    define_name!(p.book, "databases_table", "Guide!\$B\$35:\$F\$$(34 + slots)")
+    define_name!(p.book, "list_database", "Guide!\$B\$$(top + 2):\$B\$$(top + 1 + slots)")
+    define_name!(p.book, "databases_table", "Guide!\$B\$$(top + 2):\$F\$$(top + 1 + slots)")
     note!(
         p,
         sh,
-        36 + slots,
+        top + 3 + slots,
         2,
         "Properties already in these databases are on the Properties sheet.",
         6,
@@ -1185,6 +1186,21 @@ The whole template with `experiments` pairs of EXP-n and PTS-n sheets.
 """
 function build_template(experiments::Int, info::TemplateInfo, logo::Vector{UInt8})
     book = Book()
+    book.meta["title"] = "ThermophysicalDB.jl data entry template"
+    book.meta["creator"] = "ThermophysicalDB.jl " * info.package_version
+    book.meta["description"] = string(
+        "Template format ",
+        TEMPLATE_FORMAT,
+        "; ThermophysicalDB.jl ",
+        info.package_version,
+        "; XLSX.jl ",
+        pkgversion(XLSX),
+        "; Julia ",
+        VERSION,
+        "; ThermoML schema ",
+        info.schema,
+    )
+    book.meta["created"] = info.generated
     p = Painter(book)
     guide_sheet!(p, experiments, info, logo)
     reference_sheet!(p, experiments)

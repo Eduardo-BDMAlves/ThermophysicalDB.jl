@@ -14,9 +14,9 @@ function element_counts(formula::AbstractString)
     for m in eachmatch(r"([A-Z][a-z]?)(\d*)", s)
         m.offset == position || return nothing
         position = m.offset + length(m.match)
-        counts[m.captures[1]] =
-            get(counts, m.captures[1], 0) +
-            (isempty(m.captures[2]) ? 1 : parse(Int, m.captures[2]))
+        symbol = String(m.captures[1]::AbstractString)
+        digits = m.captures[2]::AbstractString
+        counts[symbol] = get(counts, symbol, 0) + (isempty(digits) ? 1 : parse(Int, digits))
     end
     position == lastindex(s) + 1 || return nothing
     return counts

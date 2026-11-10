@@ -473,7 +473,7 @@ add!(o::JObject, name::AbstractString, value) = (push!(o.pairs, String(name) => 
 
 function json_string(io::IO, s::AbstractString)
     write(io, '"')
-    for c in s
+    for c in String(s)
         if c == '"'
             write(io, "\\\"")
         elseif c == '\\'
@@ -484,7 +484,7 @@ function json_string(io::IO, s::AbstractString)
             write(io, "\\r")
         elseif c == '\t'
             write(io, "\\t")
-        elseif c < ' '
+        elseif UInt32(c) < 0x20
             write(io, "\\u", string(UInt16(c); base = 16, pad = 4))
         else
             write(io, c)
@@ -667,9 +667,10 @@ end
 function write_points_json(path::AbstractString, data::ExportData)
     open(path, "w") do io
         write(io, "{\n")
-        if data.origin !== nothing
+        origin = data.origin
+        if origin !== nothing
             write(io, "  \"origin\": ")
-            write_json(io, origin_object(data.origin), 1, 2)
+            write_json(io, origin_object(origin), 1, 2)
             write(io, ",\n")
         end
         write(io, "  \"metadata\": ")
@@ -892,6 +893,11 @@ function write_points_xlsx(path::AbstractString, data::ExportData; sheets::Symbo
     return nothing
 end
 
+function export_data(data::Union{Nothing,ExportData})
+    data === nothing && throw(ArgumentError("this format needs the data of the export"))
+    return data
+end
+
 function write_point_file(
     format::Symbol,
     path::AbstractString,
@@ -906,17 +912,17 @@ function write_point_file(
         origin = data === nothing ? origin_note(view) : data.origin
         write_points_thermoml_xml(path, view; origin)
     elseif format === :csv
-        write_points_csv(path, data)
+        write_points_csv(path, export_data(data))
     elseif format === :md
-        write_points_md(path, data)
+        write_points_md(path, export_data(data))
     elseif format === :json
-        write_points_json(path, data)
+        write_points_json(path, export_data(data))
     elseif format === :jld2
-        write_points_jld2(path, data)
+        write_points_jld2(path, export_data(data))
     elseif format === :tex
-        write_points_tex(path, data)
+        write_points_tex(path, export_data(data))
     elseif format === :xlsx
-        write_points_xlsx(path, data; sheets)
+        write_points_xlsx(path, export_data(data); sheets)
     else
         throw(ArgumentError("unknown format :$format; choose from $(POINT_FORMATS)"))
     end

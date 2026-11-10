@@ -112,7 +112,9 @@ The tables of a `Dataset`, with the role of each column, read from the type defi
 """
 function schema_tables()
     pools = schema_pools()
-    names = Symbol[n for n in fieldnames(Dataset) if !(n in pools) && n !== :lazy]
+    names = Symbol[
+        n for n in fieldnames(Dataset) if !(n in pools) && n !== :lazy && n !== :stamps
+    ]
     tables = SchemaTable[]
     for tname in names
         columns = SchemaColumn[]

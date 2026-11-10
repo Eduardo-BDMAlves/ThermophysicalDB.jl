@@ -124,7 +124,8 @@ const COMPOSITION_STATUS_TEXT = Dict{Symbol,String}(
     elseif absent == 1
         rest = 1.0 - total
         rest >= -COMPOSITION_SUM_TOLERANCE || return (nan_tuple(Val(N)), :sum_mismatch)
-        return ntuple(j -> j <= n ? (j == hole ? max(rest, 0.0) : v[j]) : NaN, Val(N)), :ok
+        gap = hole
+        return ntuple(j -> j <= n ? (j == gap ? max(rest, 0.0) : v[j]) : NaN, Val(N)), :ok
     end
     return nan_tuple(Val(N)), :incomplete
 end

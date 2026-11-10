@@ -76,13 +76,64 @@ function add_database!(
     return member
 end
 
+# The stamps of a database as seconds since 1970 UTC: from its dataset when it is read, otherwise
+# from its description file, from the file of the data or, for a file that has neither, the time of
+# the file.
+function member_stamps(m::Member)
+    is_open(m) && return (m.dataset.stamps.created, m.dataset.stamps.modified)
+    fallback = isfile(m.path) ? mtime(m.path) : time()
+    meta_path = joinpath(dirname(m.path), MEMBER_META)
+    if isfile(meta_path)
+        try
+            meta = TOML.parsefile(meta_path)
+            if haskey(meta, "created_at") && haskey(meta, "modified_at")
+                return (
+                    stamp_seconds(meta["created_at"]),
+                    stamp_seconds(meta["modified_at"]),
+                )
+            end
+        catch err
+            err isa InterruptException && rethrow()
+        end
+    end
+    isfile(m.path) || return (fallback, fallback)
+    return JLD2.jldopen(m.path, "r") do file
+        created = haskey(file, "meta/created") ? Float64(file["meta/created"]) : fallback
+        modified = haskey(file, "meta/modified") ? Float64(file["meta/modified"]) : fallback
+        (created, modified)
+    end
+end
+
+stamp_seconds(text::AbstractString) = Dates.datetime2unix(
+    Dates.DateTime(replace(text, "Z" => ""), Dates.dateformat"yyyy-mm-ddTHH:MM:SS"),
+)
+stamp_text(seconds::Real) =
+    Dates.format(Dates.unix2datetime(seconds), "yyyy-mm-ddTHH:MM:SS") * "Z"
+
+"""
+    created_at(db, name) -> DateTime
+    modified_at(db, name) -> DateTime
+
+When the database `name` was created and when data were last added to it (UTC). They are kept in
+the file, so a copy of the file keeps them. A database saved before they existed takes the time of
+its file for both. Reading the database never changes them; `modified_at` is the time of the last
+edit, not of the last [`save_database`](@ref).
+"""
+created_at(db::Database, name::AbstractString) =
+    Dates.unix2datetime(member_stamps(db.members[member_index(db, name)])[1])
+modified_at(db::Database, name::AbstractString) =
+    Dates.unix2datetime(member_stamps(db.members[member_index(db, name)])[2])
+
 function write_member_meta(m::Member, n::Integer)
+    created, modified = member_stamps(m)
     meta = Dict{String,Any}(
         "format" => MEMBER_FORMAT,
         "schema_version" => SCHEMA_VERSION,
         "name" => m.name,
         "kind" => String(m.kind),
         "priority" => m.priority,
+        "created_at" => stamp_text(created),
+        "modified_at" => stamp_text(modified),
         "saved_at" => utc_timestamp(),
         "measurements" => Int(n),
     )
@@ -472,6 +523,7 @@ end
 
 function commit_reference!(db::Database, m::Member, fields)
     ds = member_dataset(m)
+    touch!(ds)
     before = catalog_size(ds)
     id = add_reference!(ds.references; fields..., source = intern!(ds.sources, m.name))
     catalog_size(ds) == before || refresh!(db, m)
@@ -536,6 +588,7 @@ function commit_experiment!(
     number::Integer = 0,
 )
     ds = member_dataset(ref.member)
+    touch!(ds)
     before = catalog_size(ds)
     ids = Int32[intern_compound!(ds, c) for c in specs]
     id = add_experiment!(
@@ -908,6 +961,7 @@ function commit_point!(
     terms = (),
 )
     ds = member_dataset(e.member)
+    touch!(ds)
     before = length(ds.properties)
     prop = add_property!(
         ds.properties,
@@ -1146,8 +1200,10 @@ function add_reference_data!(
     else
         find_reference(db, m, reference)
     end
-    prepared = map(enumerate(list)) do (n, exp)
-        exp = exp isa AbstractDict ? (; (Symbol(k) => v for (k, v) in pairs(exp))...) : exp
+    prepared = map(enumerate(list)) do (n, given)
+        exp =
+            given isa AbstractDict ?
+            (; (Symbol(k) => v for (k, v) in pairs(given))...) : given
         exp isa NamedTuple || throw(
             ArgumentError("experiment $n must be a NamedTuple, got $(typeof(exp))"),
         )

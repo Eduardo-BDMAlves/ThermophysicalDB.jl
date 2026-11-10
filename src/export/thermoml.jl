@@ -141,12 +141,14 @@ count used when the source did not give one.
 """
 function significant_digits(x::Real)
     (isfinite(x) && x != 0) || return 1
-    text = lowercase(string(Float64(abs(x))))
-    mantissa = first(split(text, 'e'))
+    text = lowercase(string(Float64(abs(x))))::String
+    mantissa = String(first(split(text, 'e')))
     if occursin('.', mantissa)
-        whole, fraction = split(mantissa, '.')
+        parts = split(mantissa, '.')
+        whole = String(parts[1])
+        fraction = String(parts[2])
         fraction == "0" && (fraction = "")
-        digits = lstrip(whole * fraction, '0')
+        digits::String = lstrip(whole * fraction, '0')
         isempty(whole) || whole == "0" || (digits = whole * fraction)
         whole == "0" && (digits = lstrip(fraction, '0'))
         isempty(fraction) && (digits = rstrip(digits, '0'))
@@ -914,7 +916,7 @@ end
 # ----------------------------------------------------------------------------------
 
 function xml_escape(io::IO, s::AbstractString)
-    for c in s
+    for c in String(s)
         if c == '&'
             write(io, "&amp;")
         elseif c == '<'
@@ -923,7 +925,7 @@ function xml_escape(io::IO, s::AbstractString)
             write(io, "&gt;")
         elseif c == '"'
             write(io, "&quot;")
-        elseif c < ' ' && c != '\n' && c != '\t' && c != '\r'
+        elseif UInt32(c) < 0x20 && c != '\n' && c != '\t' && c != '\r'
             write(io, ' ')
         else
             write(io, c)

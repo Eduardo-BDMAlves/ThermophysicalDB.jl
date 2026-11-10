@@ -182,13 +182,14 @@ function check_update(;
     download = quick_download,
 )
     installed = installed_manifest(dir)
-    latest, source, reason = try
-        fetch(), :remote, ""
+    found = try
+        (fetch()::Release, :remote, "")
     catch err
         err isa InterruptException && rethrow()
         kind = err isa NoReleaseError && err.reached ? :unrecognized : :builtin
-        builtin_latest(), kind, sprint(showerror, err)
+        (builtin_latest()::Release, kind, sprint(showerror, err))
     end
+    latest::Release, source::Symbol, reason::String = found
     source === :unrecognized && warn_unrecognized(reason)
     republished = false
     state = if installed === nothing

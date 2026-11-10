@@ -166,7 +166,7 @@ function ThermophysicalDB.read_template_info(path::String)
     return TD.TemplateInfo(
         string(pkgversion(ThermophysicalDB)),
         TD.TEMPLATE_SCHEMA,
-        string(Dates.today()),
+        ThermophysicalDB.utc_timestamp(),
         databases,
         properties,
         NamedTuple{TD.TEMPLATE_LIST_KEYS}(lists),

@@ -106,7 +106,9 @@ function copy_conditions(c::Conditions)
         c.x_digits,
         c.temperature_digits,
         c.pressure_digits,
-        c.others === nothing ? nothing : copy(c.others),
+        let o = c.others
+            o === nothing ? nothing : copy(o)
+        end,
     )
 end
 
@@ -154,7 +156,11 @@ function apply_condition!(
         c.x = Base.setindex(c.x, value, spec.slot)
         c.x_digits = Base.setindex(c.x_digits, digits, spec.slot)
     else
-        others = c.others === nothing ? (c.others = ParsedCondition[]) : c.others
+        others = c.others
+        if others === nothing
+            others = ParsedCondition[]
+            c.others = others
+        end
         push!(others, parsed_condition(spec, value, digits))
     end
     return nothing

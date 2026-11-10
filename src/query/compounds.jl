@@ -15,7 +15,11 @@
 
 Lower-case `text`, strip accents and keep only letters and digits.
 """
-function normalize_name(text::AbstractString)
+# The text of the group `i` of a match whose group is not optional (a typeassert, so that a missing
+# group fails here and the compiler knows it is text).
+captured(m::RegexMatch, i::Integer)::String = String(m.captures[i]::AbstractString)
+
+function normalize_name(text::AbstractString)::String
     # Almost every name is plain ASCII, for which a byte loop gives the same result
     # as Unicode folding and is several times faster (the index holds hundreds of thousands).
     if isascii(text)
@@ -91,8 +95,8 @@ function query_tiers(text::AbstractString)
     # Prefix notations: n-butane, i-butane, t-butanol, s-butanol.
     m = match(r"^(n|i|t|s)[-\s]+(.+)$", raw)
     if m !== nothing
-        rest = normalize_name(m.captures[2])
-        prefix = Dict("n" => "", "i" => "iso", "t" => "tert", "s" => "sec")[m.captures[1]]
+        rest = normalize_name(captured(m, 2))
+        prefix = Dict("n" => "", "i" => "iso", "t" => "tert", "s" => "sec")[captured(m, 1)]
         push!(variants, prefix * rest)
     end
     for key in vcat(base, variants), (from, to) in SPELLING_VARIANTS

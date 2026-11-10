@@ -386,3 +386,69 @@ end
         T.forget_database!()
     end
 end
+
+@testitem "a database knows when it was created and last edited, and keeps it in its file" setup =
+    [TwoDatabases, OwnData] tags = [:unit, :fast] begin
+    using Dates
+    using TOML
+    T = ThermophysicalDB
+    mktempdir() do dir
+        db = OwnData.archive_only(joinpath(dir, "thermoml"))
+        root = joinpath(dir, "databases")
+        before = Dates.now(Dates.UTC)
+        T.add_database!(db, "my_lab"; dir = root)
+        created = T.created_at(db, "my_lab")
+        @test before - Millisecond(5) <= created <= Dates.now(Dates.UTC)
+        @test T.modified_at(db, "my_lab") == created
+        sleep(0.05)
+        ref = T.add_reference!(db; database = "my_lab", doi = "10.5555/stamps-1")
+        @test T.modified_at(db, "my_lab") > created
+        @test T.created_at(db, "my_lab") == created
+        exp = T.add_experiment!(ref; components = [OwnData.WATER])
+        edited = T.modified_at(db, "my_lab")
+        sleep(0.05)
+        T.add_measurement!(
+            exp;
+            property = "Viscosity",
+            unit = "Pa s",
+            value = 1e-3,
+            temperature = 293.15,
+        )
+        @test T.modified_at(db, "my_lab") > edited
+        # Reading changes nothing; saving writes both into the file and into the description.
+        last = T.modified_at(db, "my_lab")
+        T.points(db; property = "Viscosity")
+        @test T.modified_at(db, "my_lab") == last
+        sleep(0.05)
+        T.save_database(db, "my_lab")
+        @test T.modified_at(db, "my_lab") == last
+        meta = TOML.parsefile(joinpath(root, "my_lab", "member.toml"))
+        @test meta["created_at"] == T.stamp_text(datetime2unix(created))
+        @test meta["modified_at"] == T.stamp_text(datetime2unix(last))
+        # Another session: the stamps come back, before the data are read and after.
+        found = only(T.discover_members(root))
+        again = T.Database([db.members[1], found])
+        @test !T.is_open(found)
+        @test abs(T.created_at(again, "my_lab") - created) <= Second(1)
+        T.points(again; property = "Viscosity")
+        @test T.is_open(found)
+        @test T.created_at(again, "my_lab") == created &&
+              T.modified_at(again, "my_lab") == last
+        # The priority changes the description but not the stamps.
+        T.set_priority!(again, "my_lab", 5)
+        @test T.modified_at(again, "my_lab") == last
+        @test occursin("created", sprint(show, MIME("text/plain"), again))
+    end
+end
+
+@testitem "a file written before the stamps existed takes the time of the file" setup =
+    [TwoDatabases] tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    data = Dict{String,Any}()
+    T.write_dataset((key, value) -> (data[key] = value; nothing), ds)
+    delete!(data, "meta/created")
+    delete!(data, "meta/modified")
+    old = T.restore_dataset(key -> data[key])
+    @test old.stamps.created == old.stamps.modified && old.stamps.created > 1.6e9
+end

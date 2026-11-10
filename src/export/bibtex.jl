@@ -143,8 +143,9 @@ brackets after the initials. Keep the full given name: `Azizov, Nazim D.`
 function clean_archive_author(name::AbstractString)
     m = match(r"^(.*?)\[(.*)\]\s*$", name)
     m === nothing && return String(name)
-    family = strip(first(split(m[1], ',')))
-    return string(family, ", ", strip(m[2]))
+    given = m[1]::AbstractString
+    family = strip(first(split(given, ',')))
+    return string(family, ", ", strip(m[2]::AbstractString))
 end
 
 "The entry that the archive itself can write for reference number `r`."
@@ -465,7 +466,7 @@ struct BibtexReport
     resolved::Int
     archive_only::Vector{String}
     conflicts::Vector{
-        @NamedTuple{doi::String,field::String,resolver::String,archive::String}
+        @NamedTuple{doi::String,field::String,resolver::String,archive::String},
     }
 end
 

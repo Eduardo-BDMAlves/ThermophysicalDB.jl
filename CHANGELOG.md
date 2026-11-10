@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
-- Initial release
+- Databases know when they were created and last edited (`created_at(db, name)`, `modified_at(db, name)`, shown by `db`); the stamps are in the file and in `member.toml`, and files written before they existed take the time of the file (no schema change)
+- The spreadsheet template says the XLSX.jl and Julia versions and the UTC time that made it, and has the document properties (creator, date, versions) that Excel shows under File > Info
+- Quality checks in the tests: Aqua and JET, both ordinary tests that pass with no known reports; fixed an ambiguity of `convert_native`, a call to `first` with an unsupported keyword when joining template files, and the places where a possible `nothing` was not handled
+- Benchmarks with AirspeedVelocity.jl (`benchmark/`): a synthetic database of a chosen size, groups for loading, adding points, the filters one after another and in one call (also over a linked compound database), the units packages, the spreadsheet template and the outlier search; the workflow `Benchmark.yml` compares every pull request with the latest release and comments time and allocated memory, and `benchmark/memory_report.jl` reports what stays in memory after loading, table by table
 - `points(db; ...)` leaves out the repeated points by default (`duplicate = false`; `duplicate = true` shows every point), also the points of an experiment that repeat an earlier experiment of the same database of yours (the same file imported again); they stay in the database, replicates inside one experiment are kept, and `add_reference_data!` warns about them
 - `link_compounds(db, compound_database())` now works over a `Database` with several members: each member is linked, `points`, `mixture` and `find_compounds` on the result search all of them with any name, synonym, CAS number or CID of the compound database, and the table of links has the column `database`; `find_compounds(db, compounds, text)` is the same search over every database
 - The menus of the spreadsheet template (method, phase, sample source, supplier, purity analysis, purification) are filled with the values that the databases already hold, most used first, followed by generic choices; `add_template_experiments!` keeps them
