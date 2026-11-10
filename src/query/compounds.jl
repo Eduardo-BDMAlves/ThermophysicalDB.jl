@@ -10,15 +10,15 @@
 # Normalisation, spelling variants and aliases
 # ----------------------------------------------------------------------------------
 
+# The text of the group `i` of a match whose group is not optional (a typeassert, so that a missing
+# group fails here and the compiler knows it is text).
+captured(m::RegexMatch, i::Integer)::String = String(m.captures[i]::AbstractString)
+
 """
     normalize_name(text) -> String
 
 Lower-case `text`, strip accents and keep only letters and digits.
 """
-# The text of the group `i` of a match whose group is not optional (a typeassert, so that a missing
-# group fails here and the compiler knows it is text).
-captured(m::RegexMatch, i::Integer)::String = String(m.captures[i]::AbstractString)
-
 function normalize_name(text::AbstractString)::String
     # Almost every name is plain ASCII, for which a byte loop gives the same result
     # as Unicode folding and is several times faster (the index holds hundreds of thousands).

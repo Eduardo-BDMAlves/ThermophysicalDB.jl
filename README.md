@@ -66,6 +66,11 @@ t = table(v; quantities = Unitful)   # Tables.jl columns: temperature, pressure,
 
 The [documentation](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev) has a getting-started guide and tutorials that go from a plot of hexane conductivity to comparing the measured density of water with IAPWS-95, and hexane and CO₂ data with the equations of state of [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl).
 
+> [!NOTE]
+> The author of the package would like to state that he has made extensive use of AI in order to develop the initial implementation of the package. Any problems with the implementation will be corrected in the future.
+> This package is a personal project being developed in parallel to my Doctorate thesis, therefore, it was developed using tools to minimize the time required for the first version release. However, at every step of the implementation, extensive functionalities tests were conducted as this package will be used to facilitate the planning of several experiments in the Thesis.
+> Any collaboration and suggestions are more than welcome! Fill free to open an issue.
+
 ## Data source
 
 ThermophysicalDB.jl reads the **ThermoML Archive**, the experimental thermophysical property database of the Thermodynamics Research Center (TRC) at NIST, built on the IUPAC ThermoML standard ([dataset DOI 10.18434/mds2-2422](https://doi.org/10.18434/mds2-2422)). The data are theirs and the authors' of the original articles; this package is an independent project that downloads, reads and filters them. The aim is to bring several experimental databases under one interface, starting with this one.
@@ -100,3 +105,7 @@ If you want to make contributions of any kind, please first that a look into our
 <!-- prettier-ignore-end -->
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
+
+### Acknowledgments
+
+The authors would like to acknowledge Petrobras for the financial and technical support via the Cooperation Agreement ANP No 23424-5. We would also like to acknowledge ANP and FAPESP for the financial support through the Programa de Recursos humanos da Agência Nacional do Petróleo, Gás Natural e Biocombustíveis – PRH- ANP, managed by Fundação de Amparo à Pesquisa do Estado de São Paulo (FAPESP), Brazil. Process n° 2025/19596-8.
