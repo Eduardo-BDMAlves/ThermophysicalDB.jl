@@ -7,6 +7,11 @@
 module DocsSetup
 
 using CairoMakie
+using DocumenterVitepress
+
+# DocumenterVitepress ranks PNG above SVG, and a Makie figure offers both, so it would keep
+# writing PNG files whatever backend is active. Rank SVG first: the figures are vector files.
+DocumenterVitepress.mime_priority(::MIME"image/svg+xml") = 4.5
 
 # Neon palette. The colours are those of gas-discharge tubes: the emission of the noble
 # gases (neon, helium, krypton, argon, xenon) and of a few contrasting gases (mercury
@@ -122,11 +127,11 @@ end
 """
     activate!()
 
-Select the PNG backend of CairoMakie (twice the resolution, so figures stay sharp on
+Select the SVG backend of CairoMakie (vector figures stay sharp at any zoom and on
 high-density screens) and apply the theme of the documentation.
 """
 function activate!()
-    CairoMakie.activate!(; type = "png", px_per_unit = 2.0)
+    CairoMakie.activate!(; type = "svg")
     set_theme!(THEME)
     return nothing
 end

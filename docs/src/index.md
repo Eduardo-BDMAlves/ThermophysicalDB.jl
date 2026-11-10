@@ -31,6 +31,8 @@ features:
     details: Every expanded uncertainty is also restated at k = 2, with an explicit and documented rule, so points from different laboratories can be weighted consistently.
   - title: Tables.jl all the way
     details: A selection is a Tables.jl table made of plain vectors. Plot the columns with Makie, hand them to a DataFrame, or write them to disk, without conversion code.
+  - title: Two databases, one search
+    details: The experimental points (ThermoML) and the nomenclature of the compounds (names, CAS, PubChem CID, SMILES, InChI, molar mass) are two separate databases, linked on demand. Name a compound by any of them; when a name is ambiguous you choose.
   - title: Extensible and versatile
     details: Capacity to add your own data to a local database formatted accordingly to the same standard used in other databases. Customize the interest parameters and how to interact with then.
 ---
@@ -111,6 +113,7 @@ The articles of the whole documentation, with a download of the BibTeX file, are
   <a class="tdb-card" href="20-tutorials/40-mixtures"><strong>Binary mixtures</strong><span>The viscosity of ethanol + water against composition.</span></a>
   <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against SRK, PR, tcPR and PC-SAFT from Clapeyron.jl.</span></a>
   <a class="tdb-card" href="20-tutorials/60-co2-critical-point"><strong>Carbon dioxide</strong><span>Data and equations of state around the critical point.</span></a>
+  <a class="tdb-card" href="30-manual/35-compounds"><strong>Compounds</strong><span>The compound database and how to find a compound by any name, CAS number, CID, SMILES or InChI.</span></a>
   <a class="tdb-card" href="30-manual/30-uncertainty"><strong>Uncertainty</strong><span>What k = 2 means here and how each point is rescaled.</span></a>
   <a class="tdb-card" href="30-manual/40-data-management"><strong>Updates and cache</strong><span>Where the data live and what to do when the download fails.</span></a>
   <a class="tdb-card" href="95-reference"><strong>API reference</strong><span>Every exported function, with its docstring.</span></a>
@@ -136,6 +139,8 @@ The data, for now, comes only from the **ThermoML Archive**, created and maintai
 - Dataset: [doi:10.18434/mds2-2422](https://doi.org/10.18434/mds2-2422)
 - Standard: [frenkel2006xml](@cite); background in the series of [frenkel2003thermoml](@cite), [chirico2003thermoml](@cite), [frenkel2004thermoml](@cite), [chirico2009thermoml](@cite) and [frenkel2011thermoml](@cite)
 - More details, the terms of use and how to cite: [About the data](@ref 40-about-data)
+
+The package keeps **two databases**, side by side and never mixed. The *thermophysical database* holds the experimental points and is the reference: it is never changed. The *compound database* holds the nomenclature and the base properties of the compounds (all the names, the CAS number, the PubChem CID, the formula, the molar mass, the SMILES, the InChI and the InChIKey) and is built from lists derived from PubChem; the compounds you add are kept in a separate file of your own and loaded together with the lists. [`link_compounds`](@ref) joins them, so that a compound of the archive can be found by any of those names. See [Compounds and their identifiers](@ref compounds).
 
 ## Contributors
 

@@ -81,6 +81,10 @@
                 value = 0.02 + temp / 1.0e5,
                 unc = 0.0004,
                 unc_level = 0.95,
+                unc_method = T.intern!(
+                    ds.unc_methods,
+                    "Propagation of evaluated standard uncertainties",
+                ),
                 temperature = temp,
                 pressure = press,
                 composition = (0.5, 0.5, NaN),
@@ -94,6 +98,10 @@
                 value = 998.0,
                 unc = 0.1,
                 unc_level = 0.95,
+                unc_method = T.intern!(
+                    ds.unc_methods,
+                    "Propagation of evaluated standard uncertainties",
+                ),
                 temperature = temp,
                 pressure = 101.325,
                 composition = (1.0, NaN, NaN),
@@ -272,8 +280,8 @@ end
     both = T.points(ds; temperature = (20u"°C", 30u"°C"), pressure = (1u"atm", nothing))
     @test length(both) == 3
 
-    @test_throws DimensionError T.points(ds; temperature = (1u"m", 2u"m"))
-    @test_throws DimensionError T.points(ds; pressure = (1u"K", 2u"K"))
+    @test_throws ArgumentError T.points(ds; temperature = (1u"m", 2u"m"))
+    @test_throws ArgumentError T.points(ds; pressure = (1u"K", 2u"K"))
     # Units make no sense for a year.
     @test_throws ArgumentError T.points(ds; year = (1u"m", 2u"m"))
 end
@@ -285,7 +293,7 @@ end
     ds = Toy.build()
 
     view = T.points(ds; component = "methane")
-    tbl = T.table(view; unitful = true)
+    tbl = T.table(view; quantities = Unitful)
     plain = T.table(view)
     @test eltype(tbl.value) <: Quantity
     @test isconcretetype(eltype(tbl.value))
@@ -299,14 +307,14 @@ end
     @test tbl.unit == plain.unit
     @test tbl.doi == plain.doi
 
-    si = T.table(T.points(ds; property = "Mass density"); unitful = true, units = :si)
+    si = T.table(T.points(ds; property = "Mass density"); quantities = Unitful, units = :si)
     @test unit(eltype(si.value)) == u"kg/m^3"
     @test unit(eltype(si.pressure)) == u"Pa"
     @test Unitful.uconvert(u"atm", si.pressure[1]) ≈ 1.0u"atm"
 
     # Mixed units cannot share one concrete element type.
     err = try
-        T.table(T.points(ds; component = "water"); unitful = true)
+        T.table(T.points(ds; component = "water"); quantities = Unitful)
         nothing
     catch e
         e
@@ -314,7 +322,10 @@ end
     @test err isa ArgumentError
     @test occursin("narrow it with `property`", err.msg)
 
-    empty = T.table(T.points(ds; component = "water", temperature = (1, 2)); unitful = true)
+    empty = T.table(
+        T.points(ds; component = "water", temperature = (1, 2));
+        quantities = Unitful,
+    )
     @test isempty(empty.value)
 end
 

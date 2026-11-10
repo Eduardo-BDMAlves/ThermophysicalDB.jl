@@ -37,6 +37,83 @@ find_compounds
 ThermophysicalDB.CompoundMatches
 DataView
 table
+sample_table
+purity_step_table
+condition_table
+```
+
+## Composition scales
+
+```@docs
+convert_composition
+COMPOSITION_SCALES
+CompositionConversion
+```
+
+## Several databases
+
+```@docs
+Database
+Member
+members
+add_member!
+remove_member!
+member_dataset
+DatabaseView
+parts
+add_database!
+add_reference!
+add_experiment!
+add_measurement!
+add_reference_data!
+export_template
+import_template
+add_template_experiments!
+TemplateData
+TemplateExperiment
+save_database
+set_priority!
+databases_dir
+resolve_compound
+ReferenceRef
+ExperimentRef
+duplicates
+conflicts
+DuplicateRules
+DuplicateReport
+ThermophysicalDB.Registry
+ThermophysicalDB.Catalog
+ThermophysicalDB.loaded_tables
+ThermophysicalDB.LAZY_FIELDS
+```
+
+## Compounds and their identifiers
+
+```@docs
+compound_database
+lookup_compounds
+compound_record
+link_compounds
+LinkedDatabase
+forget_choices!
+register_compound!
+save_compounds
+fetch_pubchem!
+prefetch_compounds!
+pubchem_rate!
+ThermophysicalDB.PubChemError
+ThermophysicalDB.CompoundRecords
+ThermophysicalDB.CompoundLinks
+CompoundDB
+```
+
+## Uncertainty terms of your data
+
+```@docs
+set_uncertainty!
+UncertaintyTerm
+uncertainty_table
+expanded_uncertainty
 ```
 
 ## Exporting points
@@ -84,5 +161,5 @@ These docstrings document the implementation. They are not part of the public in
 ```@autodocs
 Modules = [ThermophysicalDB]
 Public = false
-Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.CompoundMatches, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult))
+Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.TemplateData, ThermophysicalDB.TemplateExperiment, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult, ThermophysicalDB.Registry, ThermophysicalDB.Catalog, ThermophysicalDB.loaded_tables, ThermophysicalDB.LAZY_FIELDS))
 ```

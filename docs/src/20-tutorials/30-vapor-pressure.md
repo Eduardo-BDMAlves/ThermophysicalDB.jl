@@ -34,7 +34,7 @@ v = points(db; component = "ethanol", exact = true, property = "Vapor or sublima
 ```
 
 ```@example vap
-t = table(v; unitful = true)
+t = table(v; quantities = Unitful)
 
 T = t.temperature
 p = t.value

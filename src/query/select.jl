@@ -21,14 +21,11 @@ Base.isempty(view::DataView) = isempty(view.rows)
 # ----------------------------------------------------------------------------------
 
 # Native units of the conditions in the tables: temperature in K, pressure in kPa.
-const KELVIN = u"K"
-const KILOPASCAL = u"kPa"
-
-# A bound as Float64 in the table's unit. Plain numbers are taken to already be in that
-# unit; Unitful quantities are converted, so 25u"°C" or 1u"atm" work.
-native(x::Real, ::Any) = Float64(x)
-native(x::Unitful.AbstractQuantity, unit) = Float64(Unitful.ustrip(unit, x))
-function native(x::Unitful.AbstractQuantity, ::Nothing)
+# A bound is a plain number in that unit or a quantity of a units package whose extension is
+# loaded (see `units/backend.jl`), so 25u"°C" or 1u"atm" work with Unitful.
+native(x::Real, ::Nothing) = Float64(x)
+native(x, kind::QuantityKind) = native_value(x, kind)
+function native(x, ::Nothing)
     throw(ArgumentError("units are not accepted here, got $x"))
 end
 
@@ -41,8 +38,8 @@ function bounds(t::Tuple{Any,Any}, unit = nothing)
     hi = t[2] === nothing ? Inf : native(t[2], unit)
     # Converted quantities carry rounding noise (20 °C -> 293.15000000000003 K); a few
     # ulps of slack keep a point that sits exactly on a limit.
-    t[1] isa Unitful.AbstractQuantity && (lo = prevfloat(lo, 4))
-    t[2] isa Unitful.AbstractQuantity && (hi = nextfloat(hi, 4))
+    is_quantity(t[1]) && (lo = prevfloat(lo, 4))
+    is_quantity(t[2]) && (hi = nextfloat(hi, 4))
     return (lo, hi)
 end
 function bounds(x, unit = nothing)
@@ -187,6 +184,10 @@ it on a [`DataView`](@ref) refines that view, so filters can be chained.
 
 A component or property that matches nothing throws an `ArgumentError`, so a typo is
 never mistaken for "no data".
+
+Given a [`LinkedDatabase`](@ref) (see [`link_compounds`](@ref)) instead of the dataset, a
+component can also be a synonym, a CAS number, a PubChem CID, an InChI or a SMILES, and an
+ambiguous text is resolved by asking the user (keyword `choose`).
 """
 points(ds::Dataset; kwargs...) = points(DataView(ds); kwargs...)
 
@@ -212,8 +213,8 @@ function points(
     property_ok = property_mask(ds, property)
     check_T = temperature !== nothing
     check_P = pressure !== nothing
-    tlo, thi = bounds(temperature, KELVIN)
-    plo, phi = bounds(pressure, KILOPASCAL)
+    tlo, thi = bounds(temperature, NativeTemperature())
+    plo, phi = bounds(pressure, NativePressure())
     rows = Int32[]
     sizehint!(rows, length(view.rows))
     for r in view.rows
@@ -239,12 +240,7 @@ that contain further components are included.
 When nothing is found, a message tells whether the components do occur together with
 others, so an empty result can be told apart from a too strict one.
 """
-function mixture(
-    source::Union{Dataset,DataView},
-    components...;
-    exact::Bool = true,
-    kwargs...,
-)
+function mixture(source, components...; exact::Bool = true, kwargs...)
     length(components) >= 2 ||
         throw(ArgumentError("a mixture needs at least two components"))
     wanted = collect(components)

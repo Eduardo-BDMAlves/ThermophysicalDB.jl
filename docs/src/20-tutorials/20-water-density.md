@@ -41,7 +41,7 @@ v = points(
 ## The columns we need
 
 ```@example water
-t = table(v; unitful = true)
+t = table(v; quantities = Unitful)
 
 T = t.temperature
 ρ = t.value

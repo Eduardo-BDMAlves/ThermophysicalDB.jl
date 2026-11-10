@@ -19,7 +19,7 @@ using Markdown: htmlesc
 using Pkg
 using TOML
 using ThermophysicalDB
-using ThermophysicalDB: DataView, Dataset
+using ThermophysicalDB: DataView, DatabaseView, Dataset, parts
 
 const BIB_FILE = "data-credits.bib"
 const VERSIONS_FILE = "versions.toml"
@@ -52,10 +52,28 @@ function reset!()
     return nothing
 end
 
+# Two selections share a dataset when they read the same columns. The columns are compared,
+# not the `Dataset` values: a view holds a copy of the (immutable) `Dataset`, and what
+# matters is that both copies point at the same arrays.
+same_dataset(a::Dataset, b::Dataset) =
+    a === b || (
+        a.measurements.value === b.measurements.value &&
+        a.measurements.experiment === b.measurements.experiment
+    )
+
+function dataset_mismatch(a::Dataset, b::Dataset)
+    return ArgumentError(
+        "the selections come from different datasets " *
+        "(measurements $(length(a.measurements)) and $(length(b.measurements)), " *
+        "columns $(objectid(a.measurements.value)) and $(objectid(b.measurements.value)))",
+    )
+end
+
 function check_same_dataset(views)
     ds = first(views).dataset
-    all(v -> v.dataset === ds, views) ||
-        throw(ArgumentError("the selections come from different datasets"))
+    for v in views
+        same_dataset(v.dataset, ds) || throw(dataset_mismatch(v.dataset, ds))
+    end
     return ds
 end
 
@@ -70,12 +88,16 @@ function union_view(views)
     return DataView(ds, Int32.(findall(mask)))
 end
 
+# The selection of a `Database` that has points of one database is used as its `DataView`.
+as_view(view::DataView) = view
+as_view(view::DatabaseView) = only(parts(view))
+
 function register!(view::DataView)
     if REGISTRY.dataset === nothing
         REGISTRY.dataset = view.dataset
         REGISTRY.mask = falses(length(view.dataset.measurements))
-    elseif REGISTRY.dataset !== view.dataset
-        throw(ArgumentError("the selections come from different datasets"))
+    elseif !same_dataset(REGISTRY.dataset, view.dataset)
+        throw(dataset_mismatch(REGISTRY.dataset, view.dataset))
     end
     mask = REGISTRY.mask
     for row in view.rows
@@ -158,8 +180,8 @@ and describe them: how many points and articles, and a table of the `top` articl
 the most points. The articles come from the metadata of the archive, so no network is
 needed.
 """
-function credits(views::DataView...; top::Integer = 8)
-    view = union_view(views)
+function credits(views::Union{DataView,DatabaseView}...; top::Integer = 8)
+    view = union_view(map(as_view, views))
     register!(view)
     isempty(view) && return HTML("<p>The selections of this page have no points.</p>")
     s = ThermophysicalDB.reference_summary(

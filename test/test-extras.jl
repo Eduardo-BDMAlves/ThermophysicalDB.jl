@@ -44,3 +44,60 @@ end
     push!(ds.extras.text, 0)
     @test_throws ArgumentError T.validate(ds)
 end
+
+@testitem "the extras of a block are stored once and read for every point" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-block")
+    comp = T.add_compound!(ds.compounds; names = ["water"])
+    experiment = T.add_experiment!(ds.experiments; reference = ref, components = [comp])
+    prop = T.add_property!(ds.properties, "Mass density", "kg/m3")
+    for i = 1:5
+        T.add_measurement!(
+            ds.measurements;
+            experiment,
+            property = prop,
+            value = 990.0 + i,
+            block = i <= 3 ? 1 : 4,
+        )
+    end
+    T.add_extra!(ds, :block, 1, "solvent", "water")
+    T.add_extra!(ds, :block, 1, "ratio", 0.5)
+    T.add_extra!(ds, :block, 4, "solvent", "ethanol")
+    T.add_extra!(ds, :measurement, 2, "solvent", "own")      # a point's own value wins
+    @test T.validate(ds)
+    @test T.extra_texts(ds, :measurement, "solvent") ==
+          ["water", "own", "water", "ethanol", "ethanol"]
+    @test isequal(T.extra_numbers(ds, :measurement, "ratio"), [0.5, 0.5, 0.5, NaN, NaN])
+    @test T.extra_keys(ds, :measurement) == ["ratio", "solvent"]
+    @test T.extra_texts(ds, :block, "solvent") == ["water", "", "", "ethanol", ""]
+    # a block that points outside the table is a corrupt dataset
+    ds.measurements.block[5] = 99
+    @test_throws ArgumentError T.validate(ds)
+end
+
+@testitem "points of one property keep their own extras through the cache" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    ref = T.add_reference!(ds.references; doi = "10.5555/tdbfixture-block2")
+    comp = T.add_compound!(ds.compounds; names = ["water"])
+    experiment = T.add_experiment!(ds.experiments; reference = ref, components = [comp])
+    prop = T.add_property!(ds.properties, "Mass density", "kg/m3")
+    for i = 1:4
+        T.add_measurement!(
+            ds.measurements;
+            experiment,
+            property = prop,
+            value = 1.0 * i,
+            block = isodd(i) ? 1 : 2,
+        )
+    end
+    T.add_extra!(ds, :block, 1, "solvent", "a")
+    T.add_extra!(ds, :block, 2, "solvent", "b")
+    store = Dict{String,Any}()
+    T.write_dataset((key, array) -> store[key] = array, ds)
+    back = T.restore_dataset(key -> store[key])
+    @test T.extra_texts(back, :measurement, "solvent") == ["a", "b", "a", "b"]
+end

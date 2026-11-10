@@ -185,6 +185,76 @@ end
     @test_throws ArgumentError T.export_points("x", v; reference = :nonsense)
 end
 
+@testitem "a JSON file carries the separate uncertainty terms of the points that have them" setup =
+    [Toy] tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = Toy.build()
+    v = T.points(ds; property = "Mass density")
+    r1, r2 = v.rows
+    e1 = ds.measurements.experiment[r1]
+    T.set_uncertainty!(
+        ds;
+        scope = :experiment,
+        row = e1,
+        quantity = :temperature,
+        device = 0.01,
+    )
+    T.set_uncertainty!(
+        ds;
+        scope = :measurement,
+        row = r1,
+        quantity = :temperature,
+        statistical = 0.02,
+    )
+    T.set_uncertainty!(
+        ds;
+        scope = :measurement,
+        row = r1,
+        quantity = :pressure,
+        combined = 0.5,
+    )
+    mktempdir() do tmp
+        _, file = Toy.export1(
+            joinpath(tmp, "water.json"),
+            v;
+            online = false,
+            cache = false,
+            progress = false,
+        )
+        points = T.JSON.parse(read(file, String))["points"]
+        terms = points[1]["uncertainties"]
+        @test [(t["quantity"], t["kind"], t["origin"]) for t in terms] == [
+            ("temperature", "device", "given"),
+            ("temperature", "statistical", "given"),
+            ("temperature", "combined", "derived"),
+            ("temperature", "expanded", "derived"),
+            ("pressure", "combined", "given"),
+            ("pressure", "expanded", "derived"),
+        ]
+        @test terms[1]["shared"] == true && !haskey(terms[2], "shared")
+        @test terms[4]["value"] ≈ 2 * sqrt(0.01^2 + 0.02^2) && terms[4]["k"] == 2.0
+        @test terms[4]["level"] == 0.95 && haskey(terms[3], "method")
+        # a point without terms has no member, and a term of the experiment reaches all points
+        shared = [
+            t for t in get(points[2], "uncertainties", []) if t["quantity"] == "temperature"
+        ]
+        @test length(shared) == (ds.measurements.experiment[r2] == e1 ? 1 : 0)
+        # in SI the pressure terms are in pascal, like the pressure column
+        _, file = Toy.export1(
+            joinpath(tmp, "si.json"),
+            v;
+            units = :si,
+            online = false,
+            cache = false,
+            progress = false,
+        )
+        si = T.JSON.parse(read(file, String))["points"][1]["uncertainties"]
+        @test si[5]["value"] == 500.0
+    end
+    # the ThermoML exports are untouched: only the expanded uncertainty of the property
+    @test T.validate(ds)
+end
+
 @testitem "a JSON file has one record per point, with the origin as its first entry" setup =
     [Toy] tags = [:unit, :fast] begin
     T = ThermophysicalDB

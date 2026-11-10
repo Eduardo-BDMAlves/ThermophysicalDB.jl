@@ -88,11 +88,9 @@ function central(values::Vector{Float64}, statistic::Symbol)
     return sum(values) / n
 end
 
-"`x` expressed in `to`, given in `from`; NaN stays NaN. Affine units (°C) are handled by Unitful."
-function convert_value(x::Float64, from, to)
-    isfinite(x) || return NaN
-    return Float64(Unitful.ustrip(to, x * from))
-end
+"`x`, in the native unit of `kind`, expressed in `to` (a unit name or a unit of a units package); NaN stays NaN."
+# A limit that is missing (infinite or NaN) stays missing, as NaN.
+convert_value(x::Float64, kind, to) = isfinite(x) ? convert_native(x, kind, to) : NaN
 
 # ----------------------------------------------------------------------------------
 # The summary
@@ -106,10 +104,12 @@ property), plus the explanation of the abbreviated methods (`legend`) and the bi
 whose keys the rows use. Its columns are
 
 `key, doi, year, month, citation, property, unit, system, method, method_full, phase,
-n_points, n_uncertainty, T_min, T_max, p_min, p_max, unc_abs, unc_rel`.
+n_points, n_uncertainty, T_min, T_max, p_min, p_max, unc_abs, unc_rel, purity, purity_min,
+purity_max, purity_basis, purity_method, purification, sample_source, supplier`.
 
 `T_min`, `T_max`, `p_min` and `p_max` are in `temperature_unit` and `pressure_unit`;
-`unc_abs` is in `unit` (the unit of the property) and `unc_rel` is a percentage.
+`unc_abs` is in `unit` (the unit of the property) and `unc_rel` is a percentage, as are
+`purity_min` and `purity_max`.
 """
 struct ReferenceSummary
     columns::NamedTuple
@@ -139,8 +139,9 @@ Tables.columns(s::ReferenceSummary) = getfield(s, :columns)
 Tables.schema(s::ReferenceSummary) = Tables.schema(getfield(s, :columns))
 
 """
-    reference_summary(view; temperature_unit = u"K", pressure_unit = u"MPa",
-                      statistic = :median, method_length = 24, policy = :nominal,
+    reference_summary(view; temperature_unit = "K", pressure_unit = "MPa",
+                      statistic = :median, method_length = 24, purity_digits = 6,
+                      policy = :nominal,
                       online = true, cache = true, refresh = false, include_source = true,
                       include_package = true, progress = true) -> ReferenceSummary
 
@@ -149,7 +150,8 @@ Summarise the articles behind the points of `view` ([`DataView`](@ref) or
 measured two properties has two rows.
 
 Each row has the number of points, the ranges of temperature and pressure (in the units
-you choose, any Unitful temperature and pressure unit), the methods and phases, and the
+you choose: a name such as `"K"`, `"°C"`, `"MPa"` or `"bar"`, or a unit of a units package
+whose extension is loaded, for example `u"MPa"` from Unitful), the methods and phases, and the
 expanded uncertainty at ``k = 2`` over the points that state one: the `statistic`
 (`:median`, the default, or `:mean`) of the relative uncertainty in percent, and of the
 absolute uncertainty in the unit of the property. A method name longer than
@@ -162,10 +164,11 @@ conversion of uncertainties to ``k = 2`` (see [`table`](@ref)).
 """
 function reference_summary(
     view::DataView;
-    temperature_unit = u"K",
-    pressure_unit = u"MPa",
+    temperature_unit = "K",
+    pressure_unit = "MPa",
     statistic::Symbol = :median,
     method_length::Integer = 24,
+    purity_digits::Integer = 6,
     policy::Symbol = :nominal,
     kwargs...,
 )
@@ -191,6 +194,8 @@ function reference_summary(
     systems = Vector{Vector{String}}()
     relative = Vector{Vector{Float64}}()
     absolute = Vector{Vector{Float64}}()
+    group_samples = Vector{Vector{Tuple{Int32,Int32}}}()
+    last_experiment = Int32[]
     labels = Vector{Union{Nothing,String}}(nothing, length(ex.reference))
 
     for r in view.rows
@@ -213,10 +218,19 @@ function reference_summary(
             push!(systems, String[])
             push!(relative, Float64[])
             push!(absolute, Float64[])
+            push!(group_samples, Tuple{Int32,Int32}[])
+            push!(last_experiment, NO_ID)
             g = length(group_ref)
             index[key] = g
         end
         npoints[g] += 1
+        if last_experiment[g] != e
+            last_experiment[g] = e
+            for i = 1:Int(ex.ncomp[e])
+                pair = (ex.components[i][e], ex.samples[i][e])
+                pair in group_samples[g] || push!(group_samples[g], pair)
+            end
+        end
         T = m.temperature[r]
         if !isnan(T)
             tmin[g] = min(tmin[g], T)
@@ -269,7 +283,9 @@ function reference_summary(
         ) for g in order
     ]
 
-    from_T, from_p = u"K", u"kPa"
+    described =
+        [describe_samples(ds, group_samples[g]; digits = purity_digits) for g in order]
+    from_T, from_p = NativeTemperature(), NativePressure()
     columns = (;
         key = keys_[order],
         doi = String[rf.doi[group_ref[g]] for g in order],
@@ -290,6 +306,14 @@ function reference_summary(
         p_max = Float64[convert_value(pmax[g], from_p, pressure_unit) for g in order],
         unc_abs = Float64[central(absolute[g], statistic) for g in order],
         unc_rel = Float64[central(relative[g], statistic) for g in order],
+        purity = String[d.purity for d in described],
+        purity_min = Float64[d.purity_min for d in described],
+        purity_max = Float64[d.purity_max for d in described],
+        purity_basis = String[d.purity_basis for d in described],
+        purity_method = String[d.purity_method for d in described],
+        purification = String[d.purification for d in described],
+        sample_source = String[d.sample_source for d in described],
+        supplier = String[d.supplier for d in described],
     )
     return ReferenceSummary(
         columns,
@@ -317,9 +341,8 @@ bibtex(s::ReferenceSummary) = render_bibliography(getfield(s, :bibliography))
 "A number with at most `digits` significant digits and no trailing `.0`; `--` for NaN."
 function format_number(x::Real, digits::Integer)
     isnan(x) && return "--"
-    s = string(round(Float64(x); sigdigits = digits))
-    endswith(s, ".0") && (s = chop(s; tail = 2))
-    return s
+    s = string(round(Float64(x); sigdigits = digits))::String
+    return endswith(s, ".0") ? String(chop(s; tail = 2)) : s
 end
 
 function format_range(lo::Real, hi::Real, digits::Integer, dash::AbstractString)
@@ -357,6 +380,12 @@ const SUMMARY_COLUMNS = (
     :pressure,
     :uncertainty,
     :uncertainty_abs,
+    :purity,
+    :purity_basis,
+    :purity_method,
+    :purification,
+    :sample_source,
+    :supplier,
 )
 
 "The columns shown by default: the property and the system only when they vary."
@@ -367,6 +396,9 @@ function default_columns(s::ReferenceSummary)
     length(unique(c.system)) > 1 && push!(cols, :system)
     any(!isempty, c.method) && push!(cols, :method)
     append!(cols, (:points, :temperature, :pressure, :uncertainty))
+    any(!isempty, c.purity) && push!(cols, :purity)
+    any(!isempty, c.purity_method) && push!(cols, :purity_method)
+    any(!isempty, c.purification) && push!(cols, :purification)
     return cols
 end
 
@@ -385,6 +417,12 @@ function column_header(s::ReferenceSummary, col::Symbol, latex::Bool)
         return latex ? string("\$p\$ [", esc(p), "]") : string("p [", p, "]")
     col === :uncertainty && return latex ? "\$U_\\mathrm{r}\$ [\\%]" : "U_r [%]"
     col === :uncertainty_abs && return latex ? "\$U\$" : "U"
+    col === :purity && return "Purity"
+    col === :purity_basis && return "Purity basis"
+    col === :purity_method && return "Purity analysis"
+    col === :purification && return "Purification"
+    col === :sample_source && return "Sample source"
+    col === :supplier && return "Supplier"
     throw(ArgumentError("unknown column :$col; choose from $(SUMMARY_COLUMNS)"))
 end
 
@@ -410,6 +448,12 @@ function cell_value(
     col === :system && return esc(c.system[i])
     col === :method && return esc(c.method[i])
     col === :phase && return esc(c.phase[i])
+    col === :purity && return esc(c.purity[i])
+    col === :purity_basis && return esc(c.purity_basis[i])
+    col === :purity_method && return esc(c.purity_method[i])
+    col === :purification && return esc(c.purification[i])
+    col === :sample_source && return esc(c.sample_source[i])
+    col === :supplier && return esc(c.supplier[i])
     col === :points && return string(c.n_points[i])
     col === :temperature && return format_range(c.T_min[i], c.T_max[i], digits, dash)
     col === :pressure && return format_range(c.p_min[i], c.p_max[i], digits, dash)
@@ -474,8 +518,9 @@ reference column holds `\\cite{key}` with the keys of the BibTeX export
 (`reference = :text` writes `Author et al. (year)` instead, `:key` the key). Abbreviated
 methods are explained in a note at the end of the table. `columns` is a list taken from
 `:reference, :property, :system, :method, :phase, :points, :temperature, :pressure,
-:uncertainty, :uncertainty_abs`; by default the property and the system appear only when
-they vary. `digits` and `uncertainty_digits` are significant digits. The caption may use
+:uncertainty, :uncertainty_abs, :purity, :purity_basis, :purity_method, :purification,
+:sample_source, :supplier`; by default the property and the system appear only when they
+vary, and the purity, its analysis and the purification only when an article states them. `digits` and `uncertainty_digits` are significant digits. The caption may use
 LaTeX; the rest of the text is escaped.
 
 Data from the ThermoML Archive come with a notice (origin, citation of the dataset and
@@ -503,7 +548,10 @@ function latex_table(
     n = length(columns)
     align = join((
         col === :method ? "p{3.4cm}" :
-        col === :system ? "p{3.2cm}" : col in (:reference, :property, :phase) ? "l" : "c" for col in columns
+        col === :system ? "p{3.2cm}" :
+        col in (:purity, :purity_method, :purification) ? "p{3cm}" :
+        col in (:reference, :property, :phase, :purity_basis, :sample_source, :supplier) ?
+        "l" : "c" for col in columns
     ),)
     io = IOBuffer()
     if notice_wanted(s, notice)
@@ -514,7 +562,7 @@ function latex_table(
     println(io, "% Requires: \\usepackage{booktabs} and \\usepackage{longtable}")
     println(io, "\\begin{longtable}{", align, "}")
     println(io, "\\caption{", caption, "}\\label{", label, "}\\\\")
-    head = join(header, " & ") * " \\\\"
+    head = join(header, " & ")::String * " \\\\"
     println(io, "\\toprule\n", head, "\n\\midrule\n\\endfirsthead")
     println(io, "\\toprule\n", head, "\n\\midrule\n\\endhead")
     println(
@@ -611,6 +659,14 @@ function summary_fields(s::ReferenceSummary)
         string("p_max [", p, "]")=>c.p_max,
         "unc_abs [property unit]"=>c.unc_abs,
         "unc_rel [%]"=>c.unc_rel,
+        "purity"=>c.purity,
+        "purity_min [%]"=>c.purity_min,
+        "purity_max [%]"=>c.purity_max,
+        "purity_basis"=>c.purity_basis,
+        "purity_method"=>c.purity_method,
+        "purification"=>c.purification,
+        "sample_source"=>c.sample_source,
+        "supplier"=>c.supplier,
     ]
 end
 
@@ -669,7 +725,7 @@ rest, those of [`reference_summary`](@ref). The summary is returned.
 
 # Examples
 ```julia
-summary = write_references("water", v; pressure_unit = u"kPa", statistic = :mean)
+summary = write_references("water", v; pressure_unit = "kPa", statistic = :mean)
 ```
 """
 function write_references(

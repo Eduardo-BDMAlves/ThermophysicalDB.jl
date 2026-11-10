@@ -4,7 +4,7 @@ CurrentModule = ThermophysicalDB
 
 # [Selecting points](@id selecting)
 
-[`points`](@ref) is the single entry point for filtering. It takes a [`Dataset`](@ref) (what [`database`](@ref) returns) or an earlier selection, and returns a new selection: a [`DataView`](@ref).
+[`points`](@ref) is the single entry point for filtering. It takes a [`Database`](@ref) (what [`database`](@ref) returns) or an earlier selection, and returns a new selection: a [`DatabaseView`](@ref), with a [`DataView`](@ref) for each database that has points ([`parts`](@ref)); with one database it is used as that `DataView`.
 
 ```@setup sel
 Main.DocsSetup.activate!()

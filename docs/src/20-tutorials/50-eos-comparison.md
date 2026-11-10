@@ -83,7 +83,7 @@ v = points(
     db; component = "hexane", exact = true, property = "Vapor or sublimation pressure",
     temperature = (230u"K", 500u"K"), pure = true
 )
-t = table(v; unitful = true)
+t = table(v; quantities = Unitful)
 
 T = t.temperature
 p = t.value
@@ -135,7 +135,7 @@ vd = points(
     temperature = (250u"K", 420u"K"), pressure = (1u"kPa", 60u"MPa"),
     pure = true,
 )
-td = table(vd; unitful = true)
+td = table(vd; quantities = Unitful)
 
 Td = td.temperature
 pd = td.pressure

@@ -24,14 +24,14 @@ network was used: a check that could not ask the resolver has not checked anythi
 struct ReferenceCheck
     problems::Vector{String}
     conflicts::Vector{
-        @NamedTuple{key::String,doi::String,field::String,file::String,resolver::String}
+        @NamedTuple{key::String,doi::String,field::String,file::String,resolver::String},
     }
     unresolved::Vector{@NamedTuple{key::String,doi::String,reason::String}}
     skipped::Vector{String}
     compared::Int
     strict::Bool
     notes::Vector{
-        @NamedTuple{key::String,doi::String,field::String,file::String,resolver::String}
+        @NamedTuple{key::String,doi::String,field::String,file::String,resolver::String},
     }
 end
 
@@ -107,13 +107,11 @@ function compare_with_resolver!(
     resolver::BibEntry,
     notes = conflicts,
 )
-    same_issue = all(
-        n ->
-            field_value(entry, n) !== nothing &&
-            field_value(resolver, n) !== nothing &&
-            squash(field_value(entry, n)) == squash(field_value(resolver, n)),
-        ("volume", "pages"),
-    )
+    same_issue = all(("volume", "pages")) do n
+        a = field_value(entry, n)
+        b = field_value(resolver, n)
+        return a !== nothing && b !== nothing && squash(a) == squash(b)
+    end
     for name in COMPARED_FIELDS
         mine, theirs = field_value(entry, name), field_value(resolver, name)
         (mine === nothing || theirs === nothing) && continue

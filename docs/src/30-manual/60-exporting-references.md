@@ -74,12 +74,16 @@ articles = reference_summary(v; temperature_unit = u"°C", pressure_unit = u"kPa
 | `n_points`, `n_uncertainty` | points, and how many of them state an uncertainty |
 | `T_min`, `T_max`, `p_min`, `p_max` | ranges of the conditions, in the units you choose |
 | `unc_abs`, `unc_rel` | expanded uncertainty at ``k = 2``: absolute, in the unit of the property, and relative in percent |
+| `purity`, `purity_min`, `purity_max` | the purity of the samples, as text (`methane 99.95 % mass`) and as a range in percent |
+| `purity_basis`, `purity_method` | how the purity is known: `supplier`, `measured` or `estimated`, and the analysis methods the article names |
+| `purification`, `sample_source`, `supplier` | the purification methods, where the samples came from (`Commercial source`, ...), and the supplier when one is named |
 
 The summary is a Tables.jl table (`DataFrame(articles)` works) and prints as a table in the REPL.
 
 - **Units.** `temperature_unit` and `pressure_unit` accept any Unitful temperature or pressure unit, including `u"°C"` and `u"bar"`. The database keeps K and kPa; the conversion is applied to the limits of each range only.
 - **Uncertainty.** The value of a row is the median over the points that state an uncertainty (`statistic = :median`, the default, which is not thrown off by an outlier or by a property that passes near zero); `statistic = :mean` gives the mean. Points without an uncertainty are not counted in it.
 - **Methods.** A method name longer than `method_length` characters (24 by default) is replaced by its initials, `Vibrating tube method` becoming `VTM`; two different names with the same initials are numbered (`VTM`, `VTM2`). The note that explains them is part of the LaTeX and Markdown output.
+- **Samples.** The purity columns come from what each article says about the samples of its points. Where an article does not describe a sample, the text is empty and the range is `NaN`, like any other absent value. `purity_basis` is `supplier` when the purity is the one stated by the supplier, `measured` when an analysis (gas chromatography, Karl Fischer titration, ...) is named, and `estimated` when the compiler of the data estimated it; when the samples of a row differ, the distinct classes are listed. The ThermoML archive has no field for the name of the supplier, so `supplier` is empty for its data; `sample_source` holds the closest it says. A purity is a mass, mole or volume fraction as stated, and the text says which; the range mixes them, as the articles do. The full records are in [`sample_table`](@ref) and [`purity_step_table`](@ref).
 - **Order.** By year, from the oldest to the newest; within a year, by month when the DOI entry has one, otherwise alphabetically by key.
 
 ## LaTeX, Markdown and CSV
@@ -90,12 +94,16 @@ write("water.md", markdown_table(articles))
 write("water.csv", csv_table(articles))
 ```
 
-[`latex_table`](@ref) writes a `longtable` with `booktabs` rules (load both packages). The first column holds `\cite{key}` with the keys of the BibTeX export, so the table and the `.bib` agree; `reference = :text` writes `Author et al. (year)` instead. The property and the system columns appear only when they vary within the table. Choose the columns, and the number of significant digits, with keywords:
+[`latex_table`](@ref) writes a `longtable` with `booktabs` rules (load both packages). The first column holds `\cite{key}` with the keys of the BibTeX export, so the table and the `.bib` agree; `reference = :text` writes `Author et al. (year)` instead. The property and the system columns appear only when they vary within the table. By default the table also shows the purity, its analysis and the purification, when some article states them. Choose the columns, and the number of significant digits, with keywords; the columns are `:reference`, `:property`, `:system`, `:method`, `:phase`, `:points`, `:temperature`, `:pressure`, `:uncertainty`, `:uncertainty_abs`, `:purity`, `:purity_basis`, `:purity_method`, `:purification`, `:sample_source` and `:supplier`:
 
 ```julia
 latex_table(articles; columns = [:reference, :method, :points, :temperature, :pressure, :uncertainty],
             digits = 5, label = "tab:water")
+latex_table(articles; columns = [:reference, :temperature, :pressure, :uncertainty,
+                                 :purity, :purity_basis, :purity_method, :purification])
 ```
+
+`csv_table` and the `references` sheet of an Excel export always hold every column, with the full method names.
 
 [`write_references`](@ref) writes the BibTeX file and the tables in one call, from the same summary, so they cannot disagree:
 
