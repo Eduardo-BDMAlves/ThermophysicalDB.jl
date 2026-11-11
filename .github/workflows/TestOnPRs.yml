@@ -13,7 +13,33 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
+  # Decides whether the pull request changes anything the tests depend on. The workflow itself
+  # always runs (so the required check below always reports), only the expensive job is skipped.
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "$files"
+          if echo "$files" | grep -qE '^(src/|ext/|test/|Project\.toml$|\.github/workflows/(Test|TestOnPRs|ReusableTest)\.yml$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     uses: ./.github/workflows/ReusableTest.yml
     with:
       os: ubuntu-latest
@@ -23,3 +49,20 @@ jobs:
       run_codecov: true
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+
+  # The only check to require in the ruleset: it passes when the tests passed or were not needed,
+  # and fails when they failed or were cancelled.
+  tests-passed:
+    name: Tests passed
+    needs: [changes, test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the result of the tests
+        run: |
+          echo "changes: ${{ needs.changes.result }}, test: ${{ needs.test.result }}"
+          [ "${{ needs.changes.result }}" = "success" ] || exit 1
+          case "${{ needs.test.result }}" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
