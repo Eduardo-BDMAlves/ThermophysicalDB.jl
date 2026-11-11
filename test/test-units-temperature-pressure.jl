@@ -59,7 +59,7 @@ end
     ub = T.unit_backend(Unitful)
 
     # What Unitful prints is read by the exact parser, so no Unitful conversion is used.
-    @test T.unit_text(ub, u"mW/m/K") == string(u"mW/m/K")
+    @test T.unit_text(ub, u"mW/m/K") == "mW K^-1 m^-1"
     @test T.try_named_unit(T.NativeTemperature(), T.unit_text(ub, u"°C")) ==
           T.TEMPERATURE_UNITS["°C"]
     tc = T.table(view; temperature_unit = u"°C")

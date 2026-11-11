@@ -40,13 +40,19 @@ jobs:
   test:
     needs: changes
     if: ${{ needs.changes.outputs.code == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
     uses: ./.github/workflows/ReusableTest.yml
     with:
-      os: ubuntu-latest
+      os: ${{ matrix.os }}
       version: "1.13"
       arch: default
       allow_failure: false
-      run_codecov: true
+      run_codecov: ${{ matrix.os == 'ubuntu-latest' }}
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
