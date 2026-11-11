@@ -112,15 +112,22 @@ stamp_text(seconds::Real) =
 
 """
     created_at(db, name) -> DateTime
-    modified_at(db, name) -> DateTime
 
-When the database `name` was created and when data were last added to it (UTC). They are kept in
-the file, so a copy of the file keeps them. A database saved before they existed takes the time of
-its file for both. Reading the database never changes them; `modified_at` is the time of the last
-edit, not of the last [`save_database`](@ref).
+When the database `name` was created (UTC). It is kept in the file, so a copy of the file keeps it.
+A database saved before it existed takes the time of its file. Reading the database never changes
+it. See also [`modified_at`](@ref).
 """
 created_at(db::Database, name::AbstractString) =
     Dates.unix2datetime(member_stamps(db.members[member_index(db, name)])[1])
+
+"""
+    modified_at(db, name) -> DateTime
+
+When data were last added to the database `name` (UTC); this is the time of the last edit, not of
+the last [`save_database`](@ref). It is kept in the file, so a copy of the file keeps it. A database
+saved before it existed takes the time of its file. Reading the database never changes it. See also
+[`created_at`](@ref).
+"""
 modified_at(db::Database, name::AbstractString) =
     Dates.unix2datetime(member_stamps(db.members[member_index(db, name)])[2])
 
