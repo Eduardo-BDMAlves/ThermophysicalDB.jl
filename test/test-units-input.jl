@@ -86,3 +86,24 @@ end
     @test T.exact_value(-2.5) == -5 // 2
     @test T.exact_value(3) == 3
 end
+
+# Unitful prints the exponents of a unit as superscripts on macOS and with "^" elsewhere; the package
+# has to read a unit whichever way it is printed.
+@testitem "Unitful units are read whichever way Unitful prints the exponents" tags =
+    [:unit, :fast] begin
+    using Unitful
+    T = ThermophysicalDB
+    spec = T.unit_spec("W/m/K")
+    density = 1.0u"g/cm^3"
+    old = get(ENV, "UNITFUL_FANCY_EXPONENTS", nothing)
+    try
+        for fancy in ("true", "false")
+            ENV["UNITFUL_FANCY_EXPONENTS"] = fancy
+            @test T.unit_text(T.backend_of(density), Unitful.unit(density)) == "g cm^-3"
+            @test T.native_value(1.0u"btu/hr/ft/Ra", spec) ≈ 1.730734666 rtol = 1.0e-9
+        end
+    finally
+        old === nothing ? delete!(ENV, "UNITFUL_FANCY_EXPONENTS") :
+        (ENV["UNITFUL_FANCY_EXPONENTS"] = old)
+    end
+end

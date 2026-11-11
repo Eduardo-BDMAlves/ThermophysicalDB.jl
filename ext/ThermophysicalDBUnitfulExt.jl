@@ -71,9 +71,11 @@ function T.unit_factor(::UnitfulBackend, from, to)
 end
 
 
-# Unitful prints a unit as "mW m^-1 K^-1", which the exact parser of the package reads.
+# Unitful prints a unit as "mW m^-1 K^-1", which the exact parser of the package reads. On macOS
+# (and with UNITFUL_FANCY_EXPONENTS=true) it prints the exponents as superscripts, "mW m⁻¹ K⁻¹",
+# which the parser does not read, so the form with "^" is asked for explicitly.
 function T.unit_text(::UnitfulBackend, unit::Unitful.Units)
-    text = string(unit)
+    text = sprint(show, unit; context = :fancy_exponent => false)
     return isempty(text) ? nothing : text
 end
 
