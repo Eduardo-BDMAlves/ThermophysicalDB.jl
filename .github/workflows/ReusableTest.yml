@@ -25,14 +25,17 @@ on:
         type: boolean
         default: false
     secrets:
+      # Not required: pull requests from forks and from Dependabot do not receive the secret
       codecov_token:
-        required: true
+        required: false
 
 jobs:
   test:
     name: "Julia ${{ inputs.version }} - ${{ inputs.os }} - arch: ${{ inputs.arch }} - ${{ github.event_name }}"
     runs-on: ${{ inputs.os }}
     continue-on-error: ${{ inputs.allow_failure }}
+    env:
+      CODECOV_TOKEN: ${{ secrets.codecov_token }}
 
     steps:
       - uses: actions/checkout@v7
@@ -47,7 +50,7 @@ jobs:
       - uses: julia-actions/julia-processcoverage@v1
         if: ${{ inputs.run_codecov }}
       - uses: codecov/codecov-action@v7
-        if: ${{ inputs.run_codecov }}
+        if: ${{ inputs.run_codecov && env.CODECOV_TOKEN != '' }}
         with:
           file: lcov.info
           token: ${{ secrets.codecov_token }}
