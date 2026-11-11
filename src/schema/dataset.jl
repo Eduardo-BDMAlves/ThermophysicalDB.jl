@@ -37,7 +37,7 @@ LazyState() =
 When a dataset was created and last edited, as seconds since 1970-01-01 UTC. It is written to the
 file (`meta/created`, `meta/modified`) so that it travels with the data; a file written before the
 stamps existed has none and takes the modification time of the file. Reading the data never changes
-them, adding data does ([`touch!`](@ref)).
+them, adding data does (`touch!`).
 """
 mutable struct Stamps
     created::Float64

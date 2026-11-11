@@ -7,7 +7,7 @@ CurrentModule = ThermophysicalDB
 The NIST archive is read-only: you never change it. Points from an article that is not in it, and the points you measured yourself, go into **databases of your own**, which are searched together with the archive as if they were one (see [Several databases that look like one](@ref updates)). This tutorial adds two hypothetical sets of data, in two ways:
 
 1. **Programmatically**, building the data step by step with the objects of the package: a [`ReferenceRef`](@ref) (the article or the notebook), an [`ExperimentRef`](@ref) (one system measured) and the points.
-2. **With a spreadsheet**: the package writes an Excel template, you fill it in and the package reads it back. Two filled examples are ready to download: [`example-literature.xlsx`](../assets/example-literature.xlsx) and [`example-own-measurements.xlsx`](../assets/example-own-measurements.xlsx).
+2. **With a spreadsheet**: the package writes an Excel template, you fill it in and the package reads it back. Two filled examples are ready to download: [`example-literature.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-literature.xlsx) and [`example-own-measurements.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-own-measurements.xlsx).
 
 ```@setup own
 Main.DocsSetup.activate!()
@@ -228,8 +228,8 @@ The file has these sheets:
 
 Only the input cells (the colours are explained in the `Guide`) are for you; the rest is protected. Property, method, phase, sample source, supplier, purity analysis, purification, units and scale are menus: the values that your databases already use come first (most used first), followed by generic choices, so a new point most likely joins what is already there. Method and supplier also accept your own text. Open `template.xlsx`, fill it in and save, or start from one of the examples:
 
-- [`example-literature.xlsx`](../assets/example-literature.xlsx): the hypothetical article above plus a pure-water experiment (nine points), target `literature`, temperatures in K with `u(T)`, `u(P)` and `u(w)` as expanded uncertainties (``k = 2``).
-- [`example-own-measurements.xlsx`](../assets/example-own-measurements.xlsx): the volumetric heat capacity of ethanol and of water (a check of the instrument), temperatures in °C (six points), target `my_lab`. The ethanol sheet gives `u(T)` in °C, which is a difference; the water sheet gives `u(T)` and `u(P)` as relative (`%`), which the package takes of the value in K and kPa.
+- [`example-literature.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-literature.xlsx): the hypothetical article above plus a pure-water experiment (nine points), target `literature`, temperatures in K with `u(T)`, `u(P)` and `u(w)` as expanded uncertainties (``k = 2``).
+- [`example-own-measurements.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-own-measurements.xlsx): the volumetric heat capacity of ethanol and of water (a check of the instrument), temperatures in °C (six points), target `my_lab`. The ethanol sheet gives `u(T)` in °C, which is a difference; the water sheet gives `u(T)` and `u(P)` as relative (`%`), which the package takes of the value in K and kPa.
 
 ### Check before importing
 

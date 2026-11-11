@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+- Fixed the tests and the unit text on macOS: Unitful prints exponents as superscripts there (and with `UNITFUL_FANCY_EXPONENTS=true`), which the exact unit parser does not read, so the units of a Unitful quantity are now asked for with `^` exponents on every system; the CI matrix is Julia 1.13 on Linux, Windows and macOS for now
+
 - Databases know when they were created and last edited (`created_at(db, name)`, `modified_at(db, name)`, shown by `db`); the stamps are in the file and in `member.toml`, and files written before they existed take the time of the file (no schema change)
 - The spreadsheet template says the XLSX.jl and Julia versions and the UTC time that made it, and has the document properties (creator, date, versions) that Excel shows under File > Info
 - Quality checks in the tests: Aqua and JET, both ordinary tests that pass with no known reports; fixed an ambiguity of `convert_native`, a call to `first` with an unsupported keyword when joining template files, and the places where a possible `nothing` was not handled

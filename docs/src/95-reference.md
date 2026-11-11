@@ -72,6 +72,8 @@ add_template_experiments!
 TemplateData
 TemplateExperiment
 save_database
+created_at
+modified_at
 set_priority!
 databases_dir
 resolve_compound

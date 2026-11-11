@@ -1,0 +1,197 @@
+name: Benchmark
+
+# Compares the performance of a pull request with the latest release (the latest tag `v*`; before
+# the first release, with the default branch) using AirspeedVelocity.jl, and comments the result
+# on the pull request: time and allocated memory of every benchmark of `benchmark/benchmarks.jl`,
+# plus the memory that stays after loading the database (`benchmark/memory_report.jl`).
+# Changes of more than 15 % are marked. It never fails the pull request.
+#
+# By hand (Actions > Benchmark > Run workflow) a base can be chosen (a tag, a branch or a
+# commit) and the size of the synthetic database: `small` (20 thousand points), `medium` (200
+# thousand, the default) or `full` (2.8 million, as many as the archive).
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "ext/**"
+      - "benchmark/**"
+      - "Project.toml"
+      - ".github/workflows/Benchmark.yml"
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: "Size of the synthetic database"
+        type: choice
+        options:
+          - medium
+          - small
+          - full
+        default: medium
+      base:
+        description: "Base of the comparison (tag, branch or commit); empty for the latest release"
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TDB_BENCH_SCALE: ${{ inputs.scale || 'medium' }}
+  # Changes above this fraction are marked in the comment.
+  BENCH_LIMIT: "0.15"
+
+jobs:
+  benchmark:
+    name: Benchmarks against the latest release
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@v7
+        with:
+          # The commit of the pull request (not the merge with the base) and all the tags.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: "1"
+
+      - name: Cache the Julia packages
+        uses: julia-actions/cache@v3
+
+      - name: Cache the synthetic database
+        # The folder of each revision is named by a hash of what decides the file (see
+        # benchmark/data.jl), so a file is only reused by a revision that would write the same.
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/tdb-bench-cache
+          key: bench-data-${{ runner.os }}-${{ env.TDB_BENCH_SCALE }}-${{ hashFiles('src/schema/**', 'src/store/serialize.jl', 'benchmark/synthetic.jl') }}
+          restore-keys: |
+            bench-data-${{ runner.os }}-${{ env.TDB_BENCH_SCALE }}-
+
+      - name: Choose the revisions
+        id: revs
+        shell: bash
+        run: |
+          head_sha=$(git rev-parse HEAD)
+          base="${{ inputs.base }}"
+          if [ -z "$base" ]; then
+            base=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
+          fi
+          if [ -z "$base" ]; then
+            # No release yet: the default branch.
+            base="origin/${{ github.event.repository.default_branch }}"
+            label="${{ github.event.repository.default_branch }}"
+          else
+            label="$base"
+          fi
+          base_sha=$(git rev-parse "${base}^{commit}")
+          echo "head=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "base_label=$label ($(git rev-parse --short "$base_sha"))" >> "$GITHUB_OUTPUT"
+          echo "head_label=this pull request ($(git rev-parse --short "$head_sha"))" >> "$GITHUB_OUTPUT"
+          echo "Comparing $base_sha ($label) with $head_sha"
+
+      - name: Install AirspeedVelocity
+        shell: bash
+        env:
+          JULIA_NUM_THREADS: 2
+        run: |
+          # Lightweight, as the runner can run out of memory (the same steps as the action of the package).
+          julia -e 'ENV["JULIA_PKG_PRECOMPILE_AUTO"]=0; using Pkg; pkg"add AirspeedVelocity@0.6"'
+          julia -e 'ENV["JULIA_PKG_PRECOMPILE_AUTO"]=0; import Pkg; Pkg.build("AirspeedVelocity")'
+          # JSON3 is read by benchmark/compare.jl
+          julia -e 'using Pkg; Pkg.add("JSON3")'
+          echo "$HOME/.julia/bin" >> "$GITHUB_PATH"
+
+      - name: Run the benchmarks
+        shell: bash
+        env:
+          TDB_BENCH_CACHE: ${{ runner.temp }}/tdb-bench-cache
+        run: |
+          mkdir results
+          # The script is the one of this commit for both revisions (--bench-on), so a new
+          # benchmark is also measured on the release; one that does not run there is left out.
+          benchpkg ThermophysicalDB \
+            --path=. \
+            --rev=${{ steps.revs.outputs.base }},${{ steps.revs.outputs.head }} \
+            --bench-on=${{ steps.revs.outputs.head }} \
+            --output-dir=results/
+
+      - name: Memory that stays after loading the database
+        shell: bash
+        env:
+          TDB_BENCH_CACHE: ${{ runner.temp }}/tdb-bench-cache
+        run: |
+          git worktree add "$RUNNER_TEMP/base-source" "${{ steps.revs.outputs.base }}"
+          julia benchmark/memory_report.jl \
+            "base=$RUNNER_TEMP/base-source" \
+            "head=$GITHUB_WORKSPACE" > memory.md
+          cat memory.md
+
+      - name: Write the comparison
+        id: compare
+        shell: bash
+        run: |
+          julia benchmark/compare.jl results \
+            "${{ steps.revs.outputs.base }}" "${{ steps.revs.outputs.head }}" \
+            "$BENCH_LIMIT" "${{ steps.revs.outputs.base_label }}" "${{ steps.revs.outputs.head_label }}" \
+            > comparison.md
+          cat memory.md >> comparison.md
+          cat comparison.md >> "$GITHUB_STEP_SUMMARY"
+          # The marker lets the next run find the comment and replace it.
+          { echo "<!-- thermophysicaldb-benchmark -->"; cat comparison.md; } > body.md
+
+      - name: Warn about changes above the limit
+        if: steps.compare.outputs.regressions != '0'
+        shell: bash
+        run: |
+          echo "::warning title=Performance::${{ steps.compare.outputs.regressions }} benchmarks are more than 15 % slower or allocate more memory than the base"
+
+      - name: Plot
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p plots
+          benchpkgplot ThermophysicalDB \
+            --rev=${{ steps.revs.outputs.base }},${{ steps.revs.outputs.head }} \
+            --input-dir=results/ --output-dir=plots/ --format=png --npart=10
+
+      - name: Keep the results
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmark-results
+          path: |
+            results/
+            plots/
+            comparison.md
+
+      - name: Find the comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: peter-evans/find-comment@v4
+        id: find
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "<!-- thermophysicaldb-benchmark -->"
+
+      - name: Create or update the comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: body.md
+          edit-mode: replace
