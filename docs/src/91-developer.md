@@ -246,6 +246,7 @@ To add a benchmark, define it in `benchmark/benchmarks.jl` with `register!(group
 
 To create a new release, you can follow these simple steps:
 
+- Before the first release only: the repository must be enabled on Zenodo (see "Zenodo and the DOI" below; done)
 - Create a branch `release-x.y.z`
 - Update `version` in `Project.toml` and, in `CITATION.cff`, `version`, `date-released` and (once Zenodo has issued it) the `doi` of the release; when the article of the package is published, add it as `preferred-citation`
 - Run `ThermophysicalDB.check_references()`
@@ -267,3 +268,15 @@ After that, you only need to wait and verify:
 - After the release is create, a "docs" GitHub action will start for the tag.
 - After it passes, a deploy action will run.
 - After that runs, the [stable docs](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable) should be updated. Check them and look for the version number.
+
+## Zenodo and the DOI
+
+Zenodo archives every GitHub release of the repository and gives it a DOI. Two DOIs exist: one for each version, and one "concept" DOI that always points to the latest version. The badge of the README uses the repository identifier, so it follows the latest version without being edited again.
+
+Once, before the first release:
+
+- Log in to <https://zenodo.org> with the GitHub account and open `https://zenodo.org/account/settings/github/`
+- Flip the switch of `ThermophysicalDB.jl` to on (the repository must be public; only releases created after this are archived)
+- The badge of the `README.md` already uses the numeric identifier of the repository (the field `id` of <https://api.github.com/repos/Eduardo-BDMAlves/ThermophysicalDB.jl>), `https://zenodo.org/badge/ID.svg` linked to `https://zenodo.org/badge/latestdoi/ID`, so it shows the DOI of the latest version without being edited again; it has no number until the first release is archived, and `.lychee.toml` leaves Zenodo badge links out of the link check
+
+At every release nothing else is needed: TagBot creates the GitHub release, Zenodo is notified, archives it and issues the DOI. Zenodo reads the metadata (title, authors, license) from `CITATION.cff`. After the first release, copy the concept DOI (shown on the Zenodo page as "Cite all versions") to the `doi` field of `CITATION.cff`.
