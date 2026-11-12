@@ -76,6 +76,10 @@ pkg> activate .
 pkg> test
 ```
 
+The continuous integration does not run everything everywhere: coverage is made on Linux only, and the variable `THERMOPHYSICALDB_TEST_SUITE` (see `test/runtests.jl`) chooses the part of the suite.
+
+ Linux runs `full`; macOS runs `no-quality` (everything but the Aqua and JET checks, which do not depend on the system, but all the tests of the units, which are what has differed on that system); Windows runs `platform`, the files that depend on the system (paths, files, downloads, the cache and the spreadsheets). Without the variable, `test` runs everything, as above.
+
 ## Working on a new issue
 
 We try to keep a linear history in this repo, so it is important to keep your branches up-to-date.
@@ -242,11 +246,35 @@ julia benchmark/memory_report.jl base=/path/to/release head=.
 
 To add a benchmark, define it in `benchmark/benchmarks.jl` with `register!(group, name, @benchmarkable(...))`. A benchmark that writes or loads starts from a clean state in `setup` with `evals = 1`. `register!` runs it once, so a benchmark that cannot run on an older revision (the function did not exist yet) is left out with a warning instead of stopping the others. The script is the one of the pull request for both revisions, so use only the public functions in the generator and in the setup. Change `benchmark/synthetic.jl` only when needed: it changes the data of every comparison.
 
+### Study of allocations
+
+`benchmark/allocations/` is a map of where the package allocates, run by hand (it is not part of the pull request workflow). It has its own environment and runs a registry of scenarios (filters over the database and over the linked database, `table` and `points`, the three units packages, composition conversion, repeated points, the compound database, the uncertainty and condition tables, every export format, the spreadsheet template, the outlier search), each one with a fresh state:
+
+```bash
+julia --project=benchmark/allocations -e 'using Pkg; Pkg.instantiate()'
+julia --project=benchmark/allocations benchmark/allocations/run.jl data=synthetic scale=medium
+julia --project=benchmark/allocations benchmark/allocations/run.jl data=real jet=true
+```
+
+Options (`key=value`): `data=synthetic|real` (the real one opens the installed archive; `TDB_ALLOC_COMPONENT` and `TDB_ALLOC_PROPERTY` choose the compound and the property of the filters), `scale=small|medium|full`, `only=REGEX` (scenarios by name), `lines=true|false` (allocation by line of the package with `Profile.Allocs`, for the scenarios that allocate at least 256 KiB), `jet=true|false` (static analysis with JET, which finds type instabilities and runtime dispatch), `repeats=N`, `pressure=SECONDS`, `list=true`, `out=FOLDER`. The results go to `benchmark/results/allocations/` (ignored by git): `report.md` (table by allocated bytes, global top of lines, per-scenario sites, JET), `summary.csv`, `sites.csv` and `jet.txt`.
+
+Each scenario is run once to compile, then several times, and the minimum time and bytes are kept, together with the number of allocations and the size of the result (the amplification is how many bytes were allocated for each byte of result).
+
+The columns `GC (steady)` (share of the time in the garbage collector over many calls in a row with no forced collection, for `pressure=` seconds, 2 by default: on a machine with a lot of memory the collector starts only after some GiB of garbage, so a few calls read zero) and `collect after` (one young collection right after a call) are different things: the first is zero when the heap allowance is large (a loaded archive makes it large), so a call that allocates little never triggers the collector; the second is what the garbage of one call costs when it does run. Every result also gets a fingerprint (SHA-1 of the values, the number of items and sums of the floats, plain and weighted by position), so a performance change cannot silently change the data. To use it:
+
+```bash
+# before the change
+julia --project=benchmark/allocations benchmark/allocations/run.jl save=before.tsv
+# after the change: exit status 1 if any result changed
+julia --project=benchmark/allocations benchmark/allocations/run.jl check=before.tsv
+```
+
+A result is `same`, `rounding` (the hash differs but the number of items and both sums agree to 1e-12: only the last digits moved, check that it was meant), `changed` (the data differ), `unstable` (it differs between two runs of the same code, as the timestamps in JSON) or `new`. Compare only runs of the same data (the file records the data label). The time of an export (`exported at`, in ISO form) is left out of the fingerprint of the files, and arrays of structs with padding are hashed element by element, so that the same values give the same hash in every run. The profile samples by size (every allocation is sampled in the small scenarios, down to 1 % in the largest), so the lines are estimates; the bytes of the table are exact. To add a scenario, call `scenario!` in `benchmark/allocations/scenarios.jl` with a `setup` that returns a named tuple, a `run` and a `fingerprint`.
+
 ## Making a new release
 
 To create a new release, you can follow these simple steps:
 
-- Before the first release only: the repository must be enabled on Zenodo (see "Zenodo and the DOI" below; done)
 - Create a branch `release-x.y.z`
 - Update `version` in `Project.toml` and, in `CITATION.cff`, `version`, `date-released` and (once Zenodo has issued it) the `doi` of the release; when the article of the package is published, add it as `preferred-citation`
 - Run `ThermophysicalDB.check_references()`
@@ -268,15 +296,3 @@ After that, you only need to wait and verify:
 - After the release is create, a "docs" GitHub action will start for the tag.
 - After it passes, a deploy action will run.
 - After that runs, the [stable docs](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable) should be updated. Check them and look for the version number.
-
-## Zenodo and the DOI
-
-Zenodo archives every GitHub release of the repository and gives it a DOI. Two DOIs exist: one for each version, and one "concept" DOI that always points to the latest version. The badge of the README uses the repository identifier, so it follows the latest version without being edited again.
-
-Once, before the first release:
-
-- Log in to <https://zenodo.org> with the GitHub account and open `https://zenodo.org/account/settings/github/`
-- Flip the switch of `ThermophysicalDB.jl` to on (the repository must be public; only releases created after this are archived)
-- The badge of the `README.md` already uses the numeric identifier of the repository (the field `id` of <https://api.github.com/repos/Eduardo-BDMAlves/ThermophysicalDB.jl>), `https://zenodo.org/badge/ID.svg` linked to `https://zenodo.org/badge/latestdoi/ID`, so it shows the DOI of the latest version without being edited again; it has no number until the first release is archived, and `.lychee.toml` leaves Zenodo badge links out of the link check
-
-At every release nothing else is needed: TagBot creates the GitHub release, Zenodo is notified, archives it and issues the DOI. Zenodo reads the metadata (title, authors, license) from `CITATION.cff`. After the first release, copy the concept DOI (shown on the Zenodo page as "Cite all versions") to the `doi` field of `CITATION.cff`.

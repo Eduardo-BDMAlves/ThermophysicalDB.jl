@@ -793,7 +793,7 @@ end
 One ThermoML document (`DataReport`) with the points `rows` of the reference `ref`.
 Compounds are numbered per article, as in the archive; a point is a row of `NumValues`.
 """
-function thermoml_article(context::ThermomlContext, ref::Int32, rows::Vector{Int32})
+function thermoml_article(context::ThermomlContext, ref::Int32, rows::AbstractVector{Int32})
     ds = context.ds
     m, ex, ct = ds.measurements, ds.experiments, ds.compounds
 

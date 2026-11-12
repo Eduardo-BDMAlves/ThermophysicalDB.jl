@@ -189,3 +189,70 @@ end
     @test T.unit_hint(1.05, 1.0) == ""
     @test T.unit_hint(-3.0, 1.0) == ""
 end
+
+@testitem "the fit in a workspace is bit for bit the fit that allocates" tags =
+    [:unit, :fast] begin
+    using StableRNGs, Random
+    T = ThermophysicalDB
+    rng = StableRNG(11)
+    ws = T.LineWS(40)
+    cutoff = 2.5
+    tvar = T.truncated_variance(cutoff)
+    # One assertion at the end, not one per number: the windows that differ, and in what.
+    differ = Tuple{Int,Symbol}[]
+    compared = Ref(0)
+    for trial = 1:400
+        w = rand(rng, 6:40)
+        t = sort!(2 .* rand(rng, w) .- 1)
+        trial % 7 == 0 && (t[3] = t[2])         # repeated abscissae
+        y = 3 .+ 2t .- 0.7t .^ 2 .+ 0.02 .* randn(rng, w)
+        for _ = 1:rand(rng, 0:3)                # outliers
+            y[rand(rng, 1:w)] += (rand(rng) < 0.5 ? -1 : 1) * (0.3 + rand(rng))
+        end
+        u = 0.01 .+ 0.03 .* rand(rng, w)
+        if trial % 3 == 0
+            u[rand(rng, 1:w, 2)] .= NaN         # uncertainties that are not known
+        elseif trial % 3 == 1
+            u .= NaN                             # none known
+        end
+        q = clamp(ceil(Int, 0.7w), 4, w)
+
+        u_ref, known = T.fill_missing_uncertainty(u)
+        consensus = T.lqs_parabola(t, y, u_ref, q, cutoff, known ? 1.0 : 0.0)
+        reference = nothing
+        if consensus !== nothing
+            X = hcat(ones(w), t, t .^ 2)
+            reference = T.robust_refit(X, y, u_ref, consensus[1], known, cutoff)
+        end
+
+        T.resize_window!(ws, w)
+        for l = 1:w
+            ws.t[l] = t[l]
+            ws.y[l] = y[l]
+            ws.X[l, 2] = t[l]
+            ws.X[l, 3] = t[l]^2
+        end
+        T.fill_missing_uncertainty!(ws, u, 1) == known || push!(differ, (trial, :known))
+        ws.u[1:w] == u_ref || push!(differ, (trial, :u))
+        scale = T.lqs_parabola!(ws, q, cutoff, known ? 1.0 : 0.0)
+        if consensus === nothing
+            isnan(scale) || push!(differ, (trial, :scale))
+            continue
+        end
+        scale === consensus[2] || push!(differ, (trial, :scale))
+        ws.mask[1:w] == consensus[1] || push!(differ, (trial, :mask))
+        fitted = T.robust_refit!(ws, known, cutoff, tvar)
+        fitted == (reference !== nothing) || push!(differ, (trial, :fitted))
+        reference === nothing && continue
+        compared[] += 1
+        ws.beta == reference.beta || push!(differ, (trial, :beta))
+        ws.ainv == reference.ainv || push!(differ, (trial, :ainv))
+        ws.phi === reference.phi || push!(differ, (trial, :phi))
+        isequal(ws.z[1:w], reference.z) || push!(differ, (trial, :z))
+        ws.e[1:w] == reference.e || push!(differ, (trial, :e))
+        isequal(ws.h[1:w], reference.h) || push!(differ, (trial, :h))
+        ws.inliers[1:w] == reference.inliers || push!(differ, (trial, :inliers))
+    end
+    @test isempty(differ)
+    @test compared[] > 300
+end
