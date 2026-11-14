@@ -46,11 +46,19 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+        include:
+          # Linux runs everything and sends the coverage; macOS runs everything but the quality
+          # checks, which do not depend on the system (the units are what has differed there).
+          - os: ubuntu-latest
+            suite: full
+          - os: macos-latest
+            suite: no-quality
     uses: ./.github/workflows/ReusableTest.yml
     with:
       os: ${{ matrix.os }}
       version: "1.13"
       arch: default
+      suite: ${{ matrix.suite }}
       allow_failure: false
       run_codecov: ${{ matrix.os == 'ubuntu-latest' }}
     secrets:

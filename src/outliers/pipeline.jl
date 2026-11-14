@@ -172,8 +172,8 @@ function run_detection(
     end
 
     # Stages 1 and 2: the local fits.
-    dynamic_foreach(length(line_tasks)) do _, i
-        process_line!(line_tasks[i], set)
+    dynamic_foreach(length(line_tasks); init = () -> LineWS(set.window)) do ws, i
+        process_line!(ws, line_tasks[i], set)
     end
     for task in joint_tasks
         process_joint!(task, set)

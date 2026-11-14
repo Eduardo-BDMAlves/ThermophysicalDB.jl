@@ -6,15 +6,6 @@
 # comes from, two points are never taken for the same, however close they are. Points of one
 # database are never compared with each other, and the archive is never changed.
 
-# What tells a reference apart from another one.
-struct WorkKey
-    doi::String        # lower case, empty when there is none
-    surname::String    # of the first author, normalised
-    year::Int
-    title::String      # normalised
-    label::String      # to show: the DOI, or "Surname year"
-end
-
 function surname_of(author::AbstractString)
     s = strip(author)
     isempty(s) && return ""
@@ -22,7 +13,28 @@ function surname_of(author::AbstractString)
     return normalize_name(s)
 end
 
+# The key of reference `r`, made once (see `WorkKeys`).
 function work_key(ds::Dataset, r::Integer)
+    cache = ds.references.works
+    lock(cache.lock)
+    try
+        n = length(ds.references)
+        length(cache.keys) > n && empty!(cache.keys)
+        while length(cache.keys) < n
+            push!(cache.keys, nothing)
+        end
+        key = cache.keys[r]
+        if key === nothing
+            key = compute_work_key(ds, r)
+            cache.keys[r] = key
+        end
+        return key
+    finally
+        unlock(cache.lock)
+    end
+end
+
+function compute_work_key(ds::Dataset, r::Integer)
     rf = ds.references
     doi = lowercase(strip(rf.doi[r]))
     authors = rf.authors[r]

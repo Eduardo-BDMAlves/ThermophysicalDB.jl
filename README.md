@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Experimental thermophysical data, one call away.</strong><br>
-  Download the thermophysical databases once, keep it up to date, and filter, plot and analyse more than a hundred thousand measured systems from the Julia REPL.
+  Download the thermophysical databases once, keep them up to date, and filter, plot and analyse more than a hundred thousand measured systems from the Julia REPL.
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
 [![Docs workflow Status](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Docs.yml/badge.svg?branch=main)](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/actions/workflows/Docs.yml?query=branch%3Amain)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![JET](https://img.shields.io/badge/%F0%9F%9B%A9%EF%B8%8F_tested_with-JET.jl-233f9a)](https://github.com/aviatesk/JET.jl)
-[![DOI](https://zenodo.org/badge/DOI/FIXME)](https://doi.org/FIXME)
+[![DOI](https://zenodo.org/badge/1431512374.svg)](https://zenodo.org/badge/latestdoi/1431512374)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![All Contributors](https://img.shields.io/github/all-contributors/Eduardo-BDMAlves/ThermophysicalDB.jl?labelColor=5e1ec7&color=c0ffee&style=flat-square)](#contributors)
 [![BestieTemplate](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/JuliaBesties/BestieTemplate.jl/main/docs/src/assets/badge.json)](https://github.com/JuliaBesties/BestieTemplate.jl)
@@ -28,7 +28,7 @@
 
 ## What it is for
 
-Experimental data on density, viscosity, thermal conductivity, vapor pressure, heat capacity and many other properties are scattered over thousands of articles. The idea is to gather several databases of experimental data and provide an interface for accessing and dealing with all data in a consistent manner. At this point ThermoML Archive of NIST/TRC, is the only database used. It gathers the experimental points in a standard format, but it is a collection of XML files, not something you can query. ThermophysicalDB.jl turns it into tables you can filter and compare, so that questions such as *how well does this equation of state reproduce the measured liquid density of hexane?* or *which publications agree on the density of water at 25 °C?* take a few lines.
+Experimental data on density, viscosity, thermal conductivity, vapor pressure, heat capacity and many other properties are scattered over thousands of articles. The idea is to gather several databases of experimental data and provide an interface for accessing and dealing with all data in a consistent manner. At this point the ThermoML Archive of NIST/TRC is the only database used. It gathers the experimental points in a standard format, but it is a collection of XML files, not something you can query. ThermophysicalDB.jl turns it into tables you can filter and compare, so that questions such as *how well does this equation of state reproduce the measured liquid density of hexane?* or *which publications agree on the density of water at 25 °C?* take a few lines.
 
 - **One call gets everything.** `database()` downloads the archive, verifies its checksum, parses it once and keeps a binary cache. Later sessions only check for a newer version and load the cache.
 - **Filter the way you think.** Select by compound, property, temperature and pressure range, author, DOI, year and more. Chain filters; each one only touches the rows that survived the previous one.
@@ -69,15 +69,15 @@ t = table(v; quantities = Unitful)   # Tables.jl columns: temperature, pressure,
 The [documentation](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev) has a getting-started guide and tutorials that go from a plot of hexane conductivity to comparing the measured density of water with IAPWS-95, and hexane and CO₂ data with the equations of state of [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl).
 
 > [!NOTE]
-> The author of the package would like to state that he has made extensive use of AI in order to develop the initial implementation of the package. Any problems with the implementation will be corrected in the future.
-> This package is a personal project being developed in parallel to my Doctorate thesis, therefore, it was developed using tools to minimize the time required for the first version release. However, at every step of the implementation, extensive functionalities tests were conducted as this package will be used to facilitate the planning of several experiments in the Thesis.
-> Any collaboration and suggestions are more than welcome! Fill free to open an issue.
+> I used AI tools extensively (mainly Claude) to develop the initial implementation of this package, so that the first version could be released sooner. It is a personal project, developed in parallel with my doctoral thesis, and it will be used to plan several of the experiments of the thesis. For that reason every step of the implementation was covered by extensive functional tests. Problems may still exist: please report any of them by opening an issue.
+> Collaboration and suggestions are very welcome. Feel free to open an issue.
 
 ## Data source
 
 ThermophysicalDB.jl reads the **ThermoML Archive**, the experimental thermophysical property database of the Thermodynamics Research Center (TRC) at NIST, built on the IUPAC ThermoML standard ([dataset DOI 10.18434/mds2-2422](https://doi.org/10.18434/mds2-2422)). The data are theirs and the authors' of the original articles; this package is an independent project that downloads, reads and filters them. The aim is to bring several experimental databases under one interface, starting with this one.
 
-Data distributed through the *Journal of Chemical & Engineering Data*, *The Journal of Chemical Thermodynamics*, *Fluid Phase Equilibria*, *Thermochimica Acta* and *International Journal of Thermophysics* ThermoML Archives. NIST states that these files are available with permission of the journal publishers, so this package does not contain or redistribute any of them: it downloads the archive directly from NIST to your computer. It is an independent project, not affiliated with, sponsored or endorsed by NIST, TRC, IUPAC or the publishers, and it comes with no warranty. See [NOTICE.md](NOTICE.md) and the [About the data](docs/src/40-about-data.md) page for the terms, the citations and the notice that applies to modified data.
+The data are distributed through the *Journal of Chemical & Engineering Data*, *The Journal of Chemical Thermodynamics*, *Fluid Phase Equilibria*, *Thermochimica Acta* and *International Journal of Thermophysics* ThermoML Archives. NIST states that these files are available with permission of the journal publishers, so this package does not contain or redistribute any of them: it downloads the archive directly from NIST to your computer. It is an independent project, not affiliated with, sponsored or endorsed by NIST, TRC, IUPAC or the publishers, and it comes with no warranty. See [NOTICE.md](NOTICE.md) and the [About the data](docs/src/40-about-data.md) page for the terms, the citations and the notice that applies to modified data.
+
 The data are provided by NIST "AS IS", without warranty and without liability; the full NIST disclaimer, the citation of the archive (Riccardi et al., 2022, and the dataset record) and the credit due to the original source of each point are in [NOTICE.md](NOTICE.md).
 
 ## How to Cite
@@ -86,7 +86,7 @@ If you use ThermophysicalDB.jl in your work, please cite using the reference giv
 
 ## Contributing
 
-If you want to make contributions of any kind, please first that a look into our [contributing guide directly on GitHub](docs/src/90-contributing.md) or the [contributing page on the website](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev/90-contributing/)
+If you want to make contributions of any kind, please first take a look at our [contributing guide directly on GitHub](docs/src/90-contributing.md) or the [contributing page on the website](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev/90-contributing/).
 
 ---
 

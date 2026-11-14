@@ -16,6 +16,12 @@ on:
         type: string
         # "default" means the architecture of the runner executing the job
         default: default
+      suite:
+        required: false
+        type: string
+        # What test/runtests.jl runs: full, no-quality (without Aqua and JET) or platform (only the
+        # files that depend on the operating system)
+        default: full
       allow_failure:
         required: false
         type: boolean
@@ -31,11 +37,12 @@ on:
 
 jobs:
   test:
-    name: "Julia ${{ inputs.version }} - ${{ inputs.os }} - arch: ${{ inputs.arch }} - ${{ github.event_name }}"
+    name: "Julia ${{ inputs.version }} - ${{ inputs.os }} - ${{ inputs.suite }} - arch: ${{ inputs.arch }} - ${{ github.event_name }}"
     runs-on: ${{ inputs.os }}
     continue-on-error: ${{ inputs.allow_failure }}
     env:
       CODECOV_TOKEN: ${{ secrets.codecov_token }}
+      THERMOPHYSICALDB_TEST_SUITE: ${{ inputs.suite }}
 
     steps:
       - uses: actions/checkout@v7
@@ -47,6 +54,10 @@ jobs:
         uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        with:
+          # Instrumenting the code for coverage slows the tests down, so only the job that sends it
+          # to Codecov does it
+          coverage: ${{ inputs.run_codecov }}
       - uses: julia-actions/julia-processcoverage@v1
         if: ${{ inputs.run_codecov }}
       - uses: codecov/codecov-action@v7

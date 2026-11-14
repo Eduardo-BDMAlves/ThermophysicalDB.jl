@@ -12,7 +12,7 @@ using DOI2BibTeX: DOI2BibTeX
 using Downloads: Downloads
 using JLD2: JLD2
 using JSON: JSON
-using LinearAlgebra: I, Symmetric, cholesky!, issuccess, lu
+using LinearAlgebra: I, LAPACK, Symmetric, cholesky!, issuccess, lu
 using Preferences: Preferences
 using SHA: SHA
 using SpecialFunctions: SpecialFunctions
@@ -146,6 +146,7 @@ export COMPOSITION_SCALES,
     lookup_compounds,
     markdown_table,
     mixture,
+    molar_mass,
     points,
     prefetch_compounds!,
     pubchem_rate!,
