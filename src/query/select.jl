@@ -3,15 +3,31 @@
 
 A lazy selection of measurements: it stores only the row numbers (`rows`, positions in
 `dataset.measurements`) and never copies values. Refine it with [`points`](@ref) and turn
-it into columns with [`table`](@ref). Because a view is just an index vector, chaining
+it into columns with [`table`](@ref). Because a view is just a list of rows, chaining
 filters costs one scan of the rows that survived the previous one.
+
+The rows are a `UnitRange{Int32}` when the selection is a block of consecutive rows (the whole
+dataset, in particular: `DataView(dataset)` allocates nothing, whatever its size) and a
+`Vector{Int32}` otherwise. Both iterate and index alike; call `collect(view.rows)` for a vector.
 """
 struct DataView
     dataset::Dataset
-    rows::Vector{Int32}
+    rows::Union{UnitRange{Int32},Vector{Int32}}
+
+    # Any list of integers is accepted: a range stays a range, anything else becomes a vector.
+    DataView(dataset::Dataset, rows::AbstractVector{<:Integer}) =
+        new(dataset, stored_rows(rows))
 end
 
-DataView(ds::Dataset) = DataView(ds, collect(Int32(1):Int32(length(ds.measurements))))
+stored_rows(rows::Vector{Int32}) = rows
+stored_rows(rows::UnitRange{Int32}) = rows
+stored_rows(rows::AbstractUnitRange{<:Integer}) = UnitRange{Int32}(first(rows), last(rows))
+stored_rows(rows::AbstractVector{<:Integer}) = Vector{Int32}(rows)
+
+DataView(ds::Dataset) = DataView(ds, Int32(1):Int32(length(ds.measurements)))
+
+# Rows reserved at the start of a selection; the vector grows by doubling beyond it.
+const MAX_ROWS_HINT = 1 << 14
 
 Base.length(view::DataView) = length(view.rows)
 Base.isempty(view::DataView) = isempty(view.rows)
@@ -216,7 +232,9 @@ function points(
     tlo, thi = bounds(temperature, NativeTemperature())
     plo, phi = bounds(pressure, NativePressure())
     rows = Int32[]
-    sizehint!(rows, length(view.rows))
+    # Not the length of the input: a selection of a small part of a large dataset would reserve
+    # (and zero) memory for all of it; `push!` grows by doubling.
+    sizehint!(rows, min(length(view.rows), MAX_ROWS_HINT))
     for r in view.rows
         experiment_ok[m.experiment[r]] || continue
         property_ok[m.property[r]] || continue

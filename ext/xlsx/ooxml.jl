@@ -23,16 +23,46 @@ function xml_escape(text::AbstractString)
     )
 end
 
+# The letters of a column, "A" for 1 and "XFD" for 16384, written straight into the bytes of the
+# string: a cell reference is built for every cell of a sheet, so it must not go through an
+# `IOBuffer` or a vector of characters. A column below 1 has no letters.
 function column_letters(n::Integer)
-    letters = Char[]
-    while n > 0
-        n, r = divrem(n - 1, 26)
-        pushfirst!(letters, 'A' + r)
+    count = 0
+    m = n
+    while m > 0
+        m = (m - 1) ÷ 26
+        count += 1
     end
-    return String(letters)
+    bytes = Base.StringVector(count)
+    m = n
+    for i = count:-1:1
+        m, r = divrem(m - 1, 26)
+        @inbounds bytes[i] = UInt8('A') + UInt8(r)
+    end
+    return String(bytes)
 end
 
-cell_ref(row::Integer, col::Integer) = string(column_letters(col), row)
+# The reference of a cell, "B7" (the row is not negative), in one string.
+function cell_ref(row::Integer, col::Integer)
+    count = 0
+    m = col
+    while m > 0
+        m = (m - 1) ÷ 26
+        count += 1
+    end
+    bytes = Base.StringVector(count + ndigits(row))
+    m = col
+    for i = count:-1:1
+        m, r = divrem(m - 1, 26)
+        @inbounds bytes[i] = UInt8('A') + UInt8(r)
+    end
+    x = row
+    for i = length(bytes):-1:(count+1)
+        x, d = divrem(x, 10)
+        @inbounds bytes[i] = UInt8('0') + UInt8(d)
+    end
+    return String(bytes)
+end
 range_ref(r1, c1, r2, c2) = string(cell_ref(r1, c1), ":", cell_ref(r2, c2))
 
 # A formula, as opposed to a text.
@@ -354,7 +384,7 @@ end
 function number_text(x::Real)
     isfinite(x) || throw(ArgumentError("a cell cannot hold $x"))
     x isa Integer && return string(x)
-    return repr(Float64(x))
+    return string(Float64(x))
 end
 
 function write_cell(io::IO, row::Int, col::Int, cell::Cell)

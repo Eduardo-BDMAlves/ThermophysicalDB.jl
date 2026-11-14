@@ -11,6 +11,37 @@ const MAX_COMPONENTS = 3
 # ----------------------------------------------------------------------------------
 
 """
+    WorkKey
+
+What tells a reference apart from another one when two databases are compared (see
+`duplicates.jl`): the DOI, the first author, the year and the title, normalised, and the label to
+show.
+"""
+struct WorkKey
+    doi::String        # lower case, empty when there is none
+    surname::String    # of the first author, normalised
+    year::Int
+    title::String      # normalised
+    label::String      # to show: the DOI, or "Surname year"
+end
+
+"""
+    WorkKeys()
+
+The `WorkKey` of each reference of a table, made the first time it is asked for and kept: building
+one normalises strings, and the search for repeated points asks for the key of every reference of
+a selection each time. A reference is never changed after it is added (rows are only appended), so
+a key never goes stale; the cache grows with the table and is under a lock, because selections
+can be searched from several threads.
+"""
+struct WorkKeys
+    keys::Vector{Union{Nothing,WorkKey}}
+    lock::ReentrantLock
+end
+
+WorkKeys() = WorkKeys(Union{Nothing,WorkKey}[], ReentrantLock())
+
+"""
     ReferenceTable()
 
 One row per publication. Rows are deduplicated by DOI when a DOI is known.
@@ -25,6 +56,7 @@ struct ReferenceTable
     authors::Vector{Vector{String}}
     source::Vector{Int32}
     index::Dict{String,Int32}
+    works::WorkKeys
 end
 
 function ReferenceTable()
@@ -38,6 +70,7 @@ function ReferenceTable()
         Vector{String}[],
         Int32[],
         Dict{String,Int32}(),
+        WorkKeys(),
     )
 end
 
@@ -90,8 +123,8 @@ struct NameIndex
     keys::Vector{String}
 end
 
-# Fields that are derived from the columns and therefore neither stored nor described.
-const DERIVED_FIELDS = (:index, :lookup)
+# Fields that are derived from the columns (lookups, caches) and therefore neither stored nor described.
+const DERIVED_FIELDS = (:index, :lookup, :works)
 
 """
     CompoundTable()

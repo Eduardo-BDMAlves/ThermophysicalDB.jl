@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "ThermophysicalDB.jl"
   text: "Experimental thermophysical data, one call away"
-  tagline: Download thermophysical databases once, keep it up to date, and filter, plot and analyse more than a hundred thousand measured systems from the Julia REPL. Initially only ThermoML is included, but the idea is to add more databases in the future.
+  tagline: Download thermophysical databases once, keep them up to date, and filter, plot and analyse more than a hundred thousand measured systems from the Julia REPL. Initially only ThermoML is included, but the idea is to add more databases in the future.
   image:
     src: /hero.svg
     alt: Experimental points with uncertainty bars and a fitted curve
@@ -34,7 +34,7 @@ features:
   - title: Two databases, one search
     details: The experimental points (ThermoML) and the nomenclature of the compounds (names, CAS, PubChem CID, SMILES, InChI, molar mass) are two separate databases, linked on demand. Name a compound by any of them; when a name is ambiguous you choose.
   - title: Extensible and versatile
-    details: Capacity to add your own data to a local database formatted accordingly to the same standard used in other databases. Customize the interest parameters and how to interact with then.
+    details: Capacity to add your own data to a local database formatted according to the same standard used in other databases. Customize the parameters of interest and how to interact with them.
 ---
 ```
 

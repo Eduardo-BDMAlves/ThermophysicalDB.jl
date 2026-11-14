@@ -14,6 +14,7 @@ jobs:
       os: ${{ matrix.os }}
       version: ${{ matrix.version }}
       arch: ${{ matrix.arch }}
+      suite: ${{ matrix.suite }}
       allow_failure: ${{ matrix.allow_failure }}
       run_codecov: ${{ matrix.version == '1.13' && matrix.os == 'ubuntu-latest' }}
     secrets:
@@ -27,8 +28,17 @@ jobs:
           - ubuntu-latest
           - macOS-latest
           - windows-latest
-
         arch:
           # "default" means the architecture of the runner executing the job
           - default
         allow_failure: [false]
+        include:
+          # Linux runs everything and sends the coverage. macOS runs everything but the quality
+          # checks (they do not depend on the system), because the units are what has differed
+          # there. Windows runs the files that depend on the system (paths, files, downloads).
+          - os: ubuntu-latest
+            suite: full
+          - os: macOS-latest
+            suite: no-quality
+          - os: windows-latest
+            suite: platform

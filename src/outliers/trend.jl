@@ -150,16 +150,21 @@ function LineTask(group, axis, pos, xi, x, y, u, ref)
 end
 
 """
+    process_line!(ws, task, set)
     process_line!(task, set)
 
 Fill the result arrays of `task`. Each point gets the window of `set.window` consecutive
 points centered on it (shifted at the two ends of the line, so that every window is full);
-the fit of a window is shared by the points that use it.
+the fit of a window is shared by the points that use it. The fits are made in the workspace
+`ws` (a [`LineWS`](@ref) of at least `set.window` points, which a worker keeps for all its
+lines); without one, a workspace is made for the line.
 """
-function process_line!(task::LineTask, set::Settings)
+function process_line!(ws::LineWS, task::LineTask, set::Settings)
     m = length(task.pos)
     m >= set.min_points || return nothing
     w = min(set.window, m)
+    resize_window!(ws, w)
+    tvar = truncated_variance(set.cutoff)
     half = (w - 1) ÷ 2
     last_start = m - w + 1
     j = 1
@@ -169,76 +174,108 @@ function process_line!(task::LineTask, set::Settings)
         while jend < m && clamp(jend + 1 - half, 1, last_start) == s
             jend += 1
         end
-        process_window!(task, s, w, j:jend, set)
+        process_window!(ws, task, s, w, j:jend, set, tvar)
         j = jend + 1
     end
     return nothing
 end
 
-function process_window!(task::LineTask, s::Int, w::Int, js::UnitRange{Int}, set::Settings)
-    r = s:(s+w-1)
-    x_sorted = sort(task.x[r])
-    count_distinct(set.tolerance, task.axis, x_sorted) >= 4 || return nothing
+function process_line!(task::LineTask, set::Settings)
+    length(task.pos) >= set.min_points || return nothing
+    return process_line!(LineWS(min(set.window, length(task.pos))), task, set)
+end
+
+function process_window!(
+    ws::LineWS,
+    task::LineTask,
+    s::Int,
+    w::Int,
+    js::UnitRange{Int},
+    set::Settings,
+    tvar::Float64,
+)
+    for l = 1:w
+        ws.x[l] = task.x[s+l-1]
+    end
+    sort!(ws.x)
+    count_distinct(set.tolerance, task.axis, ws.x) >= 4 || return nothing
     lo, hi = task.xi[s], task.xi[s+w-1]
     hr = (hi - lo) / 2
     hr > 0 || return nothing
     mid = (hi + lo) / 2
-    t = Float64[(task.xi[i] - mid) / hr for i in r]
-    y = task.y[r]
-    u, known = fill_missing_uncertainty(task.u[r])
-    refs = task.ref[r]
+    t, y, X = ws.t, ws.y, ws.X
+    for l = 1:w
+        tl = (task.xi[s+l-1] - mid) / hr
+        t[l] = tl
+        y[l] = task.y[s+l-1]
+        X[l, 2] = tl
+        X[l, 3] = tl^2
+    end
+    known = fill_missing_uncertainty!(ws, task.u, s)
+    u = ws.u
+    refs = task.ref
     q = clamp(ceil(Int, set.fraction * w), 4, w)
-    consensus = lqs_parabola(t, y, u, q, set.cutoff, known ? 1.0 : 0.0)
-    consensus === nothing && return nothing
-    X = hcat(ones(w), t, t .^ 2)
-    fit = robust_refit(X, y, u, consensus[1], known, set.cutoff)
-    fit === nothing && return nothing
-    n_refs = length(unique(refs))
-    if n_refs > 1
+    scale = lqs_parabola!(ws, q, set.cutoff, known ? 1.0 : 0.0)
+    isnan(scale) && return nothing
+    robust_refit!(ws, known, set.cutoff, tvar) || return nothing
+    multi_source = false
+    for i = 2:w
+        if refs[s+i-1] != refs[s]
+            multi_source = true
+            break
+        end
+    end
+    if multi_source
         for j in js
             task.multi_source[j] = true
         end
     end
+    phi, beta, ainv = ws.phi, ws.beta, ws.ainv
+    consensus = 0
+    for l = 1:w
+        ws.inliers[l] && (consensus += 1)
+    end
     for j in js
         l = j - s + 1
         tj = t[l]
-        task.z[j] = fit.z[l]
+        task.z[j] = ws.z[l]
         task.window[j] = w
-        task.consensus[j] = count(fit.inliers)
-        task.phi[j] = fit.phi
-        task.yhat[j] = fit.beta[1] + tj * (fit.beta[2] + tj * fit.beta[3])
+        task.consensus[j] = consensus
+        task.phi[j] = phi
+        task.yhat[j] = beta[1] + tj * (beta[2] + tj * beta[3])
         g = (0.0, 1 / hr, 2tj / hr)
         gag = 0.0
         for a = 1:3, b = 1:3
-            gag += g[a] * fit.ainv[a, b] * g[b]
+            gag += g[a] * ainv[a, b] * g[b]
         end
-        task.slope[j] = (fit.beta[2] + 2fit.beta[3] * tj) / hr
-        task.slope_sd[j] = fit.phi * sqrt(gag)
-        task.curvature[j] = 2fit.beta[3] / hr^2
-        task.curvature_sd[j] = fit.phi * 2 * sqrt(fit.ainv[3, 3]) / hr^2
-        if fit.inliers[l] && 1 - fit.h[l] > 1.0e-8
-            factor = fit.e[l] / (u[l]^2 * (1 - fit.h[l]))
+        task.slope[j] = (beta[2] + 2beta[3] * tj) / hr
+        task.slope_sd[j] = phi * sqrt(gag)
+        task.curvature[j] = 2beta[3] / hr^2
+        task.curvature_sd[j] = phi * 2 * sqrt(ainv[3, 3]) / hr^2
+        if ws.inliers[l] && 1 - ws.h[l] > 1.0e-8
+            factor = ws.e[l] / (u[l]^2 * (1 - ws.h[l]))
             xrow = (1.0, tj, tj^2)
             shift = 0.0
             for a = 1:3
                 dbeta = 0.0
                 for b = 1:3
-                    dbeta += fit.ainv[a, b] * xrow[b] * factor
+                    dbeta += ainv[a, b] * xrow[b] * factor
                 end
                 shift += g[a] * dbeta
             end
-            task.influence[j] = gag > 0 ? shift / (fit.phi * sqrt(gag)) : NaN
+            task.influence[j] = gag > 0 ? shift / (phi * sqrt(gag)) : NaN
         end
         # Systematic offset of one source: several points of the same publication on the
         # same side, far from the curve that the others define.
-        zw = fit.e ./ (fit.phi .* u)
-        if n_refs > 1 && abs(zw[l]) > set.cutoff
+        zwl = ws.e[l] / (phi * u[l])
+        if multi_source && abs(zwl) > set.cutoff
             members = 0
             deviating = 0
             for i = 1:w
-                refs[i] == refs[l] || continue
+                refs[s+i-1] == refs[s+l-1] || continue
                 members += 1
-                if abs(zw[i]) > set.cutoff && sign(zw[i]) == sign(zw[l])
+                zwi = ws.e[i] / (phi * u[i])
+                if abs(zwi) > set.cutoff && sign(zwi) == sign(zwl)
                     deviating += 1
                 end
             end

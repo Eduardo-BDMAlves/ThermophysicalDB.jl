@@ -95,6 +95,7 @@ ThermophysicalDB.LAZY_FIELDS
 compound_database
 lookup_compounds
 compound_record
+molar_mass
 link_compounds
 LinkedDatabase
 forget_choices!

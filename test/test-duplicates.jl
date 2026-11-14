@@ -484,3 +484,41 @@ end
     end
     @test w isa ArgumentError || (isempty(w) && length(T.table(w).value) == 0)
 end
+
+@testitem "the key of a work is made once and follows the references that are added" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    ds = T.Dataset()
+    a = T.add_reference!(
+        ds.references;
+        doi = " 10.5555/TDB-A ",
+        authors = ["Poe, Edgar"],
+        year = 1999,
+        title = "A Title",
+    )
+    key_a = T.work_key(ds, a)
+    @test key_a.doi == "10.5555/tdb-a"
+    @test key_a.surname == T.normalize_name("Poe")
+    @test key_a.year == 1999
+    @test key_a.label == "10.5555/TDB-A"
+    @test T.work_key(ds, a) === key_a                      # the same object: made once
+    # References added later get their own keys and the earlier ones are kept.
+    b = T.add_reference!(ds.references; authors = ["Smith, Jo"], year = 2004)
+    key_b = T.work_key(ds, b)
+    @test key_b.doi == "" && key_b.label == "Smith 2004"
+    @test T.work_key(ds, a) === key_a
+    @test T.work_key(ds, b) === key_b
+    # What is cached is what is computed.
+    for r in (a, b)
+        fresh = T.compute_work_key(ds, r)
+        cached = T.work_key(ds, r)
+        @test (cached.doi, cached.surname, cached.year, cached.title, cached.label) ==
+              (fresh.doi, fresh.surname, fresh.year, fresh.title, fresh.label)
+    end
+    # Searches from several threads see the same keys.
+    keys = Vector{Any}(undef, 8)
+    Threads.@threads for i = 1:8
+        keys[i] = T.work_key(ds, i % 2 == 0 ? a : b)
+    end
+    @test all(i -> keys[i] === (i % 2 == 0 ? key_a : key_b), 1:8)
+end

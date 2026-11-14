@@ -2,10 +2,10 @@ exclude = [
   "@ref",
   "@[Cc]ite.*",
   "^https://github.com/.*/releases/tag/v.*$",
-  "^https://doi.org/FIXME$",
   "^https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable/?$",
   "^https://blog.esciencecenter.nl", # due to a certificate error (cf. #556)
-  "zenodo.org/badge/DOI/FIXME$"
+  # Zenodo badges answer with an error until the first release exists
+  "^https://zenodo.org/badge/.*$"
 ]
 
 exclude_path = [
