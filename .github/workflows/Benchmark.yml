@@ -170,7 +170,7 @@ jobs:
             --input-dir=results/ --output-dir=plots/ --format=png --npart=10
 
       - name: Keep the results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
           path: |
