@@ -534,6 +534,158 @@ function compound_record(db::CompoundDB, id::Integer)
     )
 end
 
+# The factor that turns a molar mass in g/mol into the unit `unit` (text), exact up to one
+# rounding; the dimension is checked.
+function molar_mass_factor(unit::AbstractString)
+    native = parse_exact_unit("g/mol")
+    target = parse_exact_unit(unit)
+    target.dim == native.dim || throw(
+        ArgumentError(
+            "\"$unit\" is not a unit of molar mass (mass per amount of substance)",
+        ),
+    )
+    return Float64(native.scale / target.scale)
+end
+
+# `values` (g/mol) in the unit `unit`, as plain numbers or as quantities of a units package.
+function molar_mass_output(values::Vector{Float64}, unit::AbstractString, quantities)
+    backend = quantities === nothing ? nothing : unit_backend(quantities)
+    if unit != "g/mol"
+        factor = molar_mass_factor(unit)
+        values = values .* factor
+    else
+        molar_mass_factor(unit)
+    end
+    backend === nothing && return values
+    return attach_unit(backend, values, parse_unit(backend, unit))
+end
+
+# The one molar mass of the compounds `ids` that `label` identifies: they must have one and
+# agree on it (as the composition conversions require).
+function agreed_molar_mass(db::CompoundDB, ids::AbstractVector{<:Integer}, label)
+    masses = Float64[]
+    for id in ids
+        mass = db.molar_mass[id]
+        (isfinite(mass) && mass > 0) && push!(masses, mass)
+    end
+    isempty(masses) && throw(
+        ArgumentError(
+            "the compound database has no molar mass for $(repr(label)); give it with " *
+            "`register_compound!(db; names = [...], molar_mass = ...)` or ask PubChem with `online = true`",
+        ),
+    )
+    lo, hi = extrema(masses)
+    hi - lo <= 1.0e-6 * hi || throw(
+        ArgumentError(
+            "$(repr(label)) identifies compounds with different molar masses " *
+            "(ids $(join(ids, ", "))); use the `id` of the one you mean",
+        ),
+    )
+    return lo
+end
+
+"""
+    molar_mass(db, compound; by = :auto, unit = "g/mol", quantities = nothing,
+               online = false, choose = :ask, refresh = false, input = stdin,
+               output = stdout)
+
+The molar mass of a compound of the compound database `db`. `compound` is a text that
+identifies it, as in [`lookup_compounds`](@ref) (a name, a CAS number, an InChIKey, a formula
+and so on; `by` and the keywords of the search are those of that function), the `id` of a
+compound (an integer, a value of the `id` column of `lookup_compounds`), a vector of `id`s
+(a vector of masses, `NaN` for a compound without one) or the result of `lookup_compounds`
+(one mass per compound).
+
+For a text, only the compounds that the text names exactly count (not those that merely
+contain it or are close to it). It is an `ArgumentError` if there is none, if none of them
+has a molar mass, or if they have different molar masses (the message gives the `id`s; pass
+one of them). The database keeps the molar mass in g/mol; `unit` is any unit of mass per
+amount of substance that the unit reader of the package knows (`"kg/mol"`, `"g/mol"`,
+`"kg/kmol"`), converted exactly. With `quantities = Unitful` (or `DynamicQuantities`,
+`FlexUnits`, once loaded) the result is a quantity of that package, so that a value in
+J/(mol K) divided by it is a value in J/(kg K) with the package's own checking of dimensions;
+without it, the result is a `Float64`.
+
+```julia
+cdb = compound_database()
+molar_mass(cdb, "toluene")                              # 92.14 (g/mol)
+molar_mass(cdb, "108-88-3"; unit = "kg/mol")            # 0.09214
+using Unitful
+M = molar_mass(cdb, "toluene"; quantities = Unitful)    # 92.14 g mol^-1
+cp_molar / M                                            # a specific heat per mass
+```
+"""
+function molar_mass(
+    db::CompoundDB,
+    text::AbstractString;
+    by::Symbol = :auto,
+    unit::AbstractString = "g/mol",
+    quantities = nothing,
+    online::Bool = false,
+    choose = :ask,
+    refresh::Bool = false,
+    input::IO = stdin,
+    output::IO = stdout,
+)
+    found = lookup_compounds(
+        db,
+        text;
+        by,
+        limit = max(100, length(db)),
+        online,
+        choose,
+        refresh,
+        input,
+        output,
+    )
+    exact =
+        [id for (id, kind) in zip(found.id, found.match) if kind ∉ (:contains, :similar)]
+    isempty(exact) && throw(
+        ArgumentError(
+            "no compound of the database is named exactly $(repr(text))" * (
+                isempty(found) ? "" :
+                "; close ones: " *
+                join(first(found.name, 5), ", ") *
+                " (look them up with `lookup_compounds` and use their `id`)"
+            ),
+        ),
+    )
+    mass = agreed_molar_mass(db, exact, text)
+    result = molar_mass_output([mass], unit, quantities)
+    return first(result)
+end
+
+function molar_mass(
+    db::CompoundDB,
+    id::Integer;
+    unit::AbstractString = "g/mol",
+    quantities = nothing,
+)
+    1 <= id <= length(db) || throw(BoundsError(db, id))
+    mass = agreed_molar_mass(db, [id], "compound $id")
+    return first(molar_mass_output([mass], unit, quantities))
+end
+
+function molar_mass(
+    db::CompoundDB,
+    ids::AbstractVector{<:Integer};
+    unit::AbstractString = "g/mol",
+    quantities = nothing,
+)
+    all(id -> 1 <= id <= length(db), ids) || throw(BoundsError(db, ids))
+    masses = Float64[(m = db.molar_mass[id]; isfinite(m) && m > 0 ? m : NaN) for id in ids]
+    return molar_mass_output(masses, unit, quantities)
+end
+
+function molar_mass(
+    records::CompoundRecords;
+    unit::AbstractString = "g/mol",
+    quantities = nothing,
+)
+    masses = Float64[isfinite(m) && m > 0 ? m : NaN for m in records.molar_mass]
+    return molar_mass_output(masses, unit, quantities)
+end
+
 """
     register_compound!(db; names, inchikey = "", cas = "", cid = -1, formula = "",
                        molar_mass = NaN, smiles = "", inchi = "", iupac = "",

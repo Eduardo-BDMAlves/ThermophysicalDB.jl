@@ -1579,3 +1579,64 @@ end
         @test solo isa LinkedDatabase && length(points(solo; component = "oxidane")) == 3
     end
 end
+
+@testitem "molar_mass finds one mass, refuses doubt, and converts units exactly" tags =
+    [:unit, :fast] begin
+    using ThermophysicalDB: ThermophysicalDB
+    using Unitful: Unitful, @u_str
+    using DynamicQuantities: DynamicQuantities as DQ
+    T = ThermophysicalDB
+    db = T.CompoundDB()
+    tol = T.register_compound!(
+        db;
+        names = ["toluene", "methylbenzene"],
+        cas = "108-88-3",
+        formula = "C7H8",
+        molar_mass = 92.14,
+    )
+    T.register_compound!(db; names = ["nameless one"], molar_mass = NaN)
+    # Two compounds that share a name and disagree on the mass.
+    a = T.register_compound!(
+        db;
+        names = ["twin"],
+        inchikey = "AAAAAAAAAAAAAA-AAAAAAAAAA-A",
+        molar_mass = 10.0,
+    )
+    b = T.register_compound!(
+        db;
+        names = ["twin"],
+        inchikey = "BBBBBBBBBBBBBB-BBBBBBBBBB-B",
+        molar_mass = 20.0,
+    )
+
+    @test T.molar_mass(db, "toluene") == 92.14
+    @test T.molar_mass(db, "108-88-3") == 92.14
+    @test T.molar_mass(db, "methylbenzene") == 92.14
+    @test T.molar_mass(db, tol) == 92.14
+    @test T.molar_mass(db, Int32[tol]) == [92.14]
+    @test T.molar_mass(T.lookup_compounds(db, "toluene")) == [92.14]
+    @test isnan(T.molar_mass(db, Int32[2])[1])
+    # A unit of molar mass, converted by the exact reader.
+    @test T.molar_mass(db, "toluene"; unit = "kg/mol") ≈ 0.09214
+    @test T.molar_mass(db, "toluene"; unit = "kg/kmol") ≈ 92.14
+    @test_throws ArgumentError T.molar_mass(db, "toluene"; unit = "m")
+    # Doubt is an error that says what to do, never a guess.
+    @test_throws ArgumentError T.molar_mass(db, "nameless one")
+    @test_throws ArgumentError T.molar_mass(db, "no such compound")
+    err = try
+        T.molar_mass(db, "twin")
+    catch e
+        e
+    end
+    @test err isa ArgumentError && occursin("id", err.msg)
+    @test T.molar_mass(db, a) == 10.0 && T.molar_mass(db, b) == 20.0
+    @test_throws BoundsError T.molar_mass(db, 99)
+    # Quantities of each package, and the use that motivated them.
+    mu = T.molar_mass(db, "toluene"; quantities = Unitful)
+    @test Unitful.ustrip(Unitful.uconvert(u"g/mol", mu)) ≈ 92.14
+    cp = 157.3u"J/mol/K"
+    @test Unitful.ustrip(Unitful.uconvert(u"J/g/K", cp / mu)) ≈ 157.3 / 92.14
+    md = T.molar_mass(db, "toluene"; quantities = DQ, unit = "kg/mol")
+    @test DQ.ustrip(md) ≈ 0.09214
+    @test_throws ArgumentError T.molar_mass(db, "toluene"; quantities = Base)
+end
