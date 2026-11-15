@@ -33,10 +33,11 @@ function k2_uncertainty(unc, k, level, policy)
 end
 
 """
-    table(view; units = :native, policy = :nominal, quantities = nothing) -> NamedTuple
+    table(view; units = :native, policy = :nominal, quantities = nothing) -> PointTable
 
-Materialise a [`DataView`](@ref) as a `NamedTuple` of columns (a valid Tables.jl table,
-so `DataFrame(table(v))` works). One row per point, with the columns
+Materialise a [`DataView`](@ref) as a [`PointTable`](@ref): the columns of the selection (a
+valid Tables.jl table, so `DataFrame(table(v))` works), indexed like a data frame
+(`t[:temperature]`, `t[3]`, `t[3, :temperature]`, `t[1:5]`). One row per point, with the columns
 
 `source, doi, year, components, xkind, property, method, phase, temperature, pressure,
 x1, x2, x3, value, unit, unc, unc_k, unc_level, unc_k2`.
@@ -259,8 +260,14 @@ function table(
     for choice in (chosen, t_choice, p_choice)
         backend === nothing && choice !== nothing && (backend = choice.backend)
     end
-    backend === nothing && return columns
-    return attach_units(columns, units, backend, chosen, t_choice, p_choice)
+    temperature_unit = t_choice === nothing ? "K" : t_choice.text
+    pressure_unit = p_choice !== nothing ? p_choice.text : units === :si ? "Pa" : "kPa"
+    backend === nothing && return PointTable(columns, temperature_unit, pressure_unit)
+    return PointTable(
+        attach_units(columns, units, backend, chosen, t_choice, p_choice),
+        temperature_unit,
+        pressure_unit,
+    )
 end
 
 # The unit asked for the temperature or the pressure: as text, converted by the exact
@@ -421,7 +428,7 @@ end
 
 Tables.istable(::Type{DataView}) = true
 Tables.columnaccess(::Type{DataView}) = true
-Tables.columns(view::DataView) = table(view)
+Tables.columns(view::DataView) = parent(table(view))
 
 # ----------------------------------------------------------------------------------
 # Display
@@ -444,6 +451,7 @@ function display_cell(x::AbstractString)
     return length(x) > 34 ? first(x, 33) * "…" : String(x)
 end
 display_cell(x::Real) = isnan(x) ? "" : string(round(x; sigdigits = 6))
+display_cell(x) = isfinite(x) ? display_cell(string(x)) : ""
 
 function Base.show(io::IO, view::DataView)
     return print(io, "DataView(", length(view), " points)")
@@ -458,12 +466,33 @@ function Base.show(io::IO, ::MIME"text/plain", view::DataView; maxrows::Int = 12
     return nothing
 end
 
-# Prints `n` rows of a point table (the columns of `DISPLAY_COLUMNS`, plus `database` when the table
-# has it) and the number of points left out.
+# The columns `print_points` shows: those of `DISPLAY_COLUMNS` (plus `database` when the table has
+# it) with the units of a `PointTable`; a table narrowed to some columns shows every column it
+# has, under the same headers.
+function display_columns(cols)
+    labelled = DISPLAY_COLUMNS
+    if cols isa PointTable
+        temperature_label = "T [" * getfield(cols, :temperature_unit) * "]"
+        pressure_label = "p [" * getfield(cols, :pressure_unit) * "]"
+        labelled = map(labelled) do entry
+            name = first(entry)
+            name === :temperature ? (name => temperature_label) :
+            name === :pressure ? (name => pressure_label) : entry
+        end
+    end
+    if all(entry -> haskey(cols, first(entry)), labelled)
+        return haskey(cols, :database) ? ((:database => "database"), labelled...) : labelled
+    end
+    labels = Dict(labelled)
+    return Pair{Symbol,String}[
+        name => get(labels, name, String(name)) for name in keys(cols)
+    ]
+end
+
+# Prints `n` rows of a point table (the columns of `display_columns`) and the number of points
+# left out.
 function print_points(io::IO, cols, n::Integer, hidden::Integer)
-    display =
-        haskey(cols, :database) ? ((:database => "database"), DISPLAY_COLUMNS...) :
-        DISPLAY_COLUMNS
+    display = display_columns(cols)
     names = first.(display)
     cells = [[display_cell(cols[name][i]) for i = 1:n] for name in names]
     # Columns that are entirely empty (e.g. x3 for binaries) are not worth the width.

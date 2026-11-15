@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+- `table` returns a `PointTable`, which wraps the same `NamedTuple` of columns (`parent(t)` gives it back; `t.temperature`, `keys(t)` and `DataFrame(t)` work as before) and is indexed like a data frame: `t[:temperature]` (the column), `t[3]` (a row, as a `NamedTuple`), `t[3, :temperature]` and `t[:temperature, 3]` (one value), `t[3, 2]` (by position), `t[1:5]`, `t[1:5, :temperature]`, `t[1:5, [:temperature, :value]]` and a `Bool` mask (copies of the rows). Iterating gives the rows. Showing it prints a summary (points, references and years, systems, ranges of the conditions and of the values of each property and unit) computed at that moment, then the first points
+
 - Added `molar_mass(db, compound; unit = "g/mol", quantities = nothing)`: the molar mass of a compound of the compound database, found by any identifier of `lookup_compounds` (name, CAS number, InChIKey, formula, ...), by `id`, by a vector of `id`s or from the result of `lookup_compounds`. With `quantities = Unitful` (or `DynamicQuantities`, `FlexUnits`) it is a quantity, so that a molar property divided by it is a property per mass; `unit` is any unit of mass per amount of substance, converted exactly. A name that matches nothing exactly, no compound with a molar mass, or compounds that disagree on it is an `ArgumentError` that says what to do
 
 - Continuous integration: `THERMOPHYSICALDB_TEST_SUITE` chooses what `test/runtests.jl` runs (`full` by default); Linux runs everything and is the only one that instruments for coverage, macOS everything but the Aqua and JET checks, Windows only the files that depend on the system

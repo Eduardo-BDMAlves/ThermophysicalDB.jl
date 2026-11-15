@@ -37,6 +37,7 @@ find_compounds
 ThermophysicalDB.CompoundMatches
 DataView
 table
+PointTable
 sample_table
 purity_step_table
 condition_table

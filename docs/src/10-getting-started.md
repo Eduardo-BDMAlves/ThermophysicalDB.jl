@@ -74,7 +74,7 @@ The [manual page on selecting points](@ref selecting) lists every filter, includ
 
 ## Get the columns
 
-[`table`](@ref) materialises a selection as a `NamedTuple` of columns, one entry per field:
+[`table`](@ref) materializes a selection as a [`PointTable`](@ref), the columns of the selection indexed like a data frame, one column per field:
 
 ```@example gs
 t = table(v2)

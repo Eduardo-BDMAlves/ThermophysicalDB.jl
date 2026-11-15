@@ -550,7 +550,11 @@ function table(v::DatabaseView; kwargs...)
     cols = keys(first_table)
     merged = NamedTuple{cols}(map(k -> reduce(vcat, (t[k] for (_, t) in tables)), cols))
     names = reduce(vcat, [fill(n, length(t[first(cols)])) for (n, t) in tables])
-    return merge(merged, (; database = names))
+    return PointTable(
+        merge(merged, (; database = names)),
+        getfield(first_table, :temperature_unit),
+        getfield(first_table, :pressure_unit),
+    )
 end
 
 # What works with one database as before, for a `Database` and a `DatabaseView` that have one part.
@@ -619,7 +623,7 @@ validate(db::Database) = all(m -> validate(member_dataset(m)), db.members)
 
 Tables.istable(::Type{DatabaseView}) = true
 Tables.columnaccess(::Type{DatabaseView}) = true
-Tables.columns(view::DatabaseView) = table(view)
+Tables.columns(view::DatabaseView) = parent(table(view))
 
 # A selection of one database is read like a `DataView`: its `rows` and its `dataset`.
 function Base.getproperty(v::DatabaseView, name::Symbol)
