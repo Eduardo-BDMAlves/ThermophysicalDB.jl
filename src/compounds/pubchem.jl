@@ -535,7 +535,7 @@ downloads again the compounds that are already kept as files.
 (digits only), an InChI, or a SMILES written `"SMILES=CCO"`; `by` (`:name`, `:cas`, `:cid`,
 `:inchikey`, `:inchi`, `:smiles`) says what it is. Names and CAS numbers may belong to
 several compounds (salts, hydrates, stereoisomers): then they are listed in the order PubChem
-gives and you choose, with the same `choose` rules as [`LinkedDatabase`](@ref) (`:ask`,
+gives and you choose, with the same `choose` rules as [`link_compounds!`](@ref) (`:ask`,
 `:error`, `:all` or a `Dict` of prepared answers). At most `limit` candidates are offered.
 
 What PubChem answers is kept as one JSON file for each compound in `compounds/pubchem/`
@@ -659,8 +659,8 @@ InChIKey cannot be asked this way.
 Run it once after downloading the archive, to fill the gaps of the lists with the compounds
 that matter most; ionic liquids, for example, are among the most measured and are not in the
 lists. It can be interrupted and run again: what was kept stays, and nothing is asked twice.
-A `LinkedDatabase` is accepted in place of the dataset (call [`link_compounds`](@ref) again
-afterwards to refresh the table of links). The result tells how many compounds were
+A `Database` is accepted in place of the dataset (with the compound database attached, `cdb` can be
+left out; its table of links is made again). The result tells how many compounds were
 `considered`, how many of those were `unknown` to `db`, and how many were `requested`,
 `fetched`, `not_found` and `remembered_missing`.
 
@@ -672,7 +672,6 @@ is built: `database(; prefetch_compounds = 200)`.
 db = database()
 cdb = compound_database()
 prefetch_compounds!(db, cdb; top = 100)
-linked = link_compounds(db, cdb)
 ```
 """
 function prefetch_compounds!(

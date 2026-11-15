@@ -17,7 +17,7 @@ The package keeps two databases, side by side and never mixed:
 | the **thermophysical database** (`database()`) | the experimental points: properties, conditions, uncertainties, samples, references | the ThermoML Archive of NIST/TRC | no, it is the reference; you only add your own points as another source |
 | the **compound database** (`compound_database()`) | the nomenclature and the base properties of the compounds: every name, CAS number, PubChem CID, formula, molar mass, SMILES, InChI and InChIKey | lists derived from PubChem, fixed at one commit | the lists are never touched; the compounds you add or complete with [`register_compound!`](@ref) go to a separate file of your own (`custom.jld2`) and are loaded together with the lists, as one database |
 
-What you add is kept apart on your computer and never written into the lists or into the archive: `register_compound!` changes the database in the session, and [`save_compounds`](@ref) writes only the compounds you added or changed to `custom.jld2`. Every call of `compound_database()` reads the lists and then lays that file over them, so the variable you work with is a single database. [`link_compounds`](@ref) joins the two in a [`LinkedDatabase`](@ref). The join only records which compound of the compound database describes each compound of the archive; it never renames, merges or corrects anything in the archive. Where the two disagree you see both and you choose.
+What you add is kept apart on your computer and never written into the lists or into the archive: `register_compound!` changes the database in the session, and [`save_compounds`](@ref) writes only the compounds you added or changed to `custom.jld2`. Every call of `compound_database()` reads the lists and then lays that file over them, so the variable you work with is a single database. [`database`](@ref) attaches it to the archive (see [`link_compounds!`](@ref)). The join only records which compound of the compound database describes each compound of the archive; it never renames, merges or corrects anything in the archive. Where the two disagree you see both and you choose.
 
 ## Getting it
 
@@ -62,15 +62,15 @@ The first search by name in a session builds an index of the names (about three 
 
 ## Linking it to the archive
 
-[`link_compounds`](@ref) matches every compound of the archive with the database:
+[`database`](@ref) attaches the compound database to the archive (`compound_library = true`, the default), so there is nothing to do: the first search by name loads the compound database, and nothing is read before. To attach one of your own, or to a `database(; compound_library = false)`, use [`link_compounds!`](@ref):
 
 ```julia
 db = database()
-linked = link_compounds(db, cdb)
-linked.links          # the table of links
+link_compounds!(db, cdb)     # only to attach another compound database
+link_table(db)               # the table of links
 ```
 
-The InChIKey is tried first, then the InChI, then the names. `linked.links` has one row for each pair (compound of the archive, compound of the database that may describe it), and says how reliable the pair is:
+Matching every compound of the archive with the database is done once, the first time the table is looked at (and again after the databases change), not when you attach it. The InChIKey is tried first, then the InChI, then the names. The table of links (`link_table(db)`, with the column `database` that says which database each row is of) has one row for each pair (compound of the archive, compound of the database that may describe it), and says how reliable the pair is:
 
 | Column | Meaning |
 | :-- | :-- |
@@ -79,30 +79,35 @@ The InChIKey is tried first, then the InChI, then the names. `linked.links` has 
 | `formula_check` | the formulas compared by their elements: `:same`, `:different`, `:unknown` |
 | `inchi_check` | the InChIs compared: `:same`, `:stereo` (the same skeleton with other stereochemistry or isotopes), `:different`, `:unknown` |
 
-A link through the InChIKey or the InChI is the same species. **A link through a name is only a lead**: names are shared between species. In the archive of 2020-09-30, `"sulfur"` leads to hydrogen sulfide, `"(E)-3-hexene"` to `cis-3-hexene` and a hydrate to its anhydrous salt. Trust a `:name` link only when `formula_check` and `inchi_check` are `:same`; `:stereo` and `:different` mean a related compound, not the same one. `link_compounds(db, cdb; by_name = false)` links by InChIKey and InChI only. The archive is never changed, and nothing is disambiguated in it.
+A link through the InChIKey or the InChI is the same species. **A link through a name is only a lead**: names are shared between species. In the archive of 2020-09-30, `"sulfur"` leads to hydrogen sulfide, `"(E)-3-hexene"` to `cis-3-hexene` and a hydrate to its anhydrous salt. Trust a `:name` link only when `formula_check` and `inchi_check` are `:same`; `:stereo` and `:different` mean a related compound, not the same one. `link_compounds!(db, cdb; by_name = false)` links by InChIKey and InChI only. The archive is never changed, and nothing is disambiguated in it.
 
 On that archive (8 526 compounds, 8 517 of them with an InChIKey), 4 363 were found by InChIKey, 293 only by name and 3 870 were not found, and the compounds found account for 87 % of the appearances of a component in a measurement. The compounds that are missing are, above all, ionic liquids and uncommon organic compounds that the lists do not cover, and some of them, such as 1-butyl-3-methylimidazolium tetrafluoroborate, are among the most measured. The measurement was made on that date and changes with the archive and the lists.
 
-[`find_compounds`](@ref) understands the database too, when you give it as the second argument, or the linked database as the first:
+[`find_compounds`](@ref) understands the database too, and so does [`lookup_compounds`](@ref), without being given it:
 
 ```julia
-find_compounds(db, cdb, "7732-18-5")   # water in the archive, from its CAS number
-find_compounds(linked, "oxidane")      # the same, from a synonym that no article used
+find_compounds(db, "7732-18-5")        # water in the archive, from its CAS number
+find_compounds(db, "oxidane")          # the same, from a synonym that no article used
+lookup_compounds(db, "oxidane")        # the compound database's record of it
 ```
+
+The compound database can still be given as the second argument, `find_compounds(db, cdb, "7732-18-5")`.
 
 The ThermoML compounds with the same InChIKey as any compound the text identifies are found first. A compound of the archive that has no InChIKey is reached only through its own names, so nothing is guessed.
 
 ## [Searching the archive with any name](@id compounds_linked_search)
 
-A [`LinkedDatabase`](@ref) takes the place of the archive in [`points`](@ref) and [`mixture`](@ref), and a compound can be named by anything either database knows:
+With the compound database attached, [`points`](@ref) and [`mixture`](@ref) accept a compound named by anything either database knows:
 
 ```julia
-points(linked; component = "oxidane", property = "Mass density")   # a synonym
-points(linked; component = "7732-18-5", temperature = (280, 300))  # a CAS number
-mixture(linked, "7732-18-5", "64-17-5")                            # water + ethanol
+points(db; component = "oxidane", property = "Mass density")   # a synonym
+points(db; component = "7732-18-5", temperature = (280, 300))  # a CAS number
+mixture(db, "7732-18-5", "64-17-5")                            # water + ethanol
 ```
 
-The result is an ordinary [`DataView`](@ref) of the archive, so everything else works on it as before. Because a view does not remember the compound database, refine it with the names that the archive itself uses.
+The result is the usual selection, so everything else works on it as before, and refining it with `points(view; component = ...)` understands the same names. A compound can also be given as what a search returned: `a = lookup_compounds(db, "oxidane")` and then `points(db; component = a)` (the compounds of the dataset with the same InChIKeys are selected; `a[1]` is the first row), or `a = find_compounds(db, "oxidane")`, whose result carries the identifiers of the dataset. The `fraction` keyword takes the same names.
+
+A text that is not an exact name of any compound (a typo, a part of a name) is never taken as it is: the close compounds are listed and you are asked which one you mean (an `ArgumentError` that lists them when the session is not interactive, see [When a name is ambiguous](@ref)), where `database(; compound_library = false)` throws an error with a suggestion. If the compound database cannot be loaded (no cache and no network) a warning is shown, once, and names are understood the way the archive spells them.
 
 ### When a name is ambiguous
 
@@ -126,7 +131,7 @@ The keyword `choose` of `points` and `mixture` controls this:
 | `:all` | takes every exact candidate; a text with only close candidates is still refused |
 | `Dict("butane" => 2, "C4H10" => :all)` | an answer prepared for each text, by the number the menu shows, so a script does not stop; a text that is not in the dictionary is handled as with `:ask` |
 
-The question is read from `input` and written to `output` (`stdin` and `stdout` by default), which is how it is tested. The answers you give are kept in `linked.choices` and used again for the same text during the session; [`forget_choices!`](@ref) clears them. Nothing is written to disk, and the archive is never changed.
+The question is read from `input` and written to `output` (`stdin` and `stdout` by default), which is how it is tested. The answers you give are kept in the database and used again for the same text during the session; [`forget_choices!`](@ref) clears them. Nothing is written to disk, and the archive is never changed.
 
 ## [Asking PubChem](@id compounds_pubchem)
 
@@ -143,12 +148,12 @@ fetch_pubchem!(cdb, "702")                                            # a PubChe
 
 ```julia
 lookup_compounds(cdb, "bmim bf4"; online = true)       # asks PubChem only if the database does not know it
-points(linked; component = "64-17-5", online = true)   # the same, when searching the archive
+points(db; component = "64-17-5", online = true)       # the same, when searching the archive
 ```
 
 What PubChem answers is kept as one JSON file for each compound in `compounds/pubchem/`, with the date and the question. That folder is the separate table of what came from PubChem: every time the database loads, the files are read and laid over the lists, and the compounds you register go on top of both, so the order of precedence is **lists, then PubChem, then your own compounds**. The files are plain JSON, so you can read them, and deleting one (or the whole folder) removes what it brought without touching your own compounds. A compound that PubChem described is marked `source = "pubchem"`, and the text you asked about is kept as one of its names.
 
-A name or a CAS number can belong to several compounds (salts, hydrates, stereoisomers). Then they are listed in the order PubChem gives, with the CID, the IUPAC name, the formula, the InChIKey and the molar mass, and you choose with the number, `a` for all of them or `q` to cancel, exactly as in the [search with any name](@ref compounds_linked_search). The same `choose` keyword works: `:ask` (the default, which asks only in an interactive session), `:error`, `:all`, or a `Dict("glucose" => 2)` of prepared answers; in `points(linked; online = true)` the prepared answers for the PubChem menu use the key `"pubchem:glucose"`, because the dataset has a menu of its own.
+A name or a CAS number can belong to several compounds (salts, hydrates, stereoisomers). Then they are listed in the order PubChem gives, with the CID, the IUPAC name, the formula, the InChIKey and the molar mass, and you choose with the number, `a` for all of them or `q` to cancel, exactly as in the [search with any name](@ref compounds_linked_search). The same `choose` keyword works: `:ask` (the default, which asks only in an interactive session), `:error`, `:all`, or a `Dict("glucose" => 2)` of prepared answers; in `points(db; online = true)` the prepared answers for the PubChem menu use the key `"pubchem:glucose"`, because the dataset has a menu of its own.
 
 A question that PubChem cannot answer is remembered for 180 days in `pubchem_missing.toml` and not asked again, so a name that does not exist does not cost a request every time; `refresh = true` asks again, and also asks again for the compounds that are already kept. Problems with the service never turn into a "not found": if PubChem is busy or unreachable the package retries a few times and then throws a [`ThermophysicalDB.PubChemError`](@ref) that says what happened; nothing is changed or remembered.
 
@@ -161,8 +166,7 @@ The compounds that matter most to your searches are the ones that the archive me
 ```julia
 db = database()
 cdb = compound_database()
-prefetch_compounds!(db, cdb; top = 100)
-linked = link_compounds(db, cdb)       # again, to include what was fetched
+prefetch_compounds!(db, cdb; top = 100)    # the table of links is made again by itself
 ```
 
 It asks by InChIKey, so the answer is exactly the compound of the archive and there is nothing to choose; the compounds of the archive that have no InChIKey cannot be asked this way. What it fetches is kept like any other answer (one JSON file for each compound, and the questions PubChem could not answer are remembered for 180 days), so the run can be interrupted and repeated without asking twice. It sends about one request for each compound at 3 per second, so 200 compounds take about a minute. The result says how many compounds were considered, how many of them were unknown, and how many were requested, fetched, not found and skipped because PubChem was known to lack them (`considered`, `unknown`, `requested`, `fetched`, `not_found`, `remembered_missing`).

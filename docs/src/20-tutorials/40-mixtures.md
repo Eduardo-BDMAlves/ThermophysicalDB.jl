@@ -44,14 +44,11 @@ mixture("Viscosity")
 
 ## Naming the components in other ways
 
-The names above are the ones the articles use, but you do not have to remember them. The archive stays as NIST publishes it, and a second, separate database, the [compound database](@ref compounds), knows every way of naming a compound. Joining the two with [`link_compounds`](@ref) gives a [`LinkedDatabase`](@ref), and in it each component can be named in a different way: here ethanol by its SMILES and water by its CAS number.
+The names above are the ones the articles use, but you do not have to remember them. The archive stays as NIST publishes it, and a second, separate database, the [compound database](@ref compounds), knows every way of naming a compound. `database()` joins the two (see [`link_compounds!`](@ref)), and each component can be named in a different way: here ethanol by its SMILES and water by its CAS number. The compound database is loaded the first time a name has to be understood.
 
 ```@example mix
-cdb = compound_database(progress = false)
-linked = link_compounds(db, cdb)
-
 by_identifiers = points(
-    linked; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true,
+    db; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true,
     property = "Viscosity", temperature = window,
 )
 
@@ -68,7 +65,7 @@ A text that fits more than one compound is never guessed. The formula `C2H6O` be
 
 ```@example mix
 message = try
-    points(linked; component = ["C2H6O", "7732-18-5"], match = :all, exact = true, choose = :error)
+    points(db; component = ["C2H6O", "7732-18-5"], match = :all, exact = true, choose = :error)
     "the formula led to a single compound"
 catch err
     sprint(showerror, err)

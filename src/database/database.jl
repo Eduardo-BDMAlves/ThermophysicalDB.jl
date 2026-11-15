@@ -11,11 +11,33 @@ its own file. [`database`](@ref) returns it. [`points`](@ref) asks every member 
 and returns a [`DatabaseView`](@ref); [`members`](@ref), [`add_member!`](@ref) and
 [`remove_member!`](@ref) manage the members, and [`member_dataset`](@ref) gives the
 [`Dataset`](@ref) of one of them. The members are independent: none changes another.
+
+A `Database` can have the compound database attached ([`link_compounds!`](@ref); [`database`](@ref)
+does it by default). Then a compound can be named by anything the compound database knows (a
+synonym, a CAS number, a PubChem CID, an InChI, a SMILES) in [`points`](@ref),
+[`mixture`](@ref) and [`find_compounds`](@ref), and the other functions that take the compound
+database find it without being given.
 """
 mutable struct Database
     members::Vector{Member}
     registry::Registry
+    compounds::Union{Nothing,CompoundDB}
+    compound_loader::Union{Nothing,Function}
+    by_name::Bool
+    links::Union{Nothing,Vector{CompoundLinks}}
+    choices::Dict{String,CompoundMatches}
 end
+
+# A database with no compound database attached (see `link_compounds!` and `database`).
+Database(members::Vector{Member}, registry::Registry) = Database(
+    members,
+    registry,
+    nothing,
+    nothing,
+    true,
+    nothing,
+    Dict{String,CompoundMatches}(),
+)
 
 function build_registry(members::AbstractVector{Member})
     return build_registry(
@@ -69,6 +91,7 @@ function add_member!(db::Database, member::Member)
     push!(db.members, member)
     sort!(db.members; by = m -> m.priority)
     db.registry = build_registry(db.members)
+    forget_links!(db)
     return db
 end
 
@@ -80,6 +103,7 @@ Take a database out of `db` (its file is not touched).
 function remove_member!(db::Database, name::AbstractString)
     deleteat!(db.members, member_index(db, name))
     db.registry = build_registry(db.members)
+    forget_links!(db)
     return db
 end
 
@@ -98,6 +122,7 @@ end
 function Base.show(io::IO, ::MIME"text/plain", db::Database)
     n = length(db.members)
     println(io, "Database: ", n, n == 1 ? " database" : " databases")
+    println(io, "  ", compounds_state(db))
     n == 0 && return nothing
     headers = [
         "database",
@@ -170,6 +195,23 @@ function registered_compounds(reg::Registry, text::AbstractString)
     return unique!(found)
 end
 
+# The global compounds that each text, or each result of `find_compounds(db, ...)`, of a component
+# stands for; `nothing` for a component that cannot be told from the catalogs (a pattern, a number).
+function component_groups(reg::Registry, component, multi::Bool)
+    items = component isa AbstractVector ? component : [component]
+    groups = Vector{Int32}[]
+    for item in items
+        if item isa AbstractString
+            push!(groups, registered_compounds(reg, item))
+        elseif item isa CompoundMatches && multi    # with one database the numbers are its own
+            push!(groups, collect(Int32, item.id))
+        else
+            return nothing
+        end
+    end
+    return groups
+end
+
 # The members that can hold a point that matches, from their catalogs alone. A member is left out
 # only when the catalog proves it has nothing to match; whatever cannot be told here (a pattern,
 # a text that no member knows exactly) leaves every member in.
@@ -195,20 +237,11 @@ function candidate_members(
             keep[m] &= any(g -> reg.has_property[m][g], globals)
         end
     end
-    texts = if component isa AbstractString
-        [component]
-    elseif component isa AbstractVector && all(c -> c isa AbstractString, component)
-        component
-    else
-        nothing
-    end
-    if texts !== nothing
-        groups = [registered_compounds(reg, t) for t in texts]
-        if !isempty(groups) && all(!isempty, groups)
-            for m in eachindex(keep)
-                has = [any(g -> reg.has_compound[m][g], group) for group in groups]
-                keep[m] &= (exact || match === :all) ? all(has) : any(has)
-            end
+    groups = component_groups(reg, component, length(db.members) > 1)
+    if groups !== nothing && !isempty(groups) && all(!isempty, groups)
+        for m in eachindex(keep)
+            has = [any(g -> reg.has_compound[m][g], group) for group in groups]
+            keep[m] &= (exact || match === :all) ? all(has) : any(has)
         end
     end
     return findall(keep)
@@ -235,10 +268,24 @@ function member_component(reg::Registry, m::Integer, component)
     end
     throw(
         ArgumentError(
-            "a component of a selection over several databases is a name, an InChIKey, a formula " *
-            "or the result of `find_compounds(db, ...)`, not $(typeof(component))",
+            "a component of a selection over several databases is a name, an InChIKey, a formula, " *
+            "the result of `find_compounds(db, ...)` or (with a compound database attached) of " *
+            "`lookup_compounds(db, ...)`, not $(typeof(component))",
         ),
     )
+end
+
+# The same for the compounds of a `fraction`: `(false, nothing)` when the member lacks one of them,
+# because every criterion of a fraction must hold.
+function member_fraction(reg::Registry, m::Integer, fraction)
+    fraction === nothing && return (true, nothing)
+    translated = Pair[]
+    for (compound, range) in fraction_items(fraction)
+        local_compound = member_component(reg, m, compound)
+        local_compound === nothing && return (false, nothing)
+        push!(translated, local_compound => range)
+    end
+    return (true, translated)
 end
 
 function member_components(reg::Registry, m::Integer, component, match::Symbol, exact::Bool)
@@ -355,10 +402,13 @@ function select_parts(db::Database, candidates, sources, component, kwargs)
     for (m, source) in zip(candidates, sources)
         ok, comp = member_components(reg, m, component, match, exact)
         ok || continue
+        fraction_ok, amounts = member_fraction(reg, m, get(kwargs, :fraction, nothing))
+        fraction_ok || continue
+        own = amounts === nothing ? kwargs : (; kwargs..., fraction = amounts)
         try
             view =
-                comp === nothing ? points(source; kwargs...) :
-                points(source; component = comp, kwargs...)
+                comp === nothing ? points(source; own...) :
+                points(source; component = comp, own...)
             push!(index, m)
             push!(found, view)
         catch err
@@ -404,8 +454,21 @@ left out). A component or property that no database knows is an
 `ArgumentError`; one that some databases lack is not. A component given as the result of
 `find_compounds(db, text)` is translated to the identifiers of each database.
 """
-function points(db::Database; component = nothing, duplicate = false, kwargs...)
+function points(
+    db::Database;
+    component = nothing,
+    fraction = nothing,
+    duplicate = false,
+    choose = :ask,
+    online::Bool = false,
+    input::IO = stdin,
+    output::IO = stdout,
+    kwargs...,
+)
     isempty(db.members) && throw(ArgumentError("the database has no members"))
+    component, fraction =
+        resolve_inputs(db, component, fraction, choose, input, output, online)
+    kwargs = fraction === nothing ? kwargs : (; kwargs..., fraction)
     if length(db.members) > 1 &&
        (component isa Integer || component isa AbstractVector{<:Integer})
         throw(
@@ -441,8 +504,21 @@ function points(db::Database; component = nothing, duplicate = false, kwargs...)
     )
 end
 
-function points(v::DatabaseView; component = nothing, duplicate = false, kwargs...)
+function points(
+    v::DatabaseView;
+    component = nothing,
+    fraction = nothing,
+    duplicate = false,
+    choose = :ask,
+    online::Bool = false,
+    input::IO = stdin,
+    output::IO = stdout,
+    kwargs...,
+)
     db = v.database
+    component, fraction =
+        resolve_inputs(db, component, fraction, choose, input, output, online)
+    kwargs = fraction === nothing ? kwargs : (; kwargs..., fraction)
     return apply_duplicate(select_parts(db, v.index, v.parts, component, kwargs), duplicate)
 end
 
@@ -452,9 +528,13 @@ end
 
 The compounds of all the databases that `text` names, one row for each compound (the same compound in
 several databases is one), with the points that all the databases have of it. The identifiers of
-the result are global: use it as `component` of [`points`](@ref).
+the result are global: use it as `component` of [`points`](@ref). With a compound database attached
+([`link_compounds!`](@ref), the default of [`database`](@ref)), `text` can also be a CAS number, a
+synonym, a PubChem CID, an InChI or a SMILES, like in [`find_compounds`](@ref)`(db, compounds, text)`.
 """
 function find_compounds(db::Database, text::AbstractString; limit::Int = 10)
+    cdb = compounds_of(db)
+    cdb === nothing || return find_compounds(db, cdb, text; limit)
     return joined_matches(ds -> find_compounds(ds, text; limit), db, text, limit)
 end
 
@@ -577,30 +657,18 @@ for f in (
     @eval $f(db::Database, args...; kwargs...) = $f(sole_dataset(db), args...; kwargs...)
 end
 
-"""
-    link_compounds(db::Database, compounds::CompoundDB; by_name = true) -> LinkedDatabase
-
-[`link_compounds`](@ref) over every database at once: each member is linked to the compound
-database, and the result searches all of them (`points(linked; component = "oxidane")` finds the
-compound in every database that has it, whatever name that database uses). `linked.links` has one
-table for each member, in the order of `members(db)`; as a Tables.jl table it is the rows of all of
-them with the column `database`. The databases are not modified.
-"""
-function link_compounds(db::Database, compounds::CompoundDB; by_name::Bool = true)
-    links = CompoundLinks[
-        compound_links(member_dataset(m), compounds; by_name) for m in db.members
-    ]
-    return LinkedDatabase(db, compounds, links, Dict{String,CompoundMatches}())
+for f in (:bibtex, :reference_summary, :find_outliers, :expanded_uncertainty)
+    @eval $f(v::DatabaseView, args...; kwargs...) = $f(sole_part(v), args...; kwargs...)
 end
 
-for f in (
-    :bibtex,
-    :reference_summary,
-    :find_outliers,
-    :expanded_uncertainty,
-    :convert_composition,
+# The molar masses come from the compound database of the selection, unless another is given.
+function convert_composition(
+    v::DatabaseView,
+    args...;
+    compounds = compounds_of(v.database),
+    kwargs...,
 )
-    @eval $f(v::DatabaseView, args...; kwargs...) = $f(sole_part(v), args...; kwargs...)
+    return convert_composition(sole_part(v), args...; compounds, kwargs...)
 end
 
 for f in (:export_points, :write_bibtex, :write_references)

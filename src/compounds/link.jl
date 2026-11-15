@@ -65,7 +65,7 @@ end
 """
     CompoundLinks
 
-What [`link_compounds`](@ref) returns: one row for each pair (ThermoML compound, compound of the
+What the table of links of a member holds ([`link_table`](@ref) joins those of all the members): one row for each pair (ThermoML compound, compound of the
 database that may describe it). `compound` is the identifier in the dataset (`0` in `record`
 when nothing was found), `via` tells how it was found (`:inchikey`, `:inchi`, `:name` or
 `:none`), `candidates` counts the rows that the compound has (more than one means the user has

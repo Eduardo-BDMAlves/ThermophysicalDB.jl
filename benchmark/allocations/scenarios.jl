@@ -18,10 +18,7 @@ AllocStudy.canon(v::T.DataView) = v.rows
 AllocStudy.canon(v::T.DatabaseView) = [p.rows for p in v.parts]
 AllocStudy.canon(r::T.OutlierResult) =
     (r.kept.rows, r.outliers.rows, r.disputed.rows, r.category, r.counts)
-append!(
-    AllocStudy.SKIP_TYPES,
-    (T.Dataset, T.Database, T.LinkedDatabase, T.CompoundDB, T.Member),
-)
+append!(AllocStudy.SKIP_TYPES, (T.Dataset, T.Database, T.CompoundDB, T.Member))
 
 # The rows of a result, for the size that the allocated bytes are compared with.
 rows_of(v::T.DataView) = v.rows
@@ -90,9 +87,9 @@ scenario!(
         T.member_dataset(db, BENCH_MEMBER);
         (; db, compounds = ctx.compounds)
     ),
-    run = st -> T.link_compounds(st.db, st.compounds),
-    fingerprint = l -> length(T.member_dataset(l.dataset.members[1]).measurements),
-    output = l -> length(l.dataset.members),
+    run = st -> T.link_table(T.link_compounds!(st.db, st.compounds)),
+    fingerprint = l -> length(l.compound),
+    output = l -> length(unique(l.database)),
 )
 
 # ----------------------------------------------------------------------------------
@@ -216,8 +213,10 @@ scenario!(
 # filter: one after another, and everything in one call
 # ----------------------------------------------------------------------------------
 
-stage1(source, component) = T.points(source; component)
-stage1(source::T.LinkedDatabase, component) = T.points(source; component, choose = :error)
+# A database with the compound database attached never asks a question in a benchmark.
+asking(source) =
+    source isa T.Database && source.compounds !== nothing ? (; choose = :error) : (;)
+stage1(source, component) = T.points(source; component, asking(source)...)
 stage2(view, ctx) = T.points(view; property = ctx.property)
 stage3(view, ctx) = T.points(view; temperature = ctx.temperature)
 stage4(view, ctx) = T.points(view; pressure = ctx.pressure)
@@ -227,14 +226,7 @@ single(source, component, ctx) = T.points(
     property = ctx.property,
     temperature = ctx.temperature,
     pressure = ctx.pressure,
-)
-single(source::T.LinkedDatabase, component, ctx) = T.points(
-    source;
-    component,
-    property = ctx.property,
-    temperature = ctx.temperature,
-    pressure = ctx.pressure,
-    choose = :error,
+    asking(source)...,
 )
 
 function filter_scenarios!(group, source, component)

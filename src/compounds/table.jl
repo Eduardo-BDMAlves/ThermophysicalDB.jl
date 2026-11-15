@@ -280,6 +280,23 @@ struct CompoundRecords
 end
 
 Base.length(r::CompoundRecords) = length(r.id)
+
+# Some of the compounds, to pass to `points` as a `component`: `records[1]` or `records[[1, 3]]`.
+function Base.getindex(r::CompoundRecords, idx::Union{Integer,AbstractVector{<:Integer}})
+    i = idx isa Integer ? [idx] : idx
+    return CompoundRecords(
+        r.query,
+        r.id[i],
+        r.name[i],
+        r.cas[i],
+        r.cid[i],
+        r.formula[i],
+        r.molar_mass[i],
+        r.inchikey[i],
+        r.source[i],
+        r.match[i],
+    )
+end
 Base.isempty(r::CompoundRecords) = isempty(r.id)
 
 Tables.istable(::Type{CompoundRecords}) = true

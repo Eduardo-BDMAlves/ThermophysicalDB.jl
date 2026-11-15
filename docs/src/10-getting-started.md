@@ -74,7 +74,7 @@ The [manual page on selecting points](@ref selecting) lists every filter, includ
 
 ## Get the columns
 
-[`table`](@ref) materializes a selection as a [`PointTable`](@ref), the columns of the selection indexed like a data frame, one column per field:
+[`table`](@ref) materialises a selection as a [`PointTable`](@ref), the columns of the selection indexed like a data frame, one column per field:
 
 ```@example gs
 t = table(v2)
@@ -117,13 +117,10 @@ fig
 
 ## Name a compound in any way
 
-The archive names a compound as each article did. The package also keeps a second, separate database of the compounds, with all their names, CAS numbers, PubChem CIDs, SMILES and InChIs. Joining the two lets you search the archive with any of them (the first call downloads the lists, about 47 MB):
+The archive names a compound as each article did. The package also keeps a second, separate database of the compounds, with all their names, CAS numbers, PubChem CIDs, SMILES and InChIs. `database()` joins the two, so you can search the archive with any of them (the first search by name downloads the lists, about 47 MB; `database()` itself reads nothing of them):
 
 ```julia
-cdb = compound_database()
-linked = link_compounds(db, cdb)
-
-points(linked; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true)   # ethanol + water
+points(db; component = ["SMILES=CCO", "7732-18-5"], match = :all, exact = true)   # ethanol + water
 ```
 
 When a text fits more than one compound, such as the formula `"C2H6O"`, you are asked which one you mean. See [Compounds and their identifiers](@ref compounds) and the [binary mixtures tutorial](@ref tutorial_mixtures).

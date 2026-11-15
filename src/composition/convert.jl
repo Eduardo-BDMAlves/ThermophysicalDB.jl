@@ -140,11 +140,10 @@ function user_molar_mass(t::CompoundTable, c::Integer, user)
 end
 
 compound_source(compounds::CompoundDB) = compounds
-compound_source(compounds::LinkedDatabase) = compounds.compounds
 compound_source(::Nothing) = nothing
 compound_source(x) = throw(
     ArgumentError(
-        "compounds must be a compound database or a linked database, got $(typeof(x))",
+        "compounds must be a compound database or a Database with one attached, got $(typeof(x))",
     ),
 )
 
@@ -277,7 +276,7 @@ changed. A point that cannot be converted gets `NaN` and a `status` that says wh
   per amount of solvent (molality, ratios). It is never guessed.
 - `molar_mass`: a dictionary from names (or InChIKeys, or identifiers of the dataset) to molar
   masses in g/mol, e.g. `Dict("water" => 18.01528)`. What you give wins over everything else.
-- `compounds`: the compound database ([`compound_database`](@ref)) or a [`LinkedDatabase`](@ref), where
+- `compounds`: the compound database ([`compound_database`](@ref)), or a `Database` that has it attached (the default of a selection made from one), where
   the molar masses that you did not give are looked for (they include what was fetched from PubChem).
   With `fetch_molar_mass = true` a compound that the database does not know is asked from PubChem by its
   InChIKey; the network is not used otherwise.

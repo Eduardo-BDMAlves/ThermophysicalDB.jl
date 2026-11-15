@@ -544,8 +544,8 @@ end
         unknown = add(names = ["unobtainium"], formula = "Xx")
         before = (length(ds.compounds), copy(ds.compounds.names), copy(ds.compounds.key))
         linked = link_compounds(ds, cdb)
-        @test linked isa LinkedDatabase && linked.dataset === ds
-        links = linked.links
+        @test linked isa Database && linked.members[1].dataset === ds
+        links = link_table(linked)
         @test (length(ds.compounds), ds.compounds.names, ds.compounds.key) == before
         rows(c) = findall(==(Int32(c)), links.compound)
         @test links.via[only(rows(water))] == :inchikey
@@ -572,13 +572,14 @@ end
         @test links.inchi_check[rows(other)[1]] == :different
         @test links.formula_check[rows(other)[1]] == :different
         # by_name = false links only by InChIKey and InChI
-        strict = link_compounds(ds, cdb; by_name = false).links
+        strict = link_table(link_compounds(ds, cdb; by_name = false))
         @test :name ∉ strict.via
         @test strict.record[only(findall(==(Int32(by_name)), strict.compound))] == 0
-        @test occursin("found in the compound database", sprint(show, links))
-        @test occursin("LinkedDatabase", sprint(show, linked))
-        @test length(Tables.columntable(links).compound) == length(links)
-        @test Tables.columntable(linked).compound == links.compound
+        @test occursin(
+            "compound database attached",
+            sprint(show, MIME("text/plain"), linked),
+        )
+        @test all(==("thermoml"), links.database)
     end
 end
 
@@ -1434,7 +1435,7 @@ end
         # the files are read in the next session, and the link is made by InChIKey
         again = CompoundFixture.database(dir; reload = true)
         linked = link_compounds(ds, again)
-        links = linked.links
+        links = link_table(linked)
         @test links.via[only(findall(==(Int32(glucose)), links.compound))] == :inchikey
         @test links.via[only(findall(==(Int32(ethanol)), links.compound))] == :inchikey
         @test links.record[only(findall(==(Int32(keyless)), links.compound))] == 0
@@ -1556,9 +1557,9 @@ end
         ])
         # a plain name finds the members that use that name only
         @test length(points(db; component = "aqua")) == 3
-        linked = link_compounds(db, cdb)
-        @test linked isa LinkedDatabase && linked.dataset === db
-        @test length(linked.links) == 3
+        linked = link_compounds!(db, cdb)
+        @test linked === db
+        @test length(unique(link_table(linked).database)) == 3
         # the synonym, the CAS number and the CID of the compound database reach every member
         for text in ("oxidane", "7732-18-5", "962", "water", "aqua")
             view = points(linked; component = text)
@@ -1569,14 +1570,14 @@ end
         @test length(points(linked; component = "oxidane", source = "fixture")) == 6
         @test find_compounds(linked, "oxidane").id == find_compounds(db, cdb, "oxidane").id
         # the table of links has the rows of every member and says which one
-        cols = Tables.columns(linked)
+        cols = link_table(linked)
         @test sort!(unique(cols.database)) == ["one", "three", "two"]
         @test all(!=(0), cols.record)
-        @test occursin("3 databases", sprint(show, linked))
+        @test occursin("compound database attached", sprint(show, MIME("text/plain"), db))
         @test_throws ArgumentError prefetch_compounds!(linked; progress = false)
         # one member still links as before
         solo = link_compounds(b, cdb)
-        @test solo isa LinkedDatabase && length(points(solo; component = "oxidane")) == 3
+        @test solo isa Database && length(points(solo; component = "oxidane")) == 3
     end
 end
 

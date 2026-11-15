@@ -74,7 +74,7 @@ const COMPOUNDS = Synthetic.compound_database()
     PREPARED.seconds size_MB = round(filesize(PATH) / 1e6; digits = 1)
 
 const DB = open_database(PATH)
-const LINKED = T.link_compounds(DB, COMPOUNDS)
+const LINKED = T.link_compounds!(open_database(PATH), COMPOUNDS)
 
 # A compound and a property that have points in the ranges of the filters, found once.
 const TEMPERATURE = (300.0, 400.0)
@@ -143,7 +143,7 @@ register!(
     load,
     "link_compounds",
     @benchmarkable(
-        T.link_compounds(db, $COMPOUNDS),
+        T.link_table(T.link_compounds!(db, $COMPOUNDS)),
         setup = (db = open_database($PATH); T.member_dataset(db, BENCH_MEMBER)),
         evals = 1,
         samples = 10,
@@ -265,8 +265,10 @@ register!(
 # cascade measured alone (each starts from the result of the one before), the four stages chained,
 # and the four filters in one call. They find the same points, so the difference between the chain
 # and the single call is the cost of the way of asking.
-stage1(source, component) = T.points(source; component)
-stage1(source::T.LinkedDatabase, component) = T.points(source; component, choose = :error)
+# A database with the compound database attached never asks a question in a benchmark.
+asking(source) =
+    source isa T.Database && source.compounds !== nothing ? (; choose = :error) : (;)
+stage1(source, component) = T.points(source; component, asking(source)...)
 stage2(view) = T.points(view; property = PROPERTY)
 stage3(view) = T.points(view; temperature = TEMPERATURE)
 stage4(view) = T.points(view; pressure = PRESSURE)
@@ -277,14 +279,7 @@ single(source, component) = T.points(
     property = PROPERTY,
     temperature = TEMPERATURE,
     pressure = PRESSURE,
-)
-single(source::T.LinkedDatabase, component) = T.points(
-    source;
-    component,
-    property = PROPERTY,
-    temperature = TEMPERATURE,
-    pressure = PRESSURE,
-    choose = :error,
+    asking(source)...,
 )
 
 function filter_group!(group, source, component)
