@@ -123,6 +123,14 @@ uncertainty_table
 expanded_uncertainty
 ```
 
+## Audit log
+
+```@docs
+audit_log
+verify_audit_log
+audit_checkpoint
+```
+
 ## Exporting points
 
 ```@docs

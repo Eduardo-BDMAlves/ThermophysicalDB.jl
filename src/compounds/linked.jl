@@ -84,7 +84,8 @@ for all of them or `q` to cancel. The keyword `choose` of `points`, `mixture` an
 `find_compounds`-based searches decides how:
 
 - `choose = :ask` (default): ask in the terminal when the session is interactive
-  (`isinteractive()`); otherwise throw an `ArgumentError` that lists the candidates.
+  (`isinteractive()` and the output is the terminal); otherwise throw an `ArgumentError` that lists
+  the candidates.
 - `choose = :error`: never ask, always throw.
 - `choose = :all`: take every exact candidate. A text with no exact candidate is never
   accepted this way.
@@ -385,6 +386,12 @@ function ask_choice(db::Database, text, found::CompoundMatches, input::IO, outpu
     throw(ArgumentError("no compound was chosen for \"$text\""))
 end
 
+# A question is asked only where a person can answer it: in a terminal session whose output is the
+# terminal, or when the caller gave the streams to use. A build that captures the output (a
+# documentation build, a test run, a script that writes to a file) gets the error that lists the
+# candidates, instead of waiting for a key that nobody sees.
+can_ask(input::IO, output::IO) = input !== stdin || (isinteractive() && output isa Base.TTY)
+
 # What the `choose` keyword asks for `text`: (:ask | :all | :error | :index, position).
 function choice_for(choose, text::AbstractString)
     if choose isa Symbol
@@ -423,7 +430,10 @@ function resolve_text(
     saved === nothing || return saved
     found = candidate_compounds(db, cdb, text; online, choose, input, output)
     exact = all(==(:exact), found.match)
-    exact && length(found) == 1 && return found
+    if exact && length(found) == 1
+        db.choices[key] = found    # a text with one answer is not looked up again
+        return found
+    end
     action, position = choice_for(choose, text)
     if action == :all
         exact || throw(ambiguity_error(db, text, found))
@@ -435,7 +445,7 @@ function resolve_text(
             ),
         )
         picked = subset(found, [position])
-    elseif action == :error || !(input !== stdin || isinteractive())
+    elseif action == :error || !can_ask(input, output)
         throw(ambiguity_error(db, text, found))
     else
         picked = ask_choice(db, text, found, input, output)

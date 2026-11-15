@@ -19,13 +19,17 @@ Cubic equations are built from the van der Waals idea: a repulsive volume term p
 
 ```@setup eos
 Main.DocsSetup.activate!()
+using ThermophysicalDB, CairoMakie, Unitful, Statistics
 ```
 
 ## Models and a safe evaluator
 
+!!! note "The Clapeyron cells are shown, not run"
+    Compiling the solvers of Clapeyron takes longer than everything else on this page, so the cells below that call it (the plain code blocks) are not executed when the documentation is built. Their results are kept in a cache file and refreshed when the code of the page, the version of Clapeyron or the selected points change. Everything else (the selection of the data, the statistics and the figures) runs on every build. To run a cell yourself, copy it into a session.
+
 All four models are built from a list of component names.
 
-```@example eos
+```julia
 using ThermophysicalDB, CairoMakie, Unitful, Statistics
 using Clapeyron
 
@@ -36,12 +40,11 @@ models = (
     tcPR = tcPR(fluid),
     PCSAFT = PCSAFT(fluid),
 )
-keys(models)
 ```
 
 An EoS can fail to converge at a state point, especially near the critical point or in a metastable region. The helper below turns any failure into `NaN`, so one bad point never aborts a whole comparison. It also returns a vector of the same length as the data, which keeps the columns aligned with the table. If no point at all converges the helper warns, because a `NaN` column usually means a wrong call, not a hard state.
 
-```@example eos
+```julia
 function predict(f, model, args...)
     raw = map(eachindex(first(args))) do i
         try
@@ -58,7 +61,11 @@ function predict(f, model, args...)
     failed = NaN * oneunit(raw[first_ok])
     return typeof(failed)[ismissing(r) ? failed : r for r in raw]
 end
+```
 
+The two helpers below do not depend on Clapeyron and run on every build.
+
+```@example eos
 # a dimensionless quantity (any combination of units) as a plain number, for plotting and statistics
 plain(x::Unitful.AbstractQuantity) = Float64(ustrip(uconvert(NoUnits, x)))
 plain(x::Real) = Float64(x)
@@ -88,13 +95,35 @@ t = table(v; quantities = Unitful)
 T = t.temperature
 p = t.value
 year = Float64.(t.year)
+Ts = range(extrema(T)...; length = 80)   # a smooth grid for the curves of the figure
+nothing # hide
+```
 
+`saturation_pressure` returns the pressure and the two saturated volumes, and the first entry is all we need. Each experimental point maps to one call of the model, and so does each point of the smooth grid `Ts`, which draws the curve of each model in the figure below.
+
+```julia
 psat(model, T) = Clapeyron.saturation_pressure(model, T)[1] * u"Pa"   # first entry is the pressure
 
 pvap = map(models) do model
     predict(psat, model, T)
 end
 
+pcurve = map(models) do model
+    predict(psat, model, Ts)
+end
+```
+
+```@setup eos
+Main.DocsEosCache.provide!(
+    @__MODULE__, "20-tutorials/50-eos-comparison.md";
+    key = "vapor-pressure", block = 3, needle = "pvap = map",
+    inputs = (:T, :p), results = (pvap = u"Pa", pcurve = u"Pa"),
+)
+```
+
+The deviation of each model from the experiment, relative to the experiment:
+
+```@example eos
 dev_p = map(pvap) do q
     plain.((q .- p) ./ p)
 end
@@ -102,15 +131,14 @@ end
 map(summarize, dev_p)
 ```
 
-`saturation_pressure` returns the pressure and the two saturated volumes, and the first entry is all we need here. Each row of the printed table is a model; `AARD` is the mean absolute relative deviation and `bias` its signed mean. A positive bias means the model over-predicts the pressure.
+Each row of the printed table is a model; `AARD` is the mean absolute relative deviation and `bias` its signed mean. A positive bias means the model over-predicts the pressure.
 
 ```@example eos
 fig = Figure(size = (900, 440))
 ax1 = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "p [kPa]", yscale = log10, title = "Vapor pressure of hexane")
 scatter!(ax1, ustrip.(u"K", T), ustrip.(u"kPa", p); color = "#e8ecff", markersize = 6, label = "ThermoML")
-Ts = range(extrema(T)...; length = 80)
-for (name, model) in pairs(models)
-    lines!(ax1, ustrip.(u"K", Ts), ustrip.(u"kPa", predict(psat, model, Ts)); linewidth = 2.5, label = String(name))
+for (name, curve) in pairs(pcurve)
+    lines!(ax1, ustrip.(u"K", Ts), ustrip.(u"kPa", curve); linewidth = 2.5, label = String(name))
 end
 axislegend(ax1; position = :lt)
 
@@ -141,12 +169,26 @@ Td = td.temperature
 pd = td.pressure
 ρ = td.value
 yd = Float64.(td.year)
+nothing # hide
+```
 
+```julia
 liquid_density(model, P, T) = mass_density(model, P, T, phase = :liquid)
 
 ρmodel = map(models) do model
     predict(liquid_density, model, pd, Td)
 end
+```
+
+```@setup eos
+Main.DocsEosCache.provide!(
+    @__MODULE__, "20-tutorials/50-eos-comparison.md";
+    key = "liquid-density", block = 4, needle = "ρmodel = map",
+    inputs = (:Td, :pd), results = (ρmodel = u"kg/m^3",),
+)
+```
+
+```@example eos
 dev_ρ = map(ρmodel) do q
     plain.((q .- ρ) ./ ρ)
 end
@@ -191,7 +233,7 @@ The structure of the map shows *where* the problem lives: whether it grows with 
 
 ## Going further
 
-- Add a model: `SAFTVRMie(fluid)`, for instance, goes into the `models` tuple and every cell of the page follows, at the cost of one more solution per state point (and of its compilation, which is the larger part for the SAFT models).
+- Add a model: `SAFTVRMie(fluid)`, for instance, goes into the `models` tuple and every cell of the page follows, at the cost of one more solution per state point (and of its compilation, which is the larger part for the SAFT models). When you edit the plain code blocks of this page in the repository, the cache is refreshed by the next build.
 - Replace `"hexane"` with another fluid. Clapeyron looks the name up in its own parameter database, which may spell it differently from ThermoML; if the model constructor fails, try the common name or the CAS-style name it suggests in the error.
 - Compare derived properties with `Clapeyron.speed_of_sound(model, p, T; phase = :liquid)` or `Clapeyron.isobaric_heat_capacity(model, p, T)`, selecting the matching property in [`points`](@ref).
 - For mixtures, Clapeyron needs binary interaction parameters; models built from several names use the ones in its database when they exist.

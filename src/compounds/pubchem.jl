@@ -498,7 +498,7 @@ function pubchem_choose(text, cids, props, choose, input::IO, output::IO)
         )
         return cids[[position]]
     end
-    (action == :error || !(input !== stdin || isinteractive())) && throw(refuse())
+    (action == :error || !can_ask(input, output)) && throw(refuse())
     println(output, '"', text, "\" matches ", length(cids), " compounds in PubChem:")
     println(output, listing)
     for _ = 1:5

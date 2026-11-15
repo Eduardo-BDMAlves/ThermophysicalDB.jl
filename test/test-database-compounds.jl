@@ -197,3 +197,68 @@ end
         T.forget_database!()
     end
 end
+
+@testitem "a question is asked only where somebody can answer it, and a name is looked up once" tags =
+    [:unit] setup = [CompoundFixture] begin
+    T = CompoundFixture.T
+    mktempdir() do dir
+        cdb = CompoundFixture.database(dir)
+        ds = T.Dataset()
+        mole = T.intern!(ds.kinds, "Mole fraction")
+        source = T.intern!(ds.sources, "fixture")
+        ref = T.add_reference!(ds.references; doi = "10.5555/q-1", source)
+        id = T.add_compound!(
+            ds.compounds;
+            inchikey = "VNWKTOKETHGBQD-UHFFFAOYSA-N",
+            names = ["methane"],
+            formula = "CH4",
+        )
+        density = T.add_property!(ds.properties, "Mass density", "kg/m3")
+        e = T.add_experiment!(
+            ds.experiments;
+            reference = ref,
+            components = [id],
+            kinds = [mole],
+        )
+        T.add_measurement!(
+            ds.measurements;
+            experiment = e,
+            property = density,
+            temperature = 290.0,
+            pressure = 101.325,
+            value = 1.0,
+        )
+        db = T.link_compounds!(T.Database([T.Member("a"; kind = :user, dataset = ds)]), cdb)
+
+        # The streams given by the caller are asked; the terminal only when it is one
+        @test T.can_ask(IOBuffer(), IOBuffer())
+        @test !T.can_ask(stdin, IOBuffer())
+        # A misspelling is an error that lists the close compounds, never a question that waits
+        err = try
+            points(db; component = "metane")
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("methane", err.msg)
+        # ... and a prepared input still answers it
+        answer = IOBuffer("1\n")
+        @test length(
+            points(db; component = "metane", input = answer, output = IOBuffer()),
+        ) == 1
+
+        # A text with one answer is kept, and forgotten when the databases change
+        T.forget_choices!(db)
+        @test isempty(db.choices)
+        @test length(points(db; component = "methane")) == 1
+        @test haskey(db.choices, "methane")
+        T.forget_links!(db)
+        @test isempty(db.choices)
+
+        # The search of the compound database does not read every name unless asked to
+        @test isempty(T.lookup_local(cdb, "metane"; approximate = false))
+        @test !isempty(T.lookup_local(cdb, "metane"))
+        found = T.find_compounds(ds, cdb, "74-82-8")
+        @test found.id == Int32[1] && found.points == [1]
+    end
+end

@@ -191,6 +191,16 @@ Every installation follows the same safe sequence, whether the file was download
 
 A download that was interrupted, truncated or corrupted never looks like a valid installation, and a digest mismatch installs nothing.
 
+## Audit log
+
+Every permanent change that the package makes to the data on disk (an archive installed, a database saved, compounds saved) is appended to a plain text `audit.log` next to what it describes, and so are the failures of those operations. Each line carries a hash of the previous one, so an edit from outside breaks the chain and is found by [`verify_audit_log`](@ref).
+
+```julia
+audit_log(; database = "thermoml", event = "archive_installed")   # the archives that were installed
+verify_audit_log()                                # is the chain intact?
+audit_checkpoint(; database = "thermoml")         # to write down elsewhere: proof that the file was not rewritten
+```
+
 ## When the download fails
 
 The archive is served by NIST through a redirect, and some networks, proxies and firewalls refuse the connection. ThermophysicalDB.jl does not give up at the first error:
