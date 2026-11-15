@@ -53,6 +53,13 @@ function write_manifest(dir::AbstractString, manifest::Manifest)
     )
     open(io -> TOML.print(io, data; sorted = true), tmp, "w")
     mv(tmp, path; force = true)
+    audit_record!(
+        dir,
+        "archive_installed",
+        manifest.version;
+        detail = "source=" * manifest.source_url,
+        sha256 = manifest.sha256,
+    )
     return path
 end
 

@@ -10,6 +10,7 @@ using CodecZlib: GzipDecompressorStream
 using Dates: Dates
 using DOI2BibTeX: DOI2BibTeX
 using Downloads: Downloads
+using FileWatching: FileWatching
 using JLD2: JLD2
 using JSON: JSON
 using LinearAlgebra: I, LAPACK, Symmetric, cholesky!, issuccess, lu
@@ -20,9 +21,11 @@ using TOML: TOML
 using Tables: Tables
 using Tar: Tar
 using Unicode: Unicode
+using UUIDs: UUIDs
 using YAML: YAML
 
 include("remote/datadir.jl")
+include("audit/log.jl")
 include("remote/checksum.jl")
 include("remote/releases.jl")
 include("remote/manifest.jl")
@@ -121,6 +124,8 @@ export COMPOSITION_SCALES,
     DataView,
     PointTable,
     UncertaintyTerm,
+    audit_checkpoint,
+    audit_log,
     bibtex,
     check_update,
     compound_database,
@@ -164,6 +169,7 @@ export COMPOSITION_SCALES,
     table,
     uncertainty_table,
     update_database!,
+    verify_audit_log,
     write_bibtex,
     write_references
 

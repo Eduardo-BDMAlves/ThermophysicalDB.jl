@@ -230,9 +230,19 @@ list they were laid over. They are loaded again by [`compound_database`](@ref). 
 the path of the file.
 """
 function save_compounds(db::CompoundDB; dir::AbstractString = compounds_dir())
-    mkpath(dir)
     rows = findall(db.custom)
-    return write_jld2(custom_cache_path(dir), sink -> store_rows!(sink, db, rows))
+    return audited(dir, "compounds_save", basename(custom_cache_path(dir))) do
+        mkpath(dir)
+        path = write_jld2(custom_cache_path(dir), sink -> store_rows!(sink, db, rows))
+        audit_record!(
+            dir,
+            "compounds_saved",
+            basename(path);
+            sha256 = logged_sha256(path),
+            counts = string(length(rows)),
+        )
+        return path
+    end
 end
 
 function load_custom!(db::CompoundDB, dir::AbstractString)

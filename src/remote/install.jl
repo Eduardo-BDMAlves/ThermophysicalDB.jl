@@ -61,23 +61,26 @@ function install_release(
     part = final * ".part"
     previous = read_manifest(dir)
     @info "Downloading ThermoML archive $(release.version) from NIST"
-    try
+    manifest = try
         download(release.archive_url, part)
-        verify_sha256(part, expected)
-        mv(part, final; force = true)
+        verify_logged(dir, release.version, part, expected)
+        audited(dir, "archive_install", release.version) do
+            mv(part, final; force = true)
+            manifest = Manifest(
+                MANIFEST_FORMAT,
+                release.version,
+                release.archive_name,
+                expected,
+                release.archive_url,
+                utc_timestamp(),
+                Int(filesize(final)),
+            )
+            write_manifest(dir, manifest)
+            return manifest
+        end
     finally
         rm(part; force = true)
     end
-    manifest = Manifest(
-        MANIFEST_FORMAT,
-        release.version,
-        release.archive_name,
-        expected,
-        release.archive_url,
-        utc_timestamp(),
-        Int(filesize(final)),
-    )
-    write_manifest(dir, manifest)
     # The first download is when the person meets the data: say where they come from and
     # under which conditions they may be used (the same wording as in every export).
     previous === nothing && @info first_download_message()
