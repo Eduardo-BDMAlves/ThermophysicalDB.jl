@@ -5,7 +5,7 @@ julia = "1.13.4"
 
 [archive]
 file = "ThermoML.v2020-09-30.tgz"
-retrieved = "2026-11-15T01:44:56Z"
+retrieved = "2026-11-15T15:52:51Z"
 sha256 = "231161b5e443dc1ae0e5da8429d86a88474cb722016e5b790817bb31c58d7ec2"
 version = "2020-09-30"
 
@@ -24,6 +24,6 @@ Unitful = "1.29.0"
 XLSX = "0.13.4"
 
 [thermophysicaldb]
-commit = "f7a7029d47b2993139154f191e70693b56f1e4ef"
+commit = "ed81b002f1dd09acee130bb54a0b5dbd4347e95c"
 uncommitted_changes = false
 version = "0.1.0"
