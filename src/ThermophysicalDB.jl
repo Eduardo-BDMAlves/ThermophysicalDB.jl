@@ -47,6 +47,7 @@ include("parse/article.jl")
 include("parse/ingest.jl")
 include("parse/build.jl")
 include("query/table.jl")
+include("query/pointtable.jl")
 include("uncertainty/budget.jl")
 include("store/serialize.jl")
 include("store/cache.jl")
@@ -118,6 +119,7 @@ export COMPOSITION_SCALES,
     convert_composition,
     LinkedDatabase,
     DataView,
+    PointTable,
     UncertaintyTerm,
     bibtex,
     check_update,

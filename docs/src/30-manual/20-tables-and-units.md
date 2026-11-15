@@ -20,7 +20,7 @@ v = points(db; component = "water", exact = true, property = "Vapor or sublimati
 
 ## Columns
 
-`table(v)` returns a `NamedTuple` whose fields are plain vectors of equal length: one row per point.
+`table(v)` returns a [`PointTable`](@ref): a wrapper of a `NamedTuple` whose fields are plain vectors of equal length, one row per point. `t.temperature` and `t[:temperature]` are the same vector (see [Indexing a table](@ref) below).
 
 ```@example tab
 t = table(v)
@@ -181,6 +181,53 @@ Mole fraction, mass fraction, molality and the ratios do not depend on temperatu
 
 The samples themselves, one row each, and their purification steps are available as tables with [`sample_table`](@ref) and [`purity_step_table`](@ref); both accept a dataset or a selection.
 
+## Indexing a table
+
+A [`PointTable`](@ref) is indexed like a data frame, and iterating it goes row by row. A column is the vector the table holds (not a copy); asking for rows copies them.
+
+```@example tab
+t = table(v)
+t[:temperature]                  # the column, the same as t.temperature
+```
+
+```@example tab
+t[3]                             # the third row, with every column
+```
+
+```@example tab
+t[3, :temperature], t[:temperature, 3]   # one value: (row, column) or (column, row)
+```
+
+```@example tab
+t[3, 5]                          # row 3, the fifth column (by position)
+```
+
+```@example tab
+t[1:2, :temperature]             # the temperatures of the first two points
+```
+
+```@example tab
+t[1:2]                           # a PointTable with the first two points
+```
+
+```@example tab
+t[1:2, [:temperature, :value]]   # rows and columns at once
+```
+
+A `Bool` vector chooses rows (`t[t.temperature .> 300]`), `t[:, :value]` is a copy of a column, and `t[:temperature, end]` is the last temperature. `size(t)` is `(points, columns)`, `length(t)` the number of points and `keys(t)` the names of the columns. A row is a `NamedTuple`, so
+
+```@example tab
+for row in t[1:2]
+    println(row.temperature, " K  ", row.value, " ", row.unit)
+end
+```
+
+Showing the table prints a summary computed at that moment from its columns: the number of points, references and years, the systems, the range of each condition and, for every property and unit, how many points there are and their range.
+
+```@example tab
+t
+```
+
 ## Tables.jl
 
 A `DataView` is itself a [Tables.jl](https://tables.juliadata.org) source, and `table` returns a Tables.jl column table, so anything in the ecosystem accepts them directly:
@@ -193,7 +240,7 @@ first(df[:, [:components, :property, :temperature, :value, :unit]], 4)
 ```julia
 using CSV
 CSV.write("water_vapor_pressure.csv", v)          # a selection is a table
-CSV.write("water_si.csv", table(v; units = :si))  # so is the NamedTuple
+CSV.write("water_si.csv", table(v; units = :si))  # so is the table
 ```
 
 ## Sources of the data
