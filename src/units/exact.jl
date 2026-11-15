@@ -148,6 +148,13 @@ const SYMBOLS = Dict{String,ExactUnit}(
     "btu" => BTU_IT,
     "Btu_IT" => BTU_IT,
     "Btu_th" => BTU_TH,
+    # Dimensionless: a ratio can be written as a percentage or a part per million.
+    "%" => Exact(1 // 100) * ExactUnit(1),
+    "percent" => Exact(1 // 100) * ExactUnit(1),
+    "permille" => Exact(1 // 1000) * ExactUnit(1),
+    "‰" => Exact(1 // 1000) * ExactUnit(1),
+    "ppm" => Exact(1 // 10^6) * ExactUnit(1),
+    "ppb" => Exact(1 // 10^9) * ExactUnit(1),
 )
 
 const PREFIXES = Dict{Char,Exact}(

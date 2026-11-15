@@ -147,6 +147,48 @@ points(
 ) |> length
 ```
 
+## Phase, method, composition, value and uncertainty
+
+These filters look at one measurement instead of one experiment. They combine with the others by AND, like everything in `points`.
+
+| Keyword | Meaning |
+| :-- | :-- |
+| `phase = "liquid"`, `method = "hot-wire"` | text that the phase or the method contains (any case), a `Regex`, or a vector; a point that states none is excluded |
+| `fraction = "methane" => (0.2, 0.4)` | the amount of that compound, wherever it sits in the system; the same forms of limits as `temperature`, and a single number |
+| `xkind = "mole"` | the kind of composition the source used (text, `Regex` or vector) |
+| `value = (low, high)` | limits on the value, in the native unit of each property |
+| `uncertainty = (low, high)` | limits on the uncertainty at ``k = 2``, in the same unit as `value` |
+| `relative_uncertainty = (nothing, 0.01)` | the uncertainty at ``k = 2`` divided by the absolute value, so it works for any property; it may be written as `(nothing, 1u"percent")` or in `u"ppm"` (also the limits of `fraction`) |
+
+[`phases`](@ref) and [`measurement_methods`](@ref) list what the data of a selection (or of a database) have, with the number of points, the most frequent first. A phase or a method that matches nothing is an `ArgumentError`, like a property.
+
+```@example sel
+water = points(db; component = "water", exact = true, property = "Mass density")
+first(phases(water).phase, 3), first(measurement_methods(water).method, 3)
+```
+
+```@example sel
+liquid = points(water; phase = "liquid")
+accurate = points(liquid; relative_uncertainty = (nothing, 1.0e-4))
+length(water), length(liquid), length(accurate)
+```
+
+The fractions are those of the source, and a compound has a different position (`x1`, `x2`) in each system, so `fraction` finds it by name. `xkind` makes sure that the numbers are of the scale you mean:
+
+```@example sel
+binary = points(db; component = ["carbon dioxide", "methane"], match = :all, exact = true)
+length(points(binary; xkind = "mole", fraction = "methane" => (0.4, 0.6)))
+```
+
+`value` and `uncertainty` are plain numbers in the native unit of every property, so give them with one `property` or with properties that share a unit. With `unit`, or with quantities, the limits are converted for each property of that dimension and the properties of another one are left out:
+
+```@example sel
+length(points(water; value = (0.9, 1.1), unit = "g/cm3")), length(points(water; value = (900, 1100) .* u"kg/m^3"))
+```
+
+!!! note "Points without the field are excluded"
+    As with `temperature` and `pressure`, a point that states no phase, no method or no uncertainty cannot be shown to satisfy the filter on it, so it is not selected. An uncertainty that cannot be taken to ``k = 2`` without inventing data (a level of confidence the package does not know) is treated as missing; see `policy` in [`table`](@ref).
+
 ## Chaining
 
 Because `points` accepts a selection, filters chain naturally and cost one scan of the survivors each:

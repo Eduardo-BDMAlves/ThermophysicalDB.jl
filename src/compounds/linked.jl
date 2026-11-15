@@ -423,6 +423,7 @@ end
 function points(
     l::LinkedDatabase;
     component = nothing,
+    fraction = nothing,
     choose = :ask,
     online::Bool = false,
     input::IO = stdin,
@@ -430,7 +431,18 @@ function points(
     kwargs...,
 )
     resolved = resolve_component(l, component, choose, input, output; online)
-    return points(l.dataset; component = resolved, kwargs...)
+    amounts = resolve_fraction(l, fraction, choose, input, output, online)
+    return points(l.dataset; component = resolved, fraction = amounts, kwargs...)
+end
+
+# The compounds of a `fraction` criterion are understood as the ones of `component` (a synonym,
+# a CAS number, ...).
+resolve_fraction(l::LinkedDatabase, ::Nothing, choose, input, output, online) = nothing
+function resolve_fraction(l::LinkedDatabase, fraction, choose, input, output, online)
+    return [
+        resolve_component(l, compound, choose, input, output; online) => range for
+        (compound, range) in fraction_items(fraction)
+    ]
 end
 
 function mixture(
@@ -449,3 +461,6 @@ function mixture(
         Any[resolve_component(l, c, choose, input, output; online) for c in components]
     return mixture(l.dataset, resolved...; exact, kwargs...)
 end
+
+phases(l::LinkedDatabase) = phases(l.dataset)
+measurement_methods(l::LinkedDatabase) = measurement_methods(l.dataset)

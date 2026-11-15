@@ -255,7 +255,15 @@ function member_components(reg::Registry, m::Integer, component, match::Symbol, 
     return (translated !== nothing, translated)
 end
 
-const NO_MATCH_MESSAGES = ("no compound matches", "no property matches", "unknown source")
+const NO_MATCH_MESSAGES = (
+    "no compound matches",
+    "no property matches",
+    "unknown source",
+    "no phase matches",
+    "no method matches",
+    "no xkind matches",
+    "no property has the dimension",
+)
 no_match(err) = err isa ArgumentError && any(p -> startswith(err.msg, p), NO_MATCH_MESSAGES)
 
 # ----------------------------------------------------------------------------------
@@ -632,3 +640,17 @@ function Base.getproperty(v::DatabaseView, name::Symbol)
     end
     return getfield(v, name)
 end
+
+# ----------------------------------------------------------------------------------
+# Which phases and methods there are (see `query/filters.jl`)
+# ----------------------------------------------------------------------------------
+
+phases(v::DatabaseView) = joined_count_table(:phase, phases.(parts(v)))
+measurement_methods(v::DatabaseView) =
+    joined_count_table(:method, measurement_methods.(parts(v)))
+phases(db::Database) =
+    joined_count_table(:phase, [phases(member_dataset(m)) for m in db.members])
+measurement_methods(db::Database) = joined_count_table(
+    :method,
+    [measurement_methods(member_dataset(m)) for m in db.members],
+)
