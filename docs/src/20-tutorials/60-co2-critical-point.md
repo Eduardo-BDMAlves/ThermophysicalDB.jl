@@ -15,15 +15,17 @@ The models below are the four of the [previous tutorial](@ref tutorial_eos) plus
 
 ```@setup co2
 Main.DocsSetup.activate!()
+using ThermophysicalDB, CairoMakie, Unitful, Statistics
 ```
 
 ## Data and models
 
-```@example co2
+!!! note "The Clapeyron cells are shown, not run"
+    Compiling the solvers of Clapeyron takes longer than everything else on this page, so the cells below that call it (the plain code blocks) are not executed when the documentation is built. Their results are kept in a cache file and refreshed when the code of the page, the version of Clapeyron or the selected points change. The selection of the data, the statistics and the figures run on every build. To run a cell yourself, copy it into a session.
+
+```julia
 using ThermophysicalDB, CairoMakie, Unitful, Statistics
 using Clapeyron
-
-db = database(progress = false)
 
 fluid = ["carbon dioxide"]
 models = (
@@ -33,18 +35,22 @@ models = (
     PCSAFT = PCSAFT(fluid),
     GERG2008 = GERG2008(fluid),
 )
+```
+
+```@example co2
+db = database(progress = false)
 
 M = 44.0095u"g/mol"    # molar mass of carbon dioxide
 
 # One fixed colour per model, used in every figure of this page. The reference
 # equation is drawn in white, the experimental points in grey-blue.
 palette = (SRK = "#ff4a1c", PR = "#ffb000", tcPR = "#b17bff", PCSAFT = "#2fe0ff", GERG2008 = "#e8ecff")
-keys(models)
+keys(palette)
 ```
 
 A model that does not converge at a state point returns `NaN` through this helper, so a single failure never aborts a comparison. `summarize` reports the mean absolute relative deviation (AARD) and the signed mean (bias), in percent.
 
-```@example co2
+```julia
 function predict(f, model, args...)
     raw = map(eachindex(first(args))) do i
         try
@@ -61,7 +67,9 @@ function predict(f, model, args...)
     failed = NaN * oneunit(raw[first_ok])
     return typeof(failed)[ismissing(r) ? failed : r for r in raw]
 end
+```
 
+```@example co2
 # a dimensionless quantity (any combination of units) as a plain number, for plotting and statistics
 plain(x::Unitful.AbstractQuantity) = Float64(ustrip(uconvert(NoUnits, x)))
 plain(x::Real) = Float64(x)
@@ -77,12 +85,22 @@ end
 
 Every model has its own critical point, found from the condition that the first and second derivatives of pressure with respect to volume vanish. The pure-fluid parameters of cubic equations are *built* from the real critical point, whereas SAFT parameters are fitted to saturation data far from it, so the SAFT critical temperatures drift upward. This is the known overestimate of the critical temperature of mean-field SAFT models:
 
-```@example co2
+```julia
 crit = map(models) do model
     Tc, pc, Vc = crit_pure(model)
     (T = Tc * u"K", p = pc * u"Pa", ρ = M / (Vc * u"m^3/mol"))
 end
+```
 
+```@setup co2
+Main.DocsEosCache.provide!(
+    @__MODULE__, "20-tutorials/60-co2-critical-point.md";
+    key = "co2-critical-points", block = 3, needle = "crit_pure",
+    inputs = (:M,), results = (crit = (T = u"K", p = u"Pa", ρ = u"kg/m^3"),),
+)
+```
+
+```@example co2
 [
     (model = name, Tc = round(u"K", c.T; digits = 2), pc = round(u"MPa", c.p; digits = 3), ρc = round(u"kg/m^3", c.ρ; digits = 1))
     for (name, c) in pairs(crit)
@@ -133,10 +151,34 @@ T = t.temperature
 p = t.value
 year = Float64.(t.year)
 
+# the temperatures of the curve of each model: from 240 K up to just below its own critical point
+Ts_psat = map(c -> range(240.0u"K", 0.9995 * c.T; length = 100), crit)
+nothing # hide
+```
+
+```julia
 psat(model, T) = Clapeyron.saturation_pressure(model, T)[1] * u"Pa"
 
-dev_p = map(models) do model
-    plain.((predict(psat, model, T) .- p) ./ p)
+pvap = map(models) do model
+    predict(psat, model, T)
+end
+
+pcurve = map(models, Ts_psat) do model, Ts
+    predict(psat, model, Ts)
+end
+```
+
+```@setup co2
+Main.DocsEosCache.provide!(
+    @__MODULE__, "20-tutorials/60-co2-critical-point.md";
+    key = "co2-vapor-pressure", block = 4, needle = "pvap = map",
+    inputs = (:T, :p), results = (pvap = u"Pa", pcurve = u"Pa"),
+)
+```
+
+```@example co2
+dev_p = map(pvap) do q
+    plain.((q .- p) ./ p)
 end
 
 (points = length(p), table = map(summarize, dev_p))
@@ -148,9 +190,8 @@ Points between a model's own critical temperature and the real one (for the mode
 fig = Figure(size = (900, 440))
 ax1 = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "p [MPa]", title = "Vapor pressure of carbon dioxide")
 scatter!(ax1, ustrip.(u"K", T), ustrip.(u"MPa", p); color = "#9aa3c7", markersize = 6, label = "ThermoML")
-for (name, model) in pairs(models)
-    Ts = range(240.0u"K", 0.9995 * crit[name].T; length = 100)
-    lines!(ax1, ustrip.(u"K", Ts), ustrip.(u"MPa", predict(psat, model, Ts)); color = palette[name], linewidth = 2.5, label = String(name))
+for (name, curve) in pairs(pcurve)
+    lines!(ax1, ustrip.(u"K", Ts_psat[name]), ustrip.(u"MPa", curve); color = palette[name], linewidth = 2.5, label = String(name))
 end
 vlines!(ax1, [ustrip(u"K", Tref)]; color = (:gray, 0.8), linestyle = :dash)
 axislegend(ax1; position = :lt)
@@ -182,6 +223,15 @@ Td = td.temperature
 pd = td.pressure
 ρ = td.value
 
+# the temperatures of the curve of each model: from 250 K up to just below its own critical point
+Ts_coex = map(c -> range(250.0u"K", 0.9995 * c.T; length = 150), crit)
+
+(points = length(ρ), articles = length(unique(td.doi)))
+```
+
+The saturated densities of each model come from its saturation pressure and the volume of each phase at that pressure:
+
+```julia
 function coexistence(model, Ts)
     ρl = fill(NaN * u"kg/m^3", length(Ts))
     ρv = fill(NaN * u"kg/m^3", length(Ts))
@@ -196,7 +246,15 @@ function coexistence(model, Ts)
     return ρl, ρv
 end
 
-(points = length(ρ), articles = length(unique(td.doi)))
+branches = map(coexistence, models, Ts_coex)
+```
+
+```@setup co2
+Main.DocsEosCache.provide!(
+    @__MODULE__, "20-tutorials/60-co2-critical-point.md";
+    key = "co2-coexistence", block = 5, needle = "branches = map",
+    inputs = (), results = (branches = u"kg/m^3",),
+)
 ```
 
 ```@example co2
@@ -205,9 +263,9 @@ ax = Axis(
     fig[1, 1]; xlabel = "ρ [kg m⁻³]", ylabel = "T [K]",
     title = "Coexistence curve of carbon dioxide",
 )
-for (name, model) in pairs(models)
-    Ts = range(250.0u"K", 0.9995 * crit[name].T; length = 150)
-    ρl, ρv = coexistence(model, Ts)
+for name in keys(branches)
+    Ts = Ts_coex[name]
+    ρl, ρv = branches[name]
     # liquid and vapor branches share one colour; only one carries the legend entry
     lines!(ax, ustrip.(u"kg/m^3", ρl), ustrip.(u"K", Ts); color = palette[name], linewidth = name == :GERG2008 ? 3.5 : 2.5, label = String(name))
     lines!(ax, ustrip.(u"kg/m^3", ρv), ustrip.(u"K", Ts); color = palette[name], linewidth = name == :GERG2008 ? 3.5 : 2.5)
@@ -250,10 +308,21 @@ With the reference equation as a guide, look at the top of each curve. The cubic
 
 Density at given ``T`` and ``p`` (the quantity a densimeter measures) does not need the saturation curve: the model volume at that state point is enough. For supercritical states there is a single root, so the default phase detection is used instead of forcing the liquid root. The map shows the relative deviation of each model, with the reversed `:managua` colormap and a range that is symmetric about zero, so that white means agreement. The red stars are the critical points reported in the archive (the pairs of critical temperature and pressure of the same article).
 
-```@example co2
+```julia
 ρmodel = map(models) do model
     predict(mass_density, model, pd, Td)
 end
+```
+
+```@setup co2
+Main.DocsEosCache.provide!(
+    @__MODULE__, "20-tutorials/60-co2-critical-point.md";
+    key = "co2-density-map", block = 6, needle = "ρmodel = map",
+    inputs = (:Td, :pd), results = (ρmodel = u"kg/m^3",),
+)
+```
+
+```@example co2
 dev_ρ = map(ρmodel) do q
     plain.((q .- ρ) ./ ρ)
 end

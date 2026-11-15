@@ -1,6 +1,6 @@
-# Cache for the cells of a tutorial that are slow only because of the packages they call.
+# Cache for the cells of the tutorials that are slow only because of the packages they call.
 #
-# The page of the equations of state calls Clapeyron.jl, and compiling its solvers takes more
+# The pages of the equations of state call Clapeyron.jl, and compiling its solvers takes more
 # than two minutes of every documentation build. The code of those cells is written in the page
 # as plain ```julia blocks, so it is shown but not executed. A hidden `@setup` block that follows
 # each of them calls `DocsEosCache.provide!`, which puts the results of the cell in the page:
@@ -18,8 +18,8 @@
 module DocsEosCache
 
 using JLD2
+using Pkg
 using SHA
-using TOML
 using Unitful
 
 const DOCS = dirname(@__FILE__)
@@ -28,16 +28,22 @@ const CACHE = joinpath(DOCS, "cache", "eos-comparison.jld2")
 # How many blocks of the page were already run in the sandbox module of the page.
 const RUN = Dict{Module,Int}()
 
-# Version of a package in the Manifest of the active environment, without loading the package.
+# Version of a package of the active environment, without loading the package. Pkg reads the
+# Manifest wherever it is (next to the project, or at the root of a workspace).
 function dependency_version(name::AbstractString)
-    folder = dirname(Base.active_project())
-    versioned = joinpath(folder, "Manifest-v$(VERSION.major).$(VERSION.minor).toml")
-    manifest = isfile(versioned) ? versioned : joinpath(folder, "Manifest.toml")
-    isfile(manifest) || return "unknown"
-    entries = get(get(TOML.parsefile(manifest), "deps", Dict()), name, nothing)
-    (entries === nothing || isempty(entries)) && return "unknown"
-    entry = first(entries)
-    return string(get(entry, "version", "dev"), "/", get(entry, "git-tree-sha1", ""))
+    try
+        for info in values(Pkg.dependencies())
+            info.name == name || continue
+            return string(
+                info.version === nothing ? "dev" : info.version,
+                "/",
+                something(info.tree_hash, ""),
+            )
+        end
+    catch err
+        @warn "Could not read the version of $name from the environment" exception = err
+    end
+    return "unknown"
 end
 
 # The plain ```julia blocks of a page (the ones Documenter shows and does not run), in order.
@@ -52,6 +58,7 @@ end
 variable(mod::Module, name::Symbol) = Base.invokelatest(getglobal, mod, name)
 
 # The values of an input as numbers (a column of a table has units, a year has none).
+numbers(x::Number) = Float64[ustrip(x)]
 numbers(x) = Float64[ustrip(y) for y in x]
 
 function fingerprint(version::AbstractString, blocks, inputs)
@@ -68,13 +75,24 @@ function fingerprint(version::AbstractString, blocks, inputs)
     return bytes2hex(SHA.digest!(context))
 end
 
-# A result as plain numbers in `unit` (a vector, or a named tuple of vectors), and back. A model
-# that did not converge gives a `NaN` without unit.
-pack(x::AbstractVector, unit) =
-    Float64[y isa Unitful.AbstractQuantity ? ustrip(unit, y) : Float64(y) for y in x]
+# A result as plain numbers in `unit`, and back. A result can be a number, a vector, a tuple or a
+# named tuple of them, nested at will. A single unit applies to everything inside; a named tuple of
+# units with the same names as a named tuple of results gives one unit to each field. A model that
+# did not converge gives a `NaN` without unit.
+pack(x::Unitful.AbstractQuantity, unit) = Float64(ustrip(unit, x))
+pack(x::Real, unit) = Float64(x)
+pack(x::AbstractVector, unit) = Float64[pack(y, unit) for y in x]
+pack(x::Tuple, unit) = map(v -> pack(v, unit), x)
 pack(x::NamedTuple, unit) = map(v -> pack(v, unit), x)
-unpack(x::AbstractVector{Float64}, unit) = x .* unit
+pack(x::NamedTuple, unit::NamedTuple) =
+    keys(x) == keys(unit) ? map(pack, x, unit) : map(v -> pack(v, unit), x)
+
+unpack(x::Float64, unit) = x * unit
+unpack(x::Vector{Float64}, unit) = x .* unit
+unpack(x::Tuple, unit) = map(v -> unpack(v, unit), x)
 unpack(x::NamedTuple, unit) = map(v -> unpack(v, unit), x)
+unpack(x::NamedTuple, unit::NamedTuple) =
+    keys(x) == keys(unit) ? map(unpack, x, unit) : map(v -> unpack(v, unit), x)
 
 function read_store()
     isfile(CACHE) || return Dict{String,Any}()
