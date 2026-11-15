@@ -44,6 +44,7 @@ include("schema/dataset.jl")
 include("schema/relations.jl")
 include("query/compounds.jl")
 include("query/select.jl")
+include("query/filters.jl")
 include("parse/types.jl")
 include("parse/purity.jl")
 include("parse/article.jl")
@@ -152,8 +153,10 @@ export COMPOSITION_SCALES,
     link_compounds,
     lookup_compounds,
     markdown_table,
+    measurement_methods,
     mixture,
     molar_mass,
+    phases,
     points,
     prefetch_compounds!,
     pubchem_rate!,

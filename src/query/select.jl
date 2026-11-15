@@ -197,6 +197,27 @@ it on a [`DataView`](@ref) refines that view, so filters can be chained.
   and `pressure = (1u"atm", 2u"atm")`. Points without that condition are excluded when
   the filter is given.
 - `doi`, `author` (substring, any case), `source` (e.g. `"thermoml"`), `year`.
+- `phase`, `method`: text that the phase or the measurement method contains (any case), a `Regex`
+  or a vector of them; [`phases`](@ref) and [`measurement_methods`](@ref) list what there is.
+  Points that state no phase (or method) are excluded when the filter is given.
+- `fraction`: the amount of a compound, `"methane" => (0.2, 0.4)` (the same forms of limits as
+  `temperature`, and a single number), or a vector of such pairs that must all hold. The compound
+  is given like in `component`, and is found wherever it sits in each system (`x1`, `x2` or `x3`);
+  the numbers are the ones of the source, in the kind of composition it used. `xkind` is text
+  that the kind contains (`"mole"`, `"mass"`, any case, a `Regex` or a vector); with `fraction`
+  it is the kind of that compound, otherwise any kind of the system.
+- `value`, `uncertainty`: `(low, high)` limits on the value of the points and on its uncertainty
+  at k = 2 (the column `unc_k2` of [`table`](@ref); a level of confidence is taken to k = 2 with
+  `policy`), in the native unit of each property, which makes them useful for one property or for
+  properties that share a unit. With `unit = "mW/m/K"` (any unit the exact parser reads), or with
+  quantities of a units package (`value = (30, 40) .* u"mW/m/K"`), the limits are converted for
+  each property of that dimension, and the other properties are left out; nothing in the
+  selection having it is an `ArgumentError`. Points without an uncertainty are excluded when
+  `uncertainty` or `relative_uncertainty` is given.
+- `relative_uncertainty`: `(low, high)` on the uncertainty at k = 2 divided by the absolute value
+  (`(nothing, 0.01)` keeps the points known to 1 % or better, whatever the property). The limits
+  of a ratio, here and in `fraction`, may be dimensionless quantities: `(nothing, 2u"percent")`,
+  `500u"ppm"`.
 
 A component or property that matches nothing throws an `ArgumentError`, so a typo is
 never mistaken for "no data".
@@ -220,12 +241,35 @@ function points(
     author = nothing,
     source = nothing,
     year = nothing,
+    phase = nothing,
+    method = nothing,
+    xkind = nothing,
+    fraction = nothing,
+    value = nothing,
+    uncertainty = nothing,
+    relative_uncertainty = nothing,
+    unit = nothing,
+    policy::Symbol = :nominal,
 )
     match in (:any, :all) || throw(ArgumentError("match must be :any or :all, got :$match"))
     ds = view.dataset
     m = ds.measurements
     refs = reference_mask(ds, doi, author, source, year)
     experiment_ok = experiment_mask(ds, component, match, exact, pure, refs)
+    limits = fraction_limits(ds, fraction)
+    composition_ok = composition_mask(ds, limits, xkind)
+    composition_ok === nothing || (experiment_ok .&= composition_ok)
+    extra = extra_filters(
+        ds,
+        phase,
+        method,
+        limits,
+        value,
+        uncertainty,
+        relative_uncertainty,
+        unit,
+        policy,
+    )
     property_ok = property_mask(ds, property)
     check_T = temperature !== nothing
     check_P = pressure !== nothing
@@ -240,6 +284,7 @@ function points(
         property_ok[m.property[r]] || continue
         check_T && !(tlo <= m.temperature[r] <= thi) && continue
         check_P && !(plo <= m.pressure[r] <= phi) && continue
+        extra === nothing || extra_ok(extra, m, r) || continue
         push!(rows, r)
     end
     return DataView(ds, rows)

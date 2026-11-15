@@ -35,6 +35,8 @@ points
 mixture
 find_compounds
 ThermophysicalDB.CompoundMatches
+phases
+measurement_methods
 DataView
 table
 PointTable
