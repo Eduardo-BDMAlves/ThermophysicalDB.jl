@@ -149,3 +149,23 @@ end
     @test c != PointTable((; x = [1.0, 2.0], y = ["a", "b"]), "degC")
     @test !isequal(c, PointTable((; x = [1.0, 2.0], y = ["a", "c"])))
 end
+
+@testitem "a table narrowed to some columns is shown with the columns it has" setup = [Toy] tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    t = T.table(T.points(Toy.build()))
+    narrow = t[1:2, [:temperature, :value]]
+    text = sprint(show, MIME("text/plain"), narrow)
+    @test startswith(text, "PointTable: 2 points × 2 columns")
+    @test occursin("T [K]", text) &&
+          occursin("value", text) &&
+          !occursin("components", text)
+    only_text = sprint(show, MIME("text/plain"), t[[:components]])
+    @test occursin("components", only_text)
+    @test occursin("PointTable", sprint(show, MIME("text/plain"), t[[:unit, :value]]))
+    @test occursin("PointTable", sprint(show, MIME("text/plain"), t[1:0, [:value]]))
+    # A table with columns of its own (nothing of a point table) is shown too.
+    plain = T.PointTable((; a = [1.0, 2.0], b = ["x", "y"]))
+    shown = sprint(show, MIME("text/plain"), plain)
+    @test occursin("a", shown) && occursin("x", shown)
+end

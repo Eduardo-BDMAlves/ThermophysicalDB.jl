@@ -466,20 +466,33 @@ function Base.show(io::IO, ::MIME"text/plain", view::DataView; maxrows::Int = 12
     return nothing
 end
 
-# Prints `n` rows of a point table (the columns of `DISPLAY_COLUMNS`, plus `database` when the table
-# has it) and the number of points left out.
-function print_points(io::IO, cols, n::Integer, hidden::Integer)
-    base = DISPLAY_COLUMNS
+# The columns `print_points` shows: those of `DISPLAY_COLUMNS` (plus `database` when the table has
+# it) with the units of a `PointTable`; a table narrowed to some columns shows every column it
+# has, under the same headers.
+function display_columns(cols)
+    labelled = DISPLAY_COLUMNS
     if cols isa PointTable
         temperature_label = "T [" * getfield(cols, :temperature_unit) * "]"
         pressure_label = "p [" * getfield(cols, :pressure_unit) * "]"
-        base = map(base) do entry
+        labelled = map(labelled) do entry
             name = first(entry)
             name === :temperature ? (name => temperature_label) :
             name === :pressure ? (name => pressure_label) : entry
         end
     end
-    display = haskey(cols, :database) ? ((:database => "database"), base...) : base
+    if all(entry -> haskey(cols, first(entry)), labelled)
+        return haskey(cols, :database) ? ((:database => "database"), labelled...) : labelled
+    end
+    labels = Dict(labelled)
+    return Pair{Symbol,String}[
+        name => get(labels, name, String(name)) for name in keys(cols)
+    ]
+end
+
+# Prints `n` rows of a point table (the columns of `display_columns`) and the number of points
+# left out.
+function print_points(io::IO, cols, n::Integer, hidden::Integer)
+    display = display_columns(cols)
     names = first.(display)
     cells = [[display_cell(cols[name][i]) for i = 1:n] for name in names]
     # Columns that are entirely empty (e.g. x3 for binaries) are not worth the width.
