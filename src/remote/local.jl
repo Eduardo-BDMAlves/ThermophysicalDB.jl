@@ -54,31 +54,34 @@ function install_archive!(
         ),
     )
     expected = lowercase(local_expected_sha256(path, name, sha256))
-    verify_sha256(path, expected)
+    verify_logged(dir, ver, path, expected)
 
-    mkpath(dir)
     archive_name = "ThermoML.v$ver.tgz"
     final = joinpath(dir, archive_name)
-    if abspath(path) != abspath(final)
-        part = final * ".part"
-        try
-            cp(path, part; force = true)
-            mv(part, final; force = true)
-        finally
-            rm(part; force = true)
-        end
-    end
     previous = read_manifest(dir)
-    manifest = Manifest(
-        MANIFEST_FORMAT,
-        ver,
-        archive_name,
-        expected,
-        "local file: " * abspath(path),
-        utc_timestamp(),
-        Int(filesize(final)),
-    )
-    write_manifest(dir, manifest)
+    manifest = audited(dir, "archive_install", ver) do
+        mkpath(dir)
+        if abspath(path) != abspath(final)
+            part = final * ".part"
+            try
+                cp(path, part; force = true)
+                mv(part, final; force = true)
+            finally
+                rm(part; force = true)
+            end
+        end
+        manifest = Manifest(
+            MANIFEST_FORMAT,
+            ver,
+            archive_name,
+            expected,
+            "local file: " * abspath(path),
+            utc_timestamp(),
+            Int(filesize(final)),
+        )
+        write_manifest(dir, manifest)
+        return manifest
+    end
     if !keep_old && previous !== nothing && previous.archive_name != archive_name
         rm(joinpath(dir, previous.archive_name); force = true)
     end

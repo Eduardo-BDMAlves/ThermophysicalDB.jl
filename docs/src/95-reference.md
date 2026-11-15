@@ -53,6 +53,14 @@ COMPOSITION_SCALES
 CompositionConversion
 ```
 
+## Audit log
+
+```@docs
+audit_log
+verify_audit_log
+audit_checkpoint
+```
+
 ## Several databases
 
 ```@docs

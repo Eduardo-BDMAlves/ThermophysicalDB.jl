@@ -188,21 +188,30 @@ function save_database(db::Database, name::AbstractString)
     isempty(m.path) &&
         throw(ArgumentError("the database \"$(m.name)\" has no file to be saved to"))
     ds = member_dataset(m)
-    mkpath(dirname(m.path))
-    meta = joinpath(dirname(m.path), MEMBER_META)
-    # An old description must not vouch for data that is being replaced.
-    rm(meta; force = true)
-    part = m.path * ".part"
-    try
-        JLD2.jldopen(part, "w") do file
-            write_dataset((key, value) -> (file[key] = value; nothing), ds)
+    audited(dirname(m.path), "database_save", m.name) do
+        mkpath(dirname(m.path))
+        meta = joinpath(dirname(m.path), MEMBER_META)
+        # An old description must not vouch for data that is being replaced.
+        rm(meta; force = true)
+        part = m.path * ".part"
+        try
+            JLD2.jldopen(part, "w") do file
+                write_dataset((key, value) -> (file[key] = value; nothing), ds)
+            end
+            mv(part, m.path; force = true)
+        finally
+            rm(part; force = true)
         end
-        mv(part, m.path; force = true)
-    finally
-        rm(part; force = true)
+        m.persistent = true
+        write_member_meta(m, length(ds.measurements))
+        audit_record!(
+            dirname(m.path),
+            "database_saved",
+            m.name;
+            sha256 = logged_sha256(m.path),
+            counts = audit_counts(ds),
+        )
     end
-    m.persistent = true
-    write_member_meta(m, length(ds.measurements))
     return m.path
 end
 
@@ -219,6 +228,12 @@ function set_priority!(db::Database, name::AbstractString, priority::Integer)
     db.registry = build_registry(db.members)
     if m.persistent && isfile(joinpath(dirname(m.path), MEMBER_META))
         write_member_meta(m, is_open(m) ? length(m.dataset.measurements) : member_points(m))
+        audit_record!(
+            dirname(m.path),
+            "priority_changed",
+            m.name;
+            detail = "priority=$(m.priority)",
+        )
     end
     return db
 end
@@ -260,6 +275,14 @@ function discover_members(root::AbstractString; taken = String[])
             err isa InterruptException && rethrow()
             @warn "A saved database was skipped" folder = dir reason =
                 sprint(showerror, err)
+            audit_record!(
+                dir,
+                "database_unreadable",
+                entry;
+                detail = error_detail(err),
+                once = true,
+                warn = false,
+            )
         end
     end
     return found

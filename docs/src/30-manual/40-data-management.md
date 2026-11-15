@@ -190,6 +190,39 @@ Every installation follows the same safe sequence, whether the file was download
 
 A download that was interrupted, truncated or corrupted never looks like a valid installation, and a digest mismatch installs nothing.
 
+## The audit log
+
+The package keeps a plain text record of the permanent changes it makes to the data on disk: the archive that is installed or updated, the databases of yours that you save (`save_database`), their priority when it is changed in a saved database, and the compounds that you save (`save_compounds`). Changes that only live in memory are not recorded: they are not on disk yet, and a loop of `add_measurement!` costs nothing. The log says what changed and when, never who did it: it has no user name and no host name.
+
+Each log is a file `audit.log` next to what it describes: in the archive directory, in the folder of each database of yours and in the folder of the compounds. A line has the time (UTC), the event, the object, the SHA-256 of the file that was written and the counts before and after (references, experiments and points of a database). Reading it:
+
+```julia
+audit_log(db)                                   # every log, as a table
+audit_log(db; database = "my_lab", since = "2026-11-01")
+audit_log(db; event = "database_saved")
+```
+
+The question "when did this reference enter the database" is answered by the first save whose counts include it.
+
+What goes wrong is recorded too. Every save or installation writes a line `database_save_started` (or `compounds_save_started`, `archive_install_started`) before it begins and `database_saved` (`compounds_saved`, `archive_installed`) when it ends, so a start with no end shows an operation that was cut short: the process was killed or the computer was switched off. An error in the middle gives `database_save_failed` (`compounds_save_failed`, `archive_install_failed`) with the type and the first line of the error, and the error is thrown as usual. Two integrity events are recorded as well: `archive_rejected`, when the SHA-256 of an archive does not match (the expected digest and the one found), and `database_unreadable`, when a saved database cannot be read (damaged, or another schema version), once however many sessions find it. A wrong argument (a name that does not exist) and a download that fails for lack of network are not recorded: nothing on disk was changed or put in doubt.
+
+### Finding an edit from outside
+
+The file is plain text so that anyone can read it, and it can be edited like any file of yours. What the package guarantees is that an edit does not go unnoticed: every line carries a hash that depends on the line before it, so changing, removing or inserting a line breaks all the lines after it. Each log also has an identifier (UUID), in its first line and in a file `audit.toml` beside it, so a log that was replaced by another one, or removed, is reported.
+
+```julia
+verify_audit_log(db)                    # one row per log: ok, lines, the first line that fails
+```
+
+A person who knows the format could still rewrite a whole log and recompute every hash. To rule that out, write down a checkpoint somewhere the package does not control (a notebook, a commit message, an e-mail to yourself), and check it later:
+
+```julia
+cp = audit_checkpoint(db; database = "my_lab")   # identifier, number of events, hash of the last line
+verify_audit_log(db; database = "my_lab", checkpoint = cp)
+```
+
+A checkpoint is a tamper-evidence tool, not a security system: the package is open source and the files are yours. A log that cannot be written (a read-only folder, say) gives a warning and the change is still made.
+
 ## When the download fails
 
 The archive is served by NIST through a redirect, and some networks, proxies and firewalls refuse the connection. ThermophysicalDB.jl does not give up at the first error:
