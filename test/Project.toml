@@ -1,6 +1,7 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+CodeComplexity = "6a833b0f-2137-4092-987b-66bce4e6b438"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
@@ -25,6 +26,7 @@ XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
 
 [compat]
 Aqua = "0.8"
+CodeComplexity = "0.2"
 JET = "0.9, 0.10, 0.11, 0.12, 0.13"
 
 [sources]
