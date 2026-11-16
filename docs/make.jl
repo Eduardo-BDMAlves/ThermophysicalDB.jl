@@ -15,6 +15,7 @@ using ThermophysicalDB
 
 include("DocsSetup.jl")
 include("DocsCredits.jl")
+include("DocsEosCache.jl")
 include("DocsTiming.jl")
 include("SchemaDiagrams.jl")
 

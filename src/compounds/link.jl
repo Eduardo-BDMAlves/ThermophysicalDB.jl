@@ -65,7 +65,7 @@ end
 """
     CompoundLinks
 
-What [`link_compounds`](@ref) returns: one row for each pair (ThermoML compound, compound of the
+What the table of links of a member holds ([`link_table`](@ref) joins those of all the members): one row for each pair (ThermoML compound, compound of the
 database that may describe it). `compound` is the identifier in the dataset (`0` in `record`
 when nothing was found), `via` tells how it was found (`:inchikey`, `:inchi`, `:name` or
 `:none`), `candidates` counts the rows that the compound has (more than one means the user has
@@ -236,7 +236,9 @@ function find_compounds(ds::Dataset, db::CompoundDB, text::AbstractString; limit
         end
         return nothing
     end
-    records = lookup_compounds(db, text; limit = max(limit, 25))
+    # Exact matches only: the close names of the whole compound database are looked for when the search
+    # failed (`candidate_compounds`), not on every search.
+    records = lookup_local(db, text; limit = max(limit, 25), approximate = false)
     for (r, kind) in zip(records.id, records.match)
         key = db.inchikey[r]
         isempty(key) && continue
@@ -256,9 +258,22 @@ function find_compounds(ds::Dataset, db::CompoundDB, text::AbstractString; limit
         [primary_name(t, i) for i in ids],
         t.formula[ids],
         t.inchikey[ids],
-        point_counts(ds, ids),
+        counts_of(ds, ids, plain),
         [how[id] for id in ids],
     )
+end
+
+# The number of points of each compound of `ids`, reusing what the search of the dataset counted and
+# scanning the points (one pass over all of them) only for the compounds it did not find.
+function counts_of(ds::Dataset, ids::Vector{Int32}, known::CompoundMatches)
+    counted = Dict(zip(known.id, known.points))
+    missing_ids = Int32[id for id in ids if !haskey(counted, id)]
+    if !isempty(missing_ids)
+        for (id, n) in zip(missing_ids, point_counts(ds, missing_ids))
+            counted[id] = n
+        end
+    end
+    return Int[counted[id] for id in ids]
 end
 
 match_rank(kind::Symbol) = kind == :exact ? 1 : kind == :contains ? 2 : 3

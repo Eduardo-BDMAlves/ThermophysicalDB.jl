@@ -226,6 +226,7 @@ function set_priority!(db::Database, name::AbstractString, priority::Integer)
     m.priority = Int(priority)
     sort!(db.members; by = x -> x.priority)
     db.registry = build_registry(db.members)
+    forget_links!(db)
     if m.persistent && isfile(joinpath(dirname(m.path), MEMBER_META))
         write_member_meta(m, is_open(m) ? length(m.dataset.measurements) : member_points(m))
         audit_record!(
@@ -494,6 +495,7 @@ catalog_size(ds::Dataset) =
 function refresh!(db::Database, m::Member)
     m.catalog = nothing
     db.registry = build_registry(db.members)
+    forget_links!(db)
     return db
 end
 

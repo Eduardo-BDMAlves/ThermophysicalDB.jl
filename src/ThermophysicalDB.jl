@@ -61,7 +61,6 @@ include("compounds/table.jl")
 include("compounds/store.jl")
 include("compounds/pubchem.jl")
 include("compounds/link.jl")
-include("compounds/linked.jl")
 include("composition/scales.jl")
 include("composition/convert.jl")
 include("references.jl")
@@ -88,6 +87,7 @@ include("database/registry.jl")
 include("database/inputs.jl")
 include("database/repeats.jl")
 include("database/database.jl")
+include("compounds/linked.jl")
 include("database/duplicates.jl")
 include("database/user.jl")
 include("database/template.jl")
@@ -121,7 +121,6 @@ export COMPOSITION_SCALES,
     CompositionConversion,
     CompoundDB,
     convert_composition,
-    LinkedDatabase,
     DataView,
     PointTable,
     UncertaintyTerm,
@@ -151,6 +150,8 @@ export COMPOSITION_SCALES,
     install_archive!,
     latex_table,
     link_compounds,
+    link_compounds!,
+    link_table,
     lookup_compounds,
     markdown_table,
     measurement_methods,

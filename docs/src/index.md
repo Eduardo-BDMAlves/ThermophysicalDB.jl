@@ -32,7 +32,7 @@ features:
   - title: Tables.jl all the way
     details: A selection is a Tables.jl table made of plain vectors. Plot the columns with Makie, hand them to a DataFrame, or write them to disk, without conversion code.
   - title: Two databases, one search
-    details: The experimental points (ThermoML) and the nomenclature of the compounds (names, CAS, PubChem CID, SMILES, InChI, molar mass) are two separate databases, linked on demand. Name a compound by any of them; when a name is ambiguous you choose.
+    details: The experimental points (ThermoML) and the nomenclature of the compounds (names, CAS, PubChem CID, SMILES, InChI, molar mass) are two separate databases, joined by `database()`. Name a compound by any of them; when a name is ambiguous you choose.
   - title: Extensible and versatile
     details: Capacity to add your own data to a local database formatted according to the same standard used in other databases. Customize the parameters of interest and how to interact with them.
 ---
@@ -140,7 +140,7 @@ The data, for now, comes only from the **ThermoML Archive**, created and maintai
 - Standard: [frenkel2006xml](@cite); background in the series of [frenkel2003thermoml](@cite), [chirico2003thermoml](@cite), [frenkel2004thermoml](@cite), [chirico2009thermoml](@cite) and [frenkel2011thermoml](@cite)
 - More details, the terms of use and how to cite: [About the data](@ref 40-about-data)
 
-The package keeps **two databases**, side by side and never mixed. The *thermophysical database* holds the experimental points and is the reference: it is never changed. The *compound database* holds the nomenclature and the base properties of the compounds (all the names, the CAS number, the PubChem CID, the formula, the molar mass, the SMILES, the InChI and the InChIKey) and is built from lists derived from PubChem; the compounds you add are kept in a separate file of your own and loaded together with the lists. [`link_compounds`](@ref) joins them, so that a compound of the archive can be found by any of those names. See [Compounds and their identifiers](@ref compounds).
+The package keeps **two databases**, side by side and never mixed. The *thermophysical database* holds the experimental points and is the reference: it is never changed. The *compound database* holds the nomenclature and the base properties of the compounds (all the names, the CAS number, the PubChem CID, the formula, the molar mass, the SMILES, the InChI and the InChIKey) and is built from lists derived from PubChem; the compounds you add are kept in a separate file of your own and loaded together with the lists. `database()` joins them (see [`link_compounds!`](@ref)), so that a compound of the archive can be found by any of those names. See [Compounds and their identifiers](@ref compounds).
 
 ## Contributors
 

@@ -222,7 +222,7 @@ What is measured, in `benchmark/benchmarks.jl`:
 
 | Group | What it measures |
 |---|---|
-| `load` | opening a database that is stored (the registry alone, then the dataset), the first query, `link_compounds` |
+| `load` | opening a database that is stored (the registry alone, then the dataset), the first query, the table of links (`link_table`) |
 | `add` | `add_reference_data!` of one article (about 90 points) in an empty and in a large database, with and without the check of repeated points, ten articles, and 100 points added one by one |
 | `filter` | the filters by compound, property, temperature and pressure: each stage alone (starting from the result of the stage before), the four calls one after the other, and the four filters in one call; over the database and over the database linked to the compound database, by a name |
 | `units` | `table` and `points` with plain numbers, then with Unitful, DynamicQuantities and FlexUnits |

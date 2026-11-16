@@ -278,7 +278,7 @@ end
 
 The database of compound identifiers: names, CAS number, PubChem CID, formula, molar mass,
 SMILES, InChI and InChIKey of about 75 000 compounds, including salts, hydrates and the ions
-of brines, ready for [`lookup_compounds`](@ref) and [`link_compounds`](@ref).
+of brines, ready for [`lookup_compounds`](@ref) and [`link_compounds!`](@ref).
 
 The first call downloads the lists (about 45 MB, once) from a fixed commit of the
 [chemicals](https://github.com/CalebBell/chemicals) repository (MIT licence; the lists

@@ -58,7 +58,10 @@ function synthetic_context(scale::Symbol)
     prepared = prepared_database(T; scale)
     db = T.Database([T.Member(BENCH_MEMBER; kind = :user, path = String(prepared.path))])
     compounds = Synthetic.compound_database()
-    linked = T.link_compounds(db, compounds)
+    linked = T.link_compounds!(
+        T.Database([T.Member(BENCH_MEMBER; kind = :user, path = String(prepared.path))]),
+        compounds,
+    )
     temperature, pressure = (300.0, 400.0), (100.0, 30000.0)
     chosen = nothing
     for i = 1:Synthetic.COMPOUND_COUNT, (property,) in Synthetic.PROPERTIES
@@ -109,16 +112,16 @@ end
 # ----------------------------------------------------------------------------------
 
 function real_context()
-    db = T.database(; progress = false)
+    db = T.database(; progress = false, compound_library = false)
     compounds = T.compound_database(; progress = false)
     key = get(ENV, "TDB_ALLOC_COMPONENT", "hexane")
     property = get(ENV, "TDB_ALLOC_PROPERTY", "Thermal conductivity")
     temperature, pressure = (273.15, 373.15), (90.0, 110.0)
     linked = try
-        T.link_compounds(db, compounds)
+        T.link_compounds!(T.database(; progress = false), compounds)
     catch err
         err isa InterruptException && rethrow()
-        @warn "link_compounds failed; the scenarios of the linked database are left out" reason =
+        @warn "link_compounds! failed; the scenarios of the linked database are left out" reason =
             sprint(showerror, err)
         nothing
     end

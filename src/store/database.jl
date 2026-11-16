@@ -12,7 +12,7 @@ end
 
 """
     database(; update = :notify, reload = false, rebuild = false, dir = thermoml_dir(),
-             user_databases = true) -> Database
+             user_databases = true, compound_library = true) -> Database
 
 The ThermoML database, ready to query with [`points`](@ref).
 
@@ -25,6 +25,16 @@ changed archive or schema version rebuilds the cache automatically.
 The databases of your own that were saved with [`save_database`](@ref) are opened too (from
 `databases`, by default the folder `databases` next to `dir`; their tables are read only when a
 query needs them). `user_databases = false` gives the archive alone.
+
+With `compound_library = true` (the default) the compound database ([`compound_database`](@ref)) is
+attached: a compound can be named by a synonym, a CAS number, a PubChem CID, an InChI or a SMILES in
+[`points`](@ref), [`mixture`](@ref) and [`find_compounds`](@ref) (see [`link_compounds!`](@ref)).
+Nothing is read or downloaded for this when `database()` is called: the compound database is
+loaded the first time a name has to be understood, and if it cannot be loaded (no cache and no
+network) a warning is shown and names are understood the way the dataset spells them.
+`compound_library = false` gives the database without it; a compound database of your own can be
+given instead (`compound_library = cdb`, attached at once), or a function that returns one
+(loaded when it is first needed).
 
 `prefetch_compounds = n` also asks PubChem, once the database is ready, for the `n` most
 measured compounds that the compound database lacks (see [`prefetch_compounds!`](@ref); it
@@ -49,10 +59,12 @@ function database(;
     databases = joinpath(dirname(dir), "databases"),
     progress::Bool = true,
     prefetch_compounds::Integer = 0,
+    compound_library = true,
     fetch = fetch_latest_release,
     download = download_file,
 )
-    memo_key = string(dir, '\0', user_databases ? databases : "")
+    library_key = compound_library isa Bool ? compound_library : objectid(compound_library)
+    memo_key = string(dir, '\0', user_databases ? databases : "", '\0', library_key)
     memo = DATABASE_MEMO[]
     if memo !== nothing && !reload && !rebuild && memo[1] == memo_key
         return memo[2]
@@ -76,6 +88,8 @@ function database(;
     members = [member]
     user_databases && append!(members, discover_members(databases; taken = [member.name]))
     db = Database(members)
+    # The compound database is loaded the first time a name has to be understood, not now.
+    attach_library!(db, compound_library, progress)
     prefetch_compounds > 0 &&
         prefetch_missing_compounds(member_dataset(member), prefetch_compounds, progress)
     DATABASE_MEMO[] = (memo_key, db)

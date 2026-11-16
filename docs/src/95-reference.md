@@ -53,14 +53,6 @@ COMPOSITION_SCALES
 CompositionConversion
 ```
 
-## Audit log
-
-```@docs
-audit_log
-verify_audit_log
-audit_checkpoint
-```
-
 ## Several databases
 
 ```@docs
@@ -107,8 +99,9 @@ compound_database
 lookup_compounds
 compound_record
 molar_mass
+link_compounds!
 link_compounds
-LinkedDatabase
+link_table
 forget_choices!
 register_compound!
 save_compounds
@@ -128,6 +121,14 @@ set_uncertainty!
 UncertaintyTerm
 uncertainty_table
 expanded_uncertainty
+```
+
+## Audit log
+
+```@docs
+audit_log
+verify_audit_log
+audit_checkpoint
 ```
 
 ## Exporting points
