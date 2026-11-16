@@ -191,6 +191,23 @@ Every installation follows the same safe sequence, whether the file was download
 
 A download that was interrupted, truncated or corrupted never looks like a valid installation, and a digest mismatch installs nothing.
 
+## Sharing databases
+
+[`export_database`](@ref) writes one or more of your databases to a single `.tdb` file, and [`import_database!`](@ref) reads it on another computer. Only what was **saved** is exported (you are warned when the copy in memory has more), and the ThermoML archive is never exported.
+
+```julia
+export_database(db, "my_lab", "hexane.tdb")              # one database
+export_database(db, nothing, "everything.tdb")           # every database of your own
+import_database!(db, "hexane.tdb")                        # on the other computer
+import_database!(db, "lab.tdb"; only = "articles", name = "articles_home")
+```
+
+A `.tdb` is not text: it is a gzip-compressed tar, so any tool that opens a `.tar.gz` lists its contents. Inside, each database has its data, its description and its audit log, and a `manifest.toml` has the SHA-256 of every file.
+
+The log goes along so that bringing databases together can be audited. An import checks the digests and the chain of hashes of the log before writing anything, and a file that was changed is refused. Each computer keeps a log of its own: the destination records `database_imported` with the identifier, the number of lines and the last hash of the log that came, and the SHA-256 of the file, and keeps that log whole in the folder `imports/` of the database. `audit_log(db; event = ["database_exported", "database_imported"])` lists the trips of a database.
+
+If the name is taken, `on_conflict = :error` (the default) refuses, `:rename` keeps both (`my_lab-2`) and `:replace` substitutes the old one (refused when it has unsaved data). Databases imported side by side are combined by `points` like any others; use `duplicates` and `conflicts` to see what they repeat.
+
 ## Audit log
 
 Every permanent change that the package makes to the data on disk (an archive installed, a database saved, compounds saved) is appended to a plain text `audit.log` next to what it describes, and so are the failures of those operations. Each line carries a hash of the previous one, so an edit from outside breaks the chain and is found by [`verify_audit_log`](@ref).

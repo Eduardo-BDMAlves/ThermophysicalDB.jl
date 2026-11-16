@@ -6,7 +6,7 @@ databases, starting with the NIST/TRC ThermoML Archive.
 """
 module ThermophysicalDB
 
-using CodecZlib: GzipDecompressorStream
+using CodecZlib: GzipCompressorStream, GzipDecompressorStream
 using Dates: Dates
 using DOI2BibTeX: DOI2BibTeX
 using Downloads: Downloads
@@ -90,6 +90,7 @@ include("database/database.jl")
 include("compounds/linked.jl")
 include("database/duplicates.jl")
 include("database/user.jl")
+include("database/share.jl")
 include("database/template.jl")
 include("precompile.jl")
 
@@ -109,6 +110,8 @@ export COMPOSITION_SCALES,
     add_reference!,
     add_reference_data!,
     databases_dir,
+    export_database,
+    import_database!,
     member_dataset,
     members,
     parts,
