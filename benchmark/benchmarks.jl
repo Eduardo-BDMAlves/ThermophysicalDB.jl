@@ -6,9 +6,10 @@
 #
 # Groups: "load" (reading a database that exists), "add" (adding points), "filter" (the filters one
 # after another and in one call, with and without a linked compound database), "units" (the same
-# with the units packages), "template" (the spreadsheet) and "outliers". The allocations of every
-# benchmark are the memory that AirspeedVelocity compares; the size of what stays in memory after
-# loading is measured by `memory.jl`.
+# with the units packages), "digits" (the decimal arithmetic of typed numbers, the cleaning of the
+# noise of a conversion and the rounding of `report = :gum`), "template" (the spreadsheet) and
+# "outliers". The allocations of every benchmark are the memory that AirspeedVelocity compares;
+# the size of what stays in memory after loading is measured by `memory.jl`.
 #
 # A benchmark that cannot run on a revision (the function did not exist yet) is left out with a
 # warning, so the same script can measure the latest release and a pull request.
@@ -415,6 +416,59 @@ for (name, backend) in pairs(BACKENDS)
         ),
     )
 end
+
+# ----------------------------------------------------------------------------------
+# digits: the decimal arithmetic of the numbers that were typed, and the noise of a conversion
+# ----------------------------------------------------------------------------------
+
+digits = SUITE["digits"] = BenchmarkGroup()
+
+const NOISY = rand(10^6) .* 1.0e-1
+
+# One number that a person typed: its exact decimal value, and its conversion rounded once.
+register!(
+    digits,
+    "decimal_value_1e4_numbers",
+    @benchmarkable(for x in $(rand(1:(10^6), 10^4) ./ 1.0e4)
+        T.decimal_value(x)
+    end, evals = 1, samples = 20,),
+)
+register!(
+    digits,
+    "apply_exact_1e4_numbers",
+    @benchmarkable(
+        for x in $(rand(1:(10^6), 10^4) ./ 1.0e4)
+            T.apply_exact($(T.ExactAffine(1 // 1000)), x)
+        end,
+        evals = 1,
+        samples = 20,
+    ),
+)
+
+# A column of 1e6 values: the cost of cleaning the noise of a multiplication.
+register!(
+    digits,
+    "clean_floats_1e6_column",
+    @benchmarkable(
+        T.clean_floats!(v),
+        setup = (v = NOISY .* 1.0e-3),
+        evals = 1,
+        samples = 20,
+    ),
+)
+
+# `report = :gum` of an export: the rounding of 1e6 values and their uncertainties (the export
+# itself is dominated by the references and is not measured here).
+register!(
+    digits,
+    "round_metrological_1e6_points",
+    @benchmarkable(
+        T.round_metrological!(value, unc, unc_k2),
+        setup = (value = copy(NOISY); unc = NOISY .* 1.0e-3; unc_k2 = 2 .* unc),
+        evals = 1,
+        samples = 20,
+    ),
+)
 
 # ----------------------------------------------------------------------------------
 # template: the spreadsheet
