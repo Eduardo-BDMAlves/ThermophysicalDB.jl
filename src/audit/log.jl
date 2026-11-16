@@ -247,32 +247,37 @@ function walk_audit_log(path::AbstractString, on_event)
     uuid, head, count, problem, bad = "", "", 0, "", 0
     hashes = String[]
     number = 0
-    for text in eachline(path)
-        number += 1
-        fields = split(text, '\t')
-        found = String(last(fields))
-        body = tab_join(fields[1:(end-1)])
-        if number == 1
-            if length(fields) != 5 || fields[1] != "#" * AUDIT_FORMAT
-                return (false, "", 0, "", 1, "the header is missing or damaged", hashes)
+    io = open(path)    # closed on every way out: an open file cannot be removed on Windows
+    try
+        for text in eachline(io)
+            number += 1
+            fields = split(text, '\t')
+            found = String(last(fields))
+            body = tab_join(fields[1:(end-1)])
+            if number == 1
+                if length(fields) != 5 || fields[1] != "#" * AUDIT_FORMAT
+                    return (false, "", 0, "", 1, "the header is missing or damaged", hashes)
+                end
+                uuid = String(fields[3])
+                expected = audit_hash("", body)
+            else
+                expected = audit_hash(head, body)
+                if length(fields) != AUDIT_EVENT_FIELDS
+                    problem, bad = "the line does not have the fields of an event", number
+                elseif tryparse(Int, fields[1]) != number - 1
+                    problem, bad = "the sequence number is not $(number - 1)", number
+                end
             end
-            uuid = String(fields[3])
-            expected = audit_hash("", body)
-        else
-            expected = audit_hash(head, body)
-            if length(fields) != AUDIT_EVENT_FIELDS
-                problem, bad = "the line does not have the fields of an event", number
-            elseif tryparse(Int, fields[1]) != number - 1
-                problem, bad = "the sequence number is not $(number - 1)", number
+            if isempty(problem) && found != expected
+                problem, bad =
+                    "the hash does not match: the line or one before it was changed", number
             end
+            isempty(problem) || return (false, uuid, count, head, bad, problem, hashes)
+            head = found
+            number > 1 && (count += 1; push!(hashes, head); on_event(fields))
         end
-        if isempty(problem) && found != expected
-            problem, bad =
-                "the hash does not match: the line or one before it was changed", number
-        end
-        isempty(problem) || return (false, uuid, count, head, bad, problem, hashes)
-        head = found
-        number > 1 && (count += 1; push!(hashes, head); on_event(fields))
+    finally
+        close(io)
     end
     number == 0 && return (false, "", 0, "", 0, "the file is empty", hashes)
     return (true, uuid, count, head, 0, "", hashes)
