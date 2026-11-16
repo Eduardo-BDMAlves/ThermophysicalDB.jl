@@ -76,6 +76,61 @@ methane_mixtures = points(db; component = "methane", pure = false)
 length(pure_methane), length(methane_mixtures)
 ```
 
+## Combining selections
+
+A single call of [`points`](@ref) applies every filter at once, with AND. Some data can only be reached by different sets of filters, or you want to compare what two searches found. `union`, `intersect` and `setdiff` combine two selections of the same database (or the same dataset), and the result is a selection like any other: it can be refined with `points`, tabulated with [`table`](@ref) and combined again. So a search can start from several criteria, join their results, and then narrow down step by step.
+
+| Function | Symbol | Result |
+|:---------|:-------|:-------|
+| `union(a, b)` | `a ∪ b` (`\cup` and Tab) | the points in `a` or in `b` |
+| `intersect(a, b)` | `a ∩ b` (`\cap` and Tab) | the points in both |
+| `setdiff(a, b)` | | the points in `a` that are not in `b` |
+
+```@example sel
+cold = points(db; component = "methane", temperature = (nothing, 150))
+compressed = points(db; component = "methane", pressure = (5000, nothing))
+length(cold), length(compressed), length(cold ∪ compressed), length(cold ∩ compressed)
+```
+
+Each point is counted once, so `length(a ∪ b) == length(a) + length(b) - length(a ∩ b)`. The merge is linear in the number of points and copies no data. `∩` binds tighter than `∪`, as in mathematics (`a ∪ b ∩ c` is `a ∪ (b ∩ c)`); use parentheses when in doubt. More than two selections are accepted by the functions: `union(a, b, c)`.
+
+```@example sel
+length(points(cold ∪ compressed; property = "Mass density"))
+```
+
+**Which data overlap.** The intersection answers "which points do these two searches have in common?", and the difference "what does the second search add to the first?". In a literature review it counts what an article, an author or a method contributes that the others do not:
+
+```@example sel
+only_cold = setdiff(cold, compressed)        # cold points that are not also at high pressure
+length(only_cold) + length(cold ∩ compressed) == length(cold)
+```
+
+**Several selections at once.** With three or more selections the regions multiply (`2^n - 1` of them: only `a`, `a` and `b` but not `c`, ...), and writing each as an expression of `∪`, `∩` and `setdiff` is tedious and easy to get wrong. [`overlap`](@ref) places every point in the region that says which selections hold it, in one pass, and counts the points and the references of each region:
+
+```@example sel
+density = points(db; component = "methane", property = "Mass density")
+ov = overlap(:cold => cold, :compressed => compressed, :density => density)
+```
+
+`ov` is a table with a row for each region that has points (`ov.region`, `ov.points`, `ov.references` and `ov.sets`, which selections hold it). The points of a region are a selection like any other: `ov["cold ∩ compressed"]` or `ov[2]`. Regions do not overlap, so their points add up to those of the union, and the regions that contain a selection rebuild it. A point is the same point when it is the same row, so the points that two databases hold both count separately (see [`duplicates`](@ref) for those).
+
+Selections of a database leave out, in the union, the points that two databases hold both, as `points` does (`duplicate = true` keeps them, as in the section on several databases of the reference). Selections of different databases, or of a dataset and of a database, cannot be combined and give an `ArgumentError`. The three functions have their own entries in the reference.
+
+### The pure compound in articles of mixtures
+
+Many articles measure a pure compound as the end of a table of compositions: the point at `x1 = 1`, or at `x1 = 0` when the compound is the second one. Those points belong to a mixture, so `pure = true` never finds them, and `fraction` finds them in a different selection from the pure systems. [`pure_component`](@ref) puts them together, and is the union of both searches with the rule that decides what counts as the compound alone:
+
+```@example sel
+length(points(db; component = "methane", pure = true)), length(pure_component(db, "methane"))
+```
+
+A point of a mixture counts as the compound alone when its amount is a fraction (mole or mass) of at least `1 - tol` (`tol = 1e-4`), wherever the compound sits in the system (`x1`, `x2` or `x3`), or when its amount is not given and the amounts of all the others are fractions that add up to at most `tol`. Molalities and concentrations never qualify, and a point whose composition is not enough to tell is left out. Each point is returned once, and the points that two databases hold both are left out as in [`points`](@ref) (`duplicate = true` keeps them). Other keywords (`property`, `temperature`, ...) refine it. To see where the points of a pure compound came from:
+
+```@example sel
+from_mixtures = setdiff(pure_component(db, "methane"), points(db; component = "methane", pure = true))
+length(from_mixtures)
+```
+
 ## Properties
 
 `property` takes a label, a regular expression, or a list of either. Labels are the property names of the archive without their unit (the unit is stored apart and shown in the `unit` column).
