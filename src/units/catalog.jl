@@ -27,7 +27,7 @@ function UnitSpec(native::String, unitful::String, si::String)
     from.dim == to.dim ||
         throw(ArgumentError("\"$native\" and \"$si\" do not have the same dimension"))
     ratio = from.scale / to.scale
-    return UnitSpec(native, unitful, si, Float64(ratio), ratio)
+    return UnitSpec(native, unitful, si, exact_float(ratio), ratio)
 end
 
 # Every unit found in the 11,923 archive files (census of 2026-10). Dimensionless

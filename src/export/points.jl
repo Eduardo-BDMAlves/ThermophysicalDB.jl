@@ -142,7 +142,7 @@ function point_uncertainties(ds::Dataset, view::DataView, units::Symbol)
             "quantity" => UNCERTAINTY_QUANTITY_NAMES[q],
             "kind" => UNCERTAINTY_KIND_NAMES[u.kind[i]],
             "origin" => UNCERTAINTY_ORIGIN_NAMES[u.origin[i]],
-            "value" => u.value[i] * factor,
+            "value" => factor == 1.0 ? u.value[i] : clean_float(u.value[i] * factor),
             "k" => u.k[i],
         )
         isnan(u.level[i]) || add!(o, "level", u.level[i])
@@ -193,6 +193,30 @@ end
 empty_column(column::AbstractVector{<:AbstractFloat}) = all(isnan, column)
 empty_column(column::AbstractVector{<:AbstractString}) = all(isempty, column)
 
+const REPORT_MODES = (:source, :gum)
+
+# The rounding of the metrology (GUM 7.2.6, ISO 80000-1), `report = :gum`, of the points of a table, in place: an
+# uncertainty keeps two significant digits when its leading digit is 1 or 2 and one otherwise,
+# and the value is rounded to the last digit of the uncertainty at k = 2 (of the reported one
+# when that is not known). Digits are only taken away, never added, so no number carries
+# more than the source gave. A point without an uncertainty is left as it is.
+function round_metrological!(
+    value::Vector{Float64},
+    unc::Vector{Float64},
+    unc_k2::Vector{Float64},
+)
+    @inbounds for i in eachindex(value)
+        u1, u2 = unc[i], unc_k2[i]
+        ok1 = isfinite(u1) && u1 > 0
+        ok2 = isfinite(u2) && u2 > 0
+        (ok1 || ok2) || continue
+        value[i] = round_to_place(value[i], uncertainty_place(ok2 ? u2 : u1))
+        ok1 && (unc[i] = round_to_place(u1, uncertainty_place(u1)))
+        ok2 && (unc_k2[i] = round_to_place(u2, uncertainty_place(u2)))
+    end
+    return nothing
+end
+
 # Columns that are always written, even when empty.
 const REQUIRED_COLUMNS = (:reference, :components, :property, :value, :unit)
 
@@ -201,6 +225,7 @@ function build_export_data(
     reference::Symbol = :key,
     units::Symbol = :native,
     policy::Symbol = :nominal,
+    report::Symbol = :source,
     details::Bool = false,
     composition::Union{Nothing,Symbol} = nothing,
     solvent = nothing,
@@ -214,6 +239,8 @@ function build_export_data(
     reference in REFERENCE_STYLES || throw(
         ArgumentError("reference must be one of $(REFERENCE_STYLES), got :$reference"),
     )
+    report in REPORT_MODES ||
+        throw(ArgumentError("report must be one of $(REPORT_MODES), got :$report"))
     isempty(view.rows) && throw(ArgumentError("the selection has no points to export"))
     ds = view.dataset
     m, ex, rf = ds.measurements, ds.experiments, ds.references
@@ -232,6 +259,7 @@ function build_export_data(
         fetch_molar_mass,
         strict,
     )
+    report === :gum && round_metrological!(t.value, t.unc, t.unc_k2)
 
     label = fill("", length(rf))
     for (k, id) in enumerate(bib.ids)
@@ -1000,6 +1028,17 @@ come from, the citation of the dataset, that they are modified and not endorsed 
 and that the articles must be credited. With `references = false` and `reference = :key` a
 table keeps no way back to the DOIs, and a warning says so.
 
+`report` chooses how the numbers of a table are written. `:source` (the default) writes them as
+the ThermoML standard keeps them: the values and uncertainties as stored, with the digits that
+the source gave. `:gum` rounds as a laboratory reports a result (GUM 7.2.6): an uncertainty has
+at most two significant digits (two when its leading digit is 1 or 2, otherwise one) and the
+value is rounded to the last digit of the uncertainty at ``k = 2`` (of the reported one when
+that is not known); a value of 0.12234 with an uncertainty of 0.0000611 is written
+0.12234 ± 0.00006, and with 0.0187 as 0.122 ± 0.019. Digits are only taken away, never added, and
+a point without an uncertainty is not changed. Both are free of the noise in the last digits that
+a conversion of unit or of composition leaves. The ThermoML formats never round: they carry the
+digits of the source.
+
 `units = :si` converts values, uncertainties and pressure to SI (see [`table`](@ref)); the
 ThermoML formats always keep the units of the archive and the composition as the source gave it.
 `composition` converts the amounts `x1..x3` of the tables to another scale of
@@ -1035,6 +1074,7 @@ function export_points(
     reference::Symbol = :key,
     units::Symbol = :native,
     policy::Symbol = :nominal,
+    report::Symbol = :source,
     composition::Union{Nothing,Symbol} = nothing,
     solvent = nothing,
     molar_mass = nothing,
@@ -1067,6 +1107,7 @@ function export_points(
             reference,
             units,
             policy,
+            report,
             composition,
             solvent,
             molar_mass,

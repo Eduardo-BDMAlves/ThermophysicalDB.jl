@@ -755,7 +755,7 @@ function property_number(x, spec::UnitSpec, declared, difference::Bool, referenc
             difference || throw(ArgumentError("a value cannot be given as a percentage"))
             isfinite(reference) ||
                 throw(ArgumentError("a percentage needs the value of the point"))
-            return number * fraction * abs(reference)
+            return clean_float(number * fraction * abs(reference))
         end
         return apply_exact(affine(text), number)
     end

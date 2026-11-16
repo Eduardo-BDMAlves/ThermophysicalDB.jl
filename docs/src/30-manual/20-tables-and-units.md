@@ -90,6 +90,10 @@ Conversions between units, such as °R to °F to °C to K, are composed in ratio
 
 On a column the conversion is one pass over the data: the identity is a copy, a change of scale is a multiplication, and a scale with an offset (°C, °F) is one fused multiply-add. A difference of two values (an uncertainty) uses only the scale. After that, any other change of unit is left to the units package you use.
 
+### The digits of a number
+
+A number is stored as it was typed: `0.273233` is the `Float64` nearest to 0.273233 and is shown as `0.273233`, never as `0.27323300000000004`. A conversion of a number that you give (`"122.3 mW/m/K"`, a limit with a unit, a percentage of a value) is made on its decimal value and rounded once, so `122.3` mW/m/K is `0.1223` W/m/K and not a neighbour of it. In a table, the columns that come from a multiplication (`unc` and `unc_k2` after `units = :si`, a pressure in Pa, a composition in another scale) are cleaned of the noise that binary arithmetic leaves in the 16th and 17th digits: a result is rounded to 15 significant digits, the digits that every decimal number keeps in a `Float64`. Nothing is added to what the source gave, and a column that is not converted is not touched. Numbers with more than 15 real digits (a ratio such as 1/3) lose only the digits that were never significant.
+
 ## Another unit for a property
 
 `unit` gives the value and its uncertainties in a unit of your choice, as long as it measures the same quantity and the selection has a single unit:
