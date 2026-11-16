@@ -90,6 +90,7 @@ include("database/repeats.jl")
 include("database/database.jl")
 include("compounds/linked.jl")
 include("database/duplicates.jl")
+include("query/combine.jl")
 include("database/user.jl")
 include("database/share.jl")
 include("database/template.jl")
@@ -115,7 +116,10 @@ export COMPOSITION_SCALES,
     import_database!,
     member_dataset,
     members,
+    Overlap,
+    overlap,
     parts,
+    pure_component,
     remove_member!,
     resolve_compound,
     save_database,

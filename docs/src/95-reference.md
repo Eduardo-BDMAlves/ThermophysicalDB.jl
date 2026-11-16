@@ -33,6 +33,12 @@ reset_database_dir!
 ```@docs
 points
 mixture
+pure_component
+Overlap
+overlap
+Base.union(::ThermophysicalDB.Selection, ::ThermophysicalDB.Selection)
+Base.intersect(::ThermophysicalDB.Selection, ::ThermophysicalDB.Selection)
+Base.setdiff(::ThermophysicalDB.Selection, ::ThermophysicalDB.Selection)
 find_compounds
 ThermophysicalDB.CompoundMatches
 phases
@@ -178,5 +184,5 @@ These docstrings document the implementation. They are not part of the public in
 ```@autodocs
 Modules = [ThermophysicalDB]
 Public = false
-Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.TemplateData, ThermophysicalDB.TemplateExperiment, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult, ThermophysicalDB.Registry, ThermophysicalDB.Catalog, ThermophysicalDB.loaded_tables, ThermophysicalDB.LAZY_FIELDS))
+Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.TemplateData, ThermophysicalDB.TemplateExperiment, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult, ThermophysicalDB.Registry, ThermophysicalDB.Catalog, ThermophysicalDB.loaded_tables, ThermophysicalDB.LAZY_FIELDS, Base.union, Base.intersect, Base.setdiff))
 ```
