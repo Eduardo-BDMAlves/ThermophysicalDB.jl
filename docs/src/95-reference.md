@@ -75,6 +75,8 @@ add_template_experiments!
 TemplateData
 TemplateExperiment
 save_database
+export_database
+import_database!
 created_at
 modified_at
 set_priority!

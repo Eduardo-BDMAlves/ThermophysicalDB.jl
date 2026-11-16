@@ -247,32 +247,37 @@ function walk_audit_log(path::AbstractString, on_event)
     uuid, head, count, problem, bad = "", "", 0, "", 0
     hashes = String[]
     number = 0
-    for text in eachline(path)
-        number += 1
-        fields = split(text, '\t')
-        found = String(last(fields))
-        body = tab_join(fields[1:(end-1)])
-        if number == 1
-            if length(fields) != 5 || fields[1] != "#" * AUDIT_FORMAT
-                return (false, "", 0, "", 1, "the header is missing or damaged", hashes)
+    io = open(path)    # closed on every way out: an open file cannot be removed on Windows
+    try
+        for text in eachline(io)
+            number += 1
+            fields = split(text, '\t')
+            found = String(last(fields))
+            body = tab_join(fields[1:(end-1)])
+            if number == 1
+                if length(fields) != 5 || fields[1] != "#" * AUDIT_FORMAT
+                    return (false, "", 0, "", 1, "the header is missing or damaged", hashes)
+                end
+                uuid = String(fields[3])
+                expected = audit_hash("", body)
+            else
+                expected = audit_hash(head, body)
+                if length(fields) != AUDIT_EVENT_FIELDS
+                    problem, bad = "the line does not have the fields of an event", number
+                elseif tryparse(Int, fields[1]) != number - 1
+                    problem, bad = "the sequence number is not $(number - 1)", number
+                end
             end
-            uuid = String(fields[3])
-            expected = audit_hash("", body)
-        else
-            expected = audit_hash(head, body)
-            if length(fields) != AUDIT_EVENT_FIELDS
-                problem, bad = "the line does not have the fields of an event", number
-            elseif tryparse(Int, fields[1]) != number - 1
-                problem, bad = "the sequence number is not $(number - 1)", number
+            if isempty(problem) && found != expected
+                problem, bad =
+                    "the hash does not match: the line or one before it was changed", number
             end
+            isempty(problem) || return (false, uuid, count, head, bad, problem, hashes)
+            head = found
+            number > 1 && (count += 1; push!(hashes, head); on_event(fields))
         end
-        if isempty(problem) && found != expected
-            problem, bad =
-                "the hash does not match: the line or one before it was changed", number
-        end
-        isempty(problem) || return (false, uuid, count, head, bad, problem, hashes)
-        head = found
-        number > 1 && (count += 1; push!(hashes, head); on_event(fields))
+    finally
+        close(io)
     end
     number == 0 && return (false, "", 0, "", 0, "the file is empty", hashes)
     return (true, uuid, count, head, 0, "", hashes)
@@ -417,8 +422,8 @@ audit_time(x::AbstractString) = Dates.DateTime(rstrip(x, 'Z'))
 The events of the audit logs as a table (columns `scope`, `seq`, `time`, `event`, `object`,
 `detail`, `sha256`, `before` and `after`), oldest first within each log. `since` keeps the events
 from that date or time on, and `event` (a name or a vector of names, such as `"database_saved"`)
-only those. Events: `archive_installed`, `database_saved`, `priority_changed`, `compounds_saved`
-and `log_recreated`; the start of an operation (`database_save_started`, `compounds_save_started`,
+only those. Events: `archive_installed`, `database_saved`, `database_exported`, `database_imported`, `priority_changed`, `compounds_saved`
+and `log_recreated`; the start of an operation (`database_save_started`, `database_export_started`, `database_import_started`, `compounds_save_started`,
 `archive_install_started`) and its failure (`..._failed`, with the error in `detail`); and
 `archive_rejected` and `database_unreadable`. `before` and `after` are the counts of references,
 experiments and points of a database (the number of rows for the compounds) before and after the
