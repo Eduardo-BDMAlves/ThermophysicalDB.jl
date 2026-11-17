@@ -13,7 +13,7 @@ using TestItemRunner
 #                the cache, the spreadsheets), for the runners that cost the most.
 const SUITE = get(ENV, "THERMOPHYSICALDB_TEST_SUITE", "full")
 const PLATFORM_FILES =
-    r"^test-(store|remote-.+|parse|precompile|template|user-database|share|export|thermoml|compounds)\.jl$"
+    r"^test-(store|remote-.+|parse|precompile|template|user-database|share|export|thermoml|compounds|decimal)\.jl$"
 
 function in_suite(item)
     SUITE == "full" && return true

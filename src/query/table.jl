@@ -182,18 +182,22 @@ function table(
         method[i] = pool_string(ds.methods, m.method[r])
         phase[i] = pool_string(ds.phases, m.phase[r])
         temperature[i] = m.temperature[r]
-        pressure[i] = m.pressure[r] * pressure_factor
+        pressure[i] =
+            pressure_factor == 1.0 ? m.pressure[r] :
+            clean_float(m.pressure[r] * pressure_factor)
         for j = 1:MAX_COMPONENTS
             x[j][i] = m.composition[j][r]
         end
         o = offset[p]
-        value[i] = iszero(o) ? m.value[r] * f : muladd(m.value[r], f, o)
+        value[i] =
+            f == 1.0 && iszero(o) ? m.value[r] :
+            clean_float(iszero(o) ? m.value[r] * f : muladd(m.value[r], f, o))
         unit[i] = unit_of[p]
-        unc[i] = m.unc[r] * f
+        unc[i] = f == 1.0 ? m.unc[r] : clean_float(m.unc[r] * f)
         unc_k[i] = m.unc_k[r]
         unc_level[i] = m.unc_level[r]
         u2, bad = k2_uncertainty(m.unc[r], m.unc_k[r], m.unc_level[r], policy)
-        unc_k2[i] = u2 * f
+        unc_k2[i] = f == 1.0 ? u2 : clean_float(u2 * f)
         unsupported += bad
     end
     unsupported > 0 && @warn(
@@ -238,9 +242,9 @@ function table(
             columns,
             (;
                 xkind = converted.xkind,
-                x1 = converted.x1,
-                x2 = converted.x2,
-                x3 = converted.x3,
+                x1 = clean_floats!(converted.x1),
+                x2 = clean_floats!(converted.x2),
+                x3 = clean_floats!(converted.x3),
             ),
         )
         details && (columns = merge(columns, (; composition_status = converted.status)))
@@ -248,13 +252,21 @@ function table(
     if t_choice !== nothing
         columns = merge(
             columns,
-            (; temperature = convert_choice(t_choice, NativeTemperature(), temperature)),
+            (;
+                temperature = clean_floats!(
+                    convert_choice(t_choice, NativeTemperature(), temperature),
+                ),
+            ),
         )
     end
     if p_choice !== nothing
         columns = merge(
             columns,
-            (; pressure = convert_choice(p_choice, NativePressure(), pressure)),
+            (;
+                pressure = clean_floats!(
+                    convert_choice(p_choice, NativePressure(), pressure),
+                ),
+            ),
         )
     end
     for choice in (chosen, t_choice, p_choice)

@@ -312,7 +312,7 @@ struct FloatAffine
     offset::Float64
 end
 
-FloatAffine(a::ExactAffine) = FloatAffine(Float64(a.scale), Float64(a.offset))
+FloatAffine(a::ExactAffine) = FloatAffine(exact_float(a.scale), exact_float(a.offset))
 
 @inline (a::FloatAffine)(x::Float64) = muladd(x, a.scale, a.offset)
 
@@ -373,14 +373,16 @@ end
 """
     apply_exact(a::ExactAffine, x::Real) -> Float64
 
-`a(x)` computed in rational arithmetic on the exact value of `x` and rounded once to
-`Float64`. It is the conversion of a single number given by the user (a limit, a value with
-a unit); if the number does not fit in `Exact`, the `Float64` constants of `a` are used.
+`a(x)` computed in rational arithmetic and rounded once to `Float64`. It is the conversion of
+a single number given by the user (a limit, a value with a unit), taken as the decimal number
+that its text writes (see [`decimal_value`](@ref)), so that `122.3` in mW/m/K is `0.1223` in
+W/m/K and not a neighbour of it; if the number does not fit in `Exact`, the `Float64` constants
+of `a` are used.
 """
 function apply_exact(a::ExactAffine, x::Real)
     isfinite(x) || return Float64(x)
     try
-        return Float64(a(exact_value(x)))
+        return exact_float(a(decimal_value(x)))
     catch err
         (err isa OverflowError || err isa InexactError) || rethrow()
         return FloatAffine(a)(Float64(x))
