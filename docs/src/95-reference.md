@@ -83,6 +83,8 @@ TemplateExperiment
 save_database
 export_database
 import_database!
+remove_database!
+clear_database!
 created_at
 modified_at
 set_priority!

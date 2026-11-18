@@ -115,8 +115,26 @@ add_reference_data!(db;
   `unit` is the unit of a plain `value` and `unc`; if the databases already have that property (`"Mass density"` is in kg/m3 in the archive), the point is stored in their unit (`unit = "g/cm3", value = 0.9982` is stored as 998.2 kg/m3); a property that no database has is stored in the SI (`"cP"` becomes `"Pa*s"`, `"bar"` becomes `"Pa"`), and a unit that is already SI is kept as you wrote it. An uncertainty is converted as a difference (`unc = "0.5 kg/m3"`, or `"0.1 %"` of the value), so `"0.5 degC"` is 0.5 K. A unit of another quantity, a gauge pressure or a unit that cannot be read is refused, and with no `unit` and a plain number nothing is converted. The units are not kept in any struct: what is stored is always `Float64`.
 - **Nothing is filled in.** What you do not give is `NaN` (a pure compound has no composition), and a point without a value, with a temperature that is not positive or with more amounts than components is refused with a message.
 - **The order of the databases** decides which one wins when a point is in several; [`set_priority!`](@ref) changes it, and a saved database remembers it.
-- **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. Removing the folder removes the database.
+- **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. To remove a database, see [Removing and emptying a database](@ref).
 - Functions that join the points of several databases (export, outliers, references) work on one database for now: select with `parts(view)`, or open the archive alone.
+
+## Removing and emptying a database
+
+[`remove_database!`](@ref) takes a database of your own out of the session and out of `databases_dir()`, and [`clear_database!`](@ref) keeps the database and empties it.
+
+```julia
+backup = remove_database!(db, "my_lab")          # the folder goes to the temporary directory; its path is returned
+remove_database!(db, ["draft_1", "draft_2"])     # several at once
+
+clear_database!(db, "my_lab")                    # same name, kind, priority and creation time, no data
+# ... rebuild it from your script ...
+save_database(db, "my_lab")                      # the folder on disk now has the new data
+```
+
+- **Nothing is deleted at once.** The folder of a saved database, with its audit log, is moved to `<tempdir()>/ThermophysicalDB-removed/<name>-<date>`, and the operating system deletes it in due course. If you want to keep a copy for good, copy that folder (the path is what the function returns) or [`export_database`](@ref) the database first. The event `database_removed` is written in the log before the folder moves.
+- **Points that exist only in memory are not removed by accident.** A database with points that were not saved is refused, because nothing else has them; save it first or pass `force = true`.
+- **The archive is never removed**, and if one of the names is wrong nothing is removed.
+- `clear_database!` works in memory: the folder on disk changes at the next [`save_database`](@ref), so restarting Julia before that brings the saved data back.
 
 ## Filling in a spreadsheet
 
