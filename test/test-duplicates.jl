@@ -389,6 +389,7 @@ end
                 reference = (doi = "10.5555/TDBDB-001",),
                 experiments = [experiment(temperature = [291.0, 292.0, 350.0])],
                 warn_duplicates = false,
+                on_conflict = :keep,
             )
             T.add_reference_data!(
                 db;

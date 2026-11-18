@@ -136,6 +136,35 @@ save_database(db, "my_lab")                      # the folder on disk now has th
 - **The archive is never removed**, and if one of the names is wrong nothing is removed.
 - `clear_database!` works in memory: the folder on disk changes at the next [`save_database`](@ref), so restarting Julia before that brings the saved data back.
 
+### Removing one article
+
+[`remove_reference!`](@ref) removes a reference of a database of your own with its experiments, points, samples, conditions and uncertainties, and returns what went (`(references, experiments, points)`):
+
+```julia
+remove_reference!(db, "10.1000/example")                    # by DOI
+remove_reference!(db, "10.1000/example"; database = "lab")  # when there is more than one database of your own
+```
+
+The other references keep all their points with the same values. The rows are numbered again, so a reference or experiment that you hold from before stops being valid and says so when used; get it again from the database. The removal is in memory until [`save_database`](@ref), which writes `reference_removed` in the audit log.
+
+### Adding points that are already there
+
+When `add_reference_data!` is given points that the database already has, `on_conflict` says what to do. Two points are the same when [`duplicates`](@ref) says so: the same work, system and property, and the same conditions and value within the [`DuplicateRules`](@ref) (give others with `rules`). Points that are not there are no conflict.
+
+| `on_conflict` | the new points that are already there | the old ones |
+|:--|:--|:--|
+| `:ask` (default) | you are asked (`s`, `r`, `k` or `c`); a session that cannot ask gets an error | |
+| `:skip` | are left out | stay |
+| `:replace` | stay | go (recorded as `points_replaced`) |
+| `:keep` | stay | stay (the notice of repeated points is shown) |
+| `:error` | nothing is added | stay |
+
+```julia
+add_reference_data!(db; reference = "10.1000/example", experiments = more, on_conflict = :skip)
+```
+
+A refused or cancelled addition leaves the database as it was.
+
 ## Filling in a spreadsheet
 
 Typing the points of an article as columns in code is exact but tedious. With XLSX.jl loaded, the package writes a spreadsheet that you fill in, and imports it:

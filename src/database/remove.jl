@@ -124,13 +124,61 @@ brings the saved data back. To rebuild a database from a script, start with this
 """
 function clear_database!(db::Database, name::AbstractString)
     m = writable_member(db, String(name))
-    created = member_stamps(m)[1]
     ds = Dataset()
-    ds.stamps.created = created
+    getfield(ds, :stamps).created = member_stamps(m)[1]
+    replace_dataset!(db, m, ds, "database_cleared", "")
+    return m
+end
+
+# Put a new dataset in place of the one of `m` (a removal or a replacement made one), tell the
+# database, and keep the event to write in the audit log when the change becomes permanent.
+function replace_dataset!(
+    db::Database,
+    m::Member,
+    ds::Dataset,
+    event::Union{Nothing,String},
+    detail::String = "",
+)
+    touch!(ds)
     lock(m.lock) do
         m.dataset = ds
+        event === nothing || push!(m.edits, (event, detail))
     end
-    touch!(ds)
     refresh!(db, m)
     return m
+end
+
+"""
+    remove_reference!(db, reference; database = nothing) -> NamedTuple
+
+Remove a reference of a database of your own, with its experiments, points, samples, conditions and
+uncertainties. `reference` is the result of [`add_reference!`](@ref) or a DOI that is already in the
+database; `database` is needed to say which one when `reference` is a DOI and there is more than
+one database of your own. It returns what was removed, `(references, experiments, points)`.
+
+The other references keep all their points, with the same values. The rows are numbered again, so
+the references and experiments that you hold from before ([`add_reference!`](@ref),
+[`add_experiment!`](@ref)) stop being valid and refuse to be used; get them again from the
+database. The removal is in memory until [`save_database`](@ref), which also writes the event
+`reference_removed` in the audit log.
+
+```julia
+remove_reference!(db, "10.1000/example")
+```
+"""
+function remove_reference!(db::Database, reference; database = nothing)
+    m = reference isa ReferenceRef ? reference.member : writable_member(db, database)
+    ref = find_reference(db, m, reference)
+    ds = live_dataset(ref)
+    keep = cascade(ds; drop_references = Int32[ref.id])
+    removed = (;
+        references = 1,
+        experiments = count(!, keep.experiments),
+        points = count(!, keep.measurements),
+    )
+    doi = ds.references.doi[ref.id]
+    label = isempty(doi) ? "reference $(ref.id)" : doi
+    detail = "reference=$label experiments=$(removed.experiments) points=$(removed.points)"
+    replace_dataset!(db, m, subset_dataset(ds, keep), "reference_removed", detail)
+    return removed
 end
