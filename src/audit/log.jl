@@ -422,7 +422,7 @@ audit_time(x::AbstractString) = Dates.DateTime(rstrip(x, 'Z'))
 The events of the audit logs as a table (columns `scope`, `seq`, `time`, `event`, `object`,
 `detail`, `sha256`, `before` and `after`), oldest first within each log. `since` keeps the events
 from that date or time on, and `event` (a name or a vector of names, such as `"database_saved"`)
-only those. Events: `archive_installed`, `database_saved`, `database_exported`, `database_imported`, `database_removed`, `database_cleared`, `reference_removed`, `points_replaced`, `priority_changed`, `compounds_saved`
+only those. Events: `archive_installed`, `database_saved`, `database_exported`, `database_imported`, `database_removed`, `database_cleared`, `reference_removed`, `points_replaced`, `points_removed`, `points_updated`, `priority_changed`, `compounds_saved`
 and `log_recreated`; the start of an operation (`database_save_started`, `database_export_started`, `database_import_started`, `compounds_save_started`,
 `archive_install_started`) and its failure (`..._failed`, with the error in `detail`); and
 `archive_rejected` and `database_unreadable`. `before` and `after` are the counts of references,

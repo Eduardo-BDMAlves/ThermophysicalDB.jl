@@ -85,6 +85,9 @@ What makes this fast is a small index that is always in memory (the *registry*):
 
 What you measure, or take from an article, goes into a database of your own: a member that starts empty, has the same tables as the archive and never touches it (the functions below refuse the archive). Nothing is written to disk until you call [`save_database`](@ref).
 
+!!! warning "Changes live in the session until you save them"
+    Everything that adds, changes or removes data of a database of your own (`add_reference!`, `add_experiment!`, `add_measurement!`, `add_reference_data!`, `update_points!`, `remove_points!`, `remove_reference!`, `clear_database!`) works on the database that is in memory in this Julia session. **Nothing reaches the disk until you call [`save_database`](@ref)**; if you close Julia or open the database again before that, the changes are lost and the saved version comes back. [`save_database`](@ref) also writes the changes in the audit log. The one function that acts on the disk at once is [`remove_database!`](@ref), which moves the folder of a saved database away (to a temporary folder, so it can be recovered until the system cleans it). A database with changes that were not saved is not removed unless `force = true`, and [`export_database`](@ref) warns that it exports the saved version.
+
 ```julia
 db = database()
 add_database!(db, "my_lab")                       # kind = :user; use kind = :literature for points from articles
@@ -164,6 +167,41 @@ add_reference_data!(db; reference = "10.1000/example", experiments = more, on_co
 ```
 
 A refused or cancelled addition leaves the database as it was.
+
+### Adding one point
+
+A single point goes into an experiment that exists, with [`add_measurement!`](@ref); the same call adds as many as you need one at a time:
+
+```julia
+ref = add_reference!(db; doi = "10.1000/example", year = 2024)
+exp = add_experiment!(ref; components = ["water"])
+add_measurement!(exp; property = "Mass density", unit = "kg/m3", value = 998.2, temperature = 293.15)
+```
+
+### Removing points
+
+[`remove_points!`](@ref) removes the points of a selection, so the filters of [`points`](@ref) say which ones. It only says what would go until you confirm:
+
+```julia
+sel = points(db; source = "my_lab", doi = "10.1000/example", temperature = (300, nothing))
+remove_points!(db, sel)                  # (points = 12, experiments = 0, ...): nothing was removed
+remove_points!(db, sel; confirm = true)  # now they are
+```
+
+An experiment that is left without points goes with them; the references stay. The selection must have points of your own databases only (`source = "name"` leaves out the archive), and `points` leaves out a point that another database repeats unless you give `duplicate = true`. The rows are numbered again, so what you hold from before, selections included, stops being valid. The event `points_removed` is written in the audit log at the next [`save_database`](@ref).
+
+### Changing points
+
+[`update_points!`](@ref) changes columns of the points of a selection: `value`, `temperature`, `pressure`, `unc`, `unc_k`, `unc_level` and the amounts `x1`, `x2`, `x3`. Each one is a number for all the points (`NaN` clears it), a vector with a number for each point, or a function of the current number:
+
+```julia
+sel = points(db; source = "my_lab", doi = "10.1000/example")
+update_points!(db, sel; pressure = 101.325)       # the same for all
+update_points!(db, sel; value = v -> v * 1.002)   # a calibration factor
+update_points!(db, sel; temperature = T -> T + 0.05, unc = 0.01)
+```
+
+The numbers are the ones the database stores (the value in the unit `table` shows for the property, the temperature in K, the pressure in kPa). Everything is checked with the rules of an addition before anything is written, so a mistake changes nothing, and the digits the source gave for a number that changed are forgotten. Nothing is renumbered, so what you hold stays valid. If the change makes a point repeat another, `on_conflict` says what to do (`:ask`, `:keep` or `:error`, as for [adding points](@ref "Adding points that are already there")). The uncertainties of the conditions are not changed. The event `points_updated` is written at the next save.
 
 ## Filling in a spreadsheet
 

@@ -96,6 +96,7 @@ include("database/share.jl")
 include("database/subset.jl")
 include("database/remove.jl")
 include("database/conflicts.jl")
+include("database/edit.jl")
 include("database/template.jl")
 include("precompile.jl")
 
@@ -126,6 +127,8 @@ export COMPOSITION_SCALES,
     pure_component,
     remove_database!,
     remove_reference!,
+    remove_points!,
+    update_points!,
     remove_member!,
     resolve_compound,
     save_database,

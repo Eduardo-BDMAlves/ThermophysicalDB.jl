@@ -568,6 +568,9 @@ Add the article (or report, or thesis) that the points come from, to the databas
 that is already there gives the same reference again. The reference is what
 [`add_experiment!`](@ref) is given; an experiment is only part of what an article measured, so a
 reference can have as many as the article has.
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_reference!(db::Database; database = nothing, kwargs...)
     unknown = [k for k in keys(kwargs) if k ∉ REFERENCE_FIELDS]
@@ -685,6 +688,9 @@ database.
 ref = add_reference!(db; doi = "10.1000/example", authors = ["Silva, A."], year = 2024)
 exp = add_experiment!(ref; components = ["water", "7647-14-5"], composition_scale = :molality)
 ```
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_experiment!(
     ref::ReferenceRef;
@@ -1084,6 +1090,9 @@ temperature in kelvin, even when the temperature was given in degC (`"0.01 %"` o
 of 298.15 K, that is 0.030 K) and, for degF, equally of the rankine scale (the same number of
 kelvin); of the pressure in kPa; and of the amount as stored. A relative uncertainty of a
 temperature in an offset scale would otherwise depend on where its zero is.
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_measurement!(
     e::ExperimentRef;
@@ -1234,6 +1243,9 @@ add_reference_data!(
     ],
 )
 ```
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_reference_data!(
     db::Database;
