@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-18
+
 - Removing and emptying databases (issue 30, first stage): `remove_database!(db, name_or_names; force = false)` moves the folder of a saved database, with its audit log, to a folder of the temporary directory (the system deletes it in due course) and returns its path, so a backup is a copy of that folder; a database with unsaved points is refused unless `force = true`, the archive is never removed, and the event `database_removed` is logged. `clear_database!(db, name)` empties a database and keeps its name, kind, priority and creation time until the next `save_database`
 
 - Removing references and points that are already there (issue 30, second stage): `remove_reference!(db, reference_or_doi; database)` removes one article with its experiments, points, samples, conditions and uncertainties and returns the counts; `add_reference_data!(...; on_conflict = :ask)` says what to do with new points that the database already has
@@ -126,6 +128,9 @@ and this project adheres to [Semantic Versioning].
 - Added `sample_table` and `purity_step_table`, which give the samples of a dataset or of a selection as Tables.jl tables, and `table(view; details = true)`, which adds the purity of each component, the digits, the purpose and the uncertainty method to the points
 - `reference_summary` and its LaTeX, Markdown and CSV tables have the columns `purity`, `purity_min`, `purity_max`, `purity_basis`, `purity_method`, `purification`, `sample_source` and `supplier`; the default tables show the purity, its analysis and the purification when an article states them, and `columns` chooses any of them
 
+- The ThermoML export follows the standard: `:thermoml` writes the JSON form of the archive and the new `:thermoml_xml` a directory with one XML document per article, in the element order of the schema and validated with `xmllint` against `ThermoML.xsd`; samples and purity steps, the exact presentation of each property, the citation fields and the digits of every value are written, and what the standard requires but the archive lacks is derived (see the manual page "Exporting points")
+- The data schema is version 3: it stores the significant digits of the composition variables, the free-text methods (a new string pool) and the citation fields of the article; a cache of an older version is rebuilt
+
 <!-- Links -->
 
 [keep a changelog]: https://keepachangelog.com/en/1.1.0/
@@ -134,6 +139,4 @@ and this project adheres to [Semantic Versioning].
 <!-- Versions -->
 
 [unreleased]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.0...HEAD
-
-- The ThermoML export follows the standard: `:thermoml` writes the JSON form of the archive and the new `:thermoml_xml` a directory with one XML document per article, in the element order of the schema and validated with `xmllint` against `ThermoML.xsd`; samples and purity steps, the exact presentation of each property, the citation fields and the digits of every value are written, and what the standard requires but the archive lacks is derived (see the manual page "Exporting points")
-- The data schema is version 3: it stores the significant digits of the composition variables, the free-text methods (a new string pool) and the citation fields of the article; a cache of an older version is rebuilt
+[0.1.0]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/releases/tag/v0.1.0
