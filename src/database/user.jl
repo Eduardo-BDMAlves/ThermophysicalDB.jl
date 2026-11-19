@@ -204,6 +204,10 @@ function save_database(db::Database, name::AbstractString)
         end
         m.persistent = true
         write_member_meta(m, length(ds.measurements))
+        for (event, detail) in m.edits
+            audit_record!(dirname(m.path), event, m.name; detail)
+        end
+        empty!(m.edits)
         audit_record!(
             dirname(m.path),
             "database_saved",
@@ -447,6 +451,7 @@ A reference of a database of your own, as returned by [`add_reference!`](@ref); 
 struct ReferenceRef
     database::Database
     member::Member
+    dataset::Dataset
     id::Int32
 end
 
@@ -459,13 +464,28 @@ An experiment of a database of your own, as returned by [`add_experiment!`](@ref
 struct ExperimentRef
     database::Database
     member::Member
+    dataset::Dataset
     id::Int32
     reference::Int32
     ncomp::Int
 end
 
+# The dataset a reference or an experiment belongs to, if it is still the one of its database. A
+# removal or a replacement makes a new dataset, with other row numbers, so what was held before
+# points at rows that are no longer the same: it is refused instead of used.
+function live_dataset(r::Union{ReferenceRef,ExperimentRef})
+    member_dataset(r.member) === r.dataset || throw(
+        ArgumentError(
+            "this $(r isa ReferenceRef ? "reference" : "experiment") of the database \"$(r.member.name)\" is no longer valid: the database was changed by a removal or a replacement; get it again with add_reference!",
+        ),
+    )
+    return r.dataset
+end
+
 function Base.show(io::IO, r::ReferenceRef)
-    ds = member_dataset(r.member)
+    ds = r.dataset
+    member_dataset(r.member) === ds ||
+        return print(io, "ReferenceRef(\"", r.member.name, "\", no longer valid)")
     doi = ds.references.doi[r.id]
     return print(
         io,
@@ -478,7 +498,15 @@ function Base.show(io::IO, r::ReferenceRef)
 end
 
 function Base.show(io::IO, e::ExperimentRef)
-    return print(io, "ExperimentRef(\"", e.member.name, "\", experiment ", e.id, ")")
+    valid = member_dataset(e.member) === e.dataset
+    return print(
+        io,
+        "ExperimentRef(\"",
+        e.member.name,
+        "\", ",
+        valid ? "experiment $(e.id)" : "no longer valid",
+        ")",
+    )
 end
 
 function normalize_doi(text::AbstractString)
@@ -540,6 +568,9 @@ Add the article (or report, or thesis) that the points come from, to the databas
 that is already there gives the same reference again. The reference is what
 [`add_experiment!`](@ref) is given; an experiment is only part of what an article measured, so a
 reference can have as many as the article has.
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_reference!(db::Database; database = nothing, kwargs...)
     unknown = [k for k in keys(kwargs) if k ∉ REFERENCE_FIELDS]
@@ -559,11 +590,14 @@ function commit_reference!(db::Database, m::Member, fields)
     before = catalog_size(ds)
     id = add_reference!(ds.references; fields..., source = intern!(ds.sources, m.name))
     catalog_size(ds) == before || refresh!(db, m)
-    return ReferenceRef(db, m, id)
+    return ReferenceRef(db, m, ds, id)
 end
 
 function find_reference(db::Database, m::Member, reference)
-    reference isa ReferenceRef && return reference
+    if reference isa ReferenceRef
+        live_dataset(reference)
+        return reference
+    end
     if reference isa AbstractString
         ds = member_dataset(m)
         id = get(ds.references.index, normalize_doi(reference), NO_ID)
@@ -572,7 +606,7 @@ function find_reference(db::Database, m::Member, reference)
                 "the database \"$(m.name)\" has no reference with the DOI \"$reference\"; add it with add_reference!",
             ),
         )
-        return ReferenceRef(db, m, id)
+        return ReferenceRef(db, m, ds, id)
     end
     throw(
         ArgumentError(
@@ -619,7 +653,7 @@ function commit_experiment!(
     purpose = "",
     number::Integer = 0,
 )
-    ds = member_dataset(ref.member)
+    ds = live_dataset(ref)
     touch!(ds)
     before = catalog_size(ds)
     ids = Int32[intern_compound!(ds, c) for c in specs]
@@ -633,7 +667,7 @@ function commit_experiment!(
         purpose = intern!(ds.purposes, String(purpose)),
     )
     catalog_size(ds) == before || refresh!(ref.database, ref.member)
-    return ExperimentRef(ref.database, ref.member, id, ref.id, length(specs))
+    return ExperimentRef(ref.database, ref.member, ds, id, ref.id, length(specs))
 end
 
 """
@@ -654,6 +688,9 @@ database.
 ref = add_reference!(db; doi = "10.1000/example", authors = ["Silva, A."], year = 2024)
 exp = add_experiment!(ref; components = ["water", "7647-14-5"], composition_scale = :molality)
 ```
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_experiment!(
     ref::ReferenceRef;
@@ -992,7 +1029,7 @@ function commit_point!(
     unc_level,
     terms = (),
 )
-    ds = member_dataset(e.member)
+    ds = live_dataset(e)
     touch!(ds)
     before = length(ds.properties)
     prop = add_property!(
@@ -1053,6 +1090,9 @@ temperature in kelvin, even when the temperature was given in degC (`"0.01 %"` o
 of 298.15 K, that is 0.030 K) and, for degF, equally of the rankine scale (the same number of
 kelvin); of the pressure in kPa; and of the amount as stored. A relative uncertainty of a
 temperature in an offset scale would otherwise depend on where its zero is.
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_measurement!(
     e::ExperimentRef;
@@ -1203,6 +1243,9 @@ add_reference_data!(
     ],
 )
 ```
+
+The change is in memory, in the session's database; it becomes permanent only when you call
+[`save_database`](@ref).
 """
 function add_reference_data!(
     db::Database;
@@ -1212,7 +1255,12 @@ function add_reference_data!(
     compounds = nothing,
     warn_duplicates::Bool = true,
     dry_run::Bool = false,
+    on_conflict::Symbol = :ask,
+    rules::DuplicateRules = DEFAULT_DUPLICATE_RULES,
+    input::IO = stdin,
+    output::IO = stdout,
 )
+    check_on_conflict(on_conflict)
     m = reference isa ReferenceRef ? reference.member : writable_member(db, database)
     list =
         experiments isa NamedTuple || experiments isa AbstractDict ? [experiments] :
@@ -1316,6 +1364,8 @@ function add_reference_data!(
         points = sum(p -> length(p.points), prepared),
     )
     # Second pass: add.
+    ds0 = member_dataset(m)
+    n0, nr0 = length(ds0.measurements), length(ds0.references)
     ref =
         fields === nothing ? find_reference(db, m, reference) :
         commit_reference!(db, m, fields)
@@ -1350,6 +1400,28 @@ function add_reference_data!(
             )
             total += 1
         end
+    end
+    outcome = resolve_conflicts!(
+        db,
+        m,
+        member_dataset(m),
+        ref.id,
+        n0,
+        nr0,
+        on_conflict,
+        rules,
+        input,
+        output,
+    )
+    if outcome !== nothing
+        ds2 = member_dataset(m)
+        rmap, emap = id_map(outcome.keep.references), id_map(outcome.keep.experiments)
+        ref = ReferenceRef(db, m, ds2, rmap[ref.id])
+        experiments_added = ExperimentRef[
+            ExperimentRef(db, m, ds2, emap[e.id], rmap[e.reference], e.ncomp) for
+            e in experiments_added if emap[e.id] != 0
+        ]
+        outcome.mode === :skip && (total -= outcome.left)
     end
     if warn_duplicates
         # A notice about data that are already in another database must never undo the work.

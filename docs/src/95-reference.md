@@ -75,6 +75,9 @@ add_reference!
 add_experiment!
 add_measurement!
 add_reference_data!
+update_points!
+remove_points!
+remove_reference!
 export_template
 import_template
 add_template_experiments!
@@ -83,6 +86,8 @@ TemplateExperiment
 save_database
 export_database
 import_database!
+remove_database!
+clear_database!
 created_at
 modified_at
 set_priority!

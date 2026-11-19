@@ -69,6 +69,9 @@ mutable struct Member
     dataset::Union{Nothing,Dataset}
     catalog::Union{Nothing,Catalog}
     lock::ReentrantLock
+    # What was removed or replaced in memory since the last save, as (event, detail); the audit log
+    # records it when it becomes permanent, at `save_database`.
+    edits::Vector{Tuple{String,String}}
 end
 
 function Member(
@@ -93,6 +96,7 @@ function Member(
         dataset,
         nothing,
         ReentrantLock(),
+        Tuple{String,String}[],
     )
 end
 

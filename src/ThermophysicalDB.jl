@@ -93,6 +93,10 @@ include("database/duplicates.jl")
 include("query/combine.jl")
 include("database/user.jl")
 include("database/share.jl")
+include("database/subset.jl")
+include("database/remove.jl")
+include("database/conflicts.jl")
+include("database/edit.jl")
 include("database/template.jl")
 include("precompile.jl")
 
@@ -112,6 +116,7 @@ export COMPOSITION_SCALES,
     add_reference!,
     add_reference_data!,
     databases_dir,
+    clear_database!,
     export_database,
     import_database!,
     member_dataset,
@@ -120,6 +125,10 @@ export COMPOSITION_SCALES,
     overlap,
     parts,
     pure_component,
+    remove_database!,
+    remove_reference!,
+    remove_points!,
+    update_points!,
     remove_member!,
     resolve_compound,
     save_database,

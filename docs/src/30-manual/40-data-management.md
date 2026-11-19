@@ -85,6 +85,9 @@ What makes this fast is a small index that is always in memory (the *registry*):
 
 What you measure, or take from an article, goes into a database of your own: a member that starts empty, has the same tables as the archive and never touches it (the functions below refuse the archive). Nothing is written to disk until you call [`save_database`](@ref).
 
+!!! warning "Changes live in the session until you save them"
+    Everything that adds, changes or removes data of a database of your own (`add_reference!`, `add_experiment!`, `add_measurement!`, `add_reference_data!`, `update_points!`, `remove_points!`, `remove_reference!`, `clear_database!`) works on the database that is in memory in this Julia session. **Nothing reaches the disk until you call [`save_database`](@ref)**; if you close Julia or open the database again before that, the changes are lost and the saved version comes back. [`save_database`](@ref) also writes the changes in the audit log. The one function that acts on the disk at once is [`remove_database!`](@ref), which moves the folder of a saved database away (to a temporary folder, so it can be recovered until the system cleans it). A database with changes that were not saved is not removed unless `force = true`, and [`export_database`](@ref) warns that it exports the saved version.
+
 ```julia
 db = database()
 add_database!(db, "my_lab")                       # kind = :user; use kind = :literature for points from articles
@@ -115,8 +118,90 @@ add_reference_data!(db;
   `unit` is the unit of a plain `value` and `unc`; if the databases already have that property (`"Mass density"` is in kg/m3 in the archive), the point is stored in their unit (`unit = "g/cm3", value = 0.9982` is stored as 998.2 kg/m3); a property that no database has is stored in the SI (`"cP"` becomes `"Pa*s"`, `"bar"` becomes `"Pa"`), and a unit that is already SI is kept as you wrote it. An uncertainty is converted as a difference (`unc = "0.5 kg/m3"`, or `"0.1 %"` of the value), so `"0.5 degC"` is 0.5 K. A unit of another quantity, a gauge pressure or a unit that cannot be read is refused, and with no `unit` and a plain number nothing is converted. The units are not kept in any struct: what is stored is always `Float64`.
 - **Nothing is filled in.** What you do not give is `NaN` (a pure compound has no composition), and a point without a value, with a temperature that is not positive or with more amounts than components is refused with a message.
 - **The order of the databases** decides which one wins when a point is in several; [`set_priority!`](@ref) changes it, and a saved database remembers it.
-- **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. Removing the folder removes the database.
+- **Where it is saved**: `<data directory>/databases/<name>/`, see [`databases_dir`](@ref). `database(user_databases = false)` opens the archive alone. To remove a database, see [Removing and emptying a database](@ref).
 - Functions that join the points of several databases (export, outliers, references) work on one database for now: select with `parts(view)`, or open the archive alone.
+
+## Removing and emptying a database
+
+[`remove_database!`](@ref) takes a database of your own out of the session and out of `databases_dir()`, and [`clear_database!`](@ref) keeps the database and empties it.
+
+```julia
+backup = remove_database!(db, "my_lab")          # the folder goes to the temporary directory; its path is returned
+remove_database!(db, ["draft_1", "draft_2"])     # several at once
+
+clear_database!(db, "my_lab")                    # same name, kind, priority and creation time, no data
+# ... rebuild it from your script ...
+save_database(db, "my_lab")                      # the folder on disk now has the new data
+```
+
+- **Nothing is deleted at once.** The folder of a saved database, with its audit log, is moved to `<tempdir()>/ThermophysicalDB-removed/<name>-<date>`, and the operating system deletes it in due course. If you want to keep a copy for good, copy that folder (the path is what the function returns) or [`export_database`](@ref) the database first. The event `database_removed` is written in the log before the folder moves.
+- **Points that exist only in memory are not removed by accident.** A database with points that were not saved is refused, because nothing else has them; save it first or pass `force = true`.
+- **The archive is never removed**, and if one of the names is wrong nothing is removed.
+- `clear_database!` works in memory: the folder on disk changes at the next [`save_database`](@ref), so restarting Julia before that brings the saved data back.
+
+### Removing one article
+
+[`remove_reference!`](@ref) removes a reference of a database of your own with its experiments, points, samples, conditions and uncertainties, and returns what went (`(references, experiments, points)`):
+
+```julia
+remove_reference!(db, "10.1000/example")                    # by DOI
+remove_reference!(db, "10.1000/example"; database = "lab")  # when there is more than one database of your own
+```
+
+The other references keep all their points with the same values. The rows are numbered again, so a reference or experiment that you hold from before stops being valid and says so when used; get it again from the database. The removal is in memory until [`save_database`](@ref), which writes `reference_removed` in the audit log.
+
+### Adding points that are already there
+
+When `add_reference_data!` is given points that the database already has, `on_conflict` says what to do. Two points are the same when [`duplicates`](@ref) says so: the same work, system and property, and the same conditions and value within the [`DuplicateRules`](@ref) (give others with `rules`). Points that are not there are no conflict.
+
+| `on_conflict` | the new points that are already there | the old ones |
+|:--|:--|:--|
+| `:ask` (default) | you are asked (`s`, `r`, `k` or `c`); a session that cannot ask gets an error | |
+| `:skip` | are left out | stay |
+| `:replace` | stay | go (recorded as `points_replaced`) |
+| `:keep` | stay | stay (the notice of repeated points is shown) |
+| `:error` | nothing is added | stay |
+
+```julia
+add_reference_data!(db; reference = "10.1000/example", experiments = more, on_conflict = :skip)
+```
+
+A refused or cancelled addition leaves the database as it was.
+
+### Adding one point
+
+A single point goes into an experiment that exists, with [`add_measurement!`](@ref); the same call adds as many as you need one at a time:
+
+```julia
+ref = add_reference!(db; doi = "10.1000/example", year = 2024)
+exp = add_experiment!(ref; components = ["water"])
+add_measurement!(exp; property = "Mass density", unit = "kg/m3", value = 998.2, temperature = 293.15)
+```
+
+### Removing points
+
+[`remove_points!`](@ref) removes the points of a selection, so the filters of [`points`](@ref) say which ones. It only says what would go until you confirm:
+
+```julia
+sel = points(db; source = "my_lab", doi = "10.1000/example", temperature = (300, nothing))
+remove_points!(db, sel)                  # (points = 12, experiments = 0, ...): nothing was removed
+remove_points!(db, sel; confirm = true)  # now they are
+```
+
+An experiment that is left without points goes with them; the references stay. The selection must have points of your own databases only (`source = "name"` leaves out the archive), and `points` leaves out a point that another database repeats unless you give `duplicate = true`. The rows are numbered again, so what you hold from before, selections included, stops being valid. The event `points_removed` is written in the audit log at the next [`save_database`](@ref).
+
+### Changing points
+
+[`update_points!`](@ref) changes columns of the points of a selection: `value`, `temperature`, `pressure`, `unc`, `unc_k`, `unc_level` and the amounts `x1`, `x2`, `x3`. Each one is a number for all the points (`NaN` clears it), a vector with a number for each point, or a function of the current number:
+
+```julia
+sel = points(db; source = "my_lab", doi = "10.1000/example")
+update_points!(db, sel; pressure = 101.325)       # the same for all
+update_points!(db, sel; value = v -> v * 1.002)   # a calibration factor
+update_points!(db, sel; temperature = T -> T + 0.05, unc = 0.01)
+```
+
+The numbers are the ones the database stores (the value in the unit `table` shows for the property, the temperature in K, the pressure in kPa). Everything is checked with the rules of an addition before anything is written, so a mistake changes nothing, and the digits the source gave for a number that changed are forgotten. Nothing is renumbered, so what you hold stays valid. If the change makes a point repeat another, `on_conflict` says what to do (`:ask`, `:keep` or `:error`, as for [adding points](@ref "Adding points that are already there")). The uncertainties of the conditions are not changed. The event `points_updated` is written at the next save.
 
 ## Filling in a spreadsheet
 
