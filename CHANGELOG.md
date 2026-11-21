@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-21
+
+- Links that were broken are fixed: the contributing page of the website (the address with a final slash is not served), the documentation of Unitful.jl (moved to JuliaPhysics) and the repository of FlexUnits.jl (moved to Deduction42), in the README, the manual and the issue templates.
+- The installation instructions of the README and of the getting started page use the General registry (`Pkg.add("ThermophysicalDB")`) now that the package is registered; the GitHub address is kept for the development version.
+- The link checker (`.lychee.toml`) retries a link that answers with a temporary error before failing, and leaves out the one article whose publisher refuses automatic requests.
+
 ## [0.1.0] - 2026-11-18
 
 - Removing and emptying databases (issue 30, first stage): `remove_database!(db, name_or_names; force = false)` moves the folder of a saved database, with its audit log, to a folder of the temporary directory (the system deletes it in due course) and returns its path, so a backup is a copy of that folder; a database with unsaved points is refused unless `force = true`, the archive is never removed, and the event `database_removed` is logged. `clear_database!(db, name)` empties a database and keeps its name, kind, priority and creation time until the next `save_database`
@@ -138,5 +144,6 @@ and this project adheres to [Semantic Versioning].
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/releases/tag/v0.1.0

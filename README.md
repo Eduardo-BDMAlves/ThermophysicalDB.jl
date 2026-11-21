@@ -41,12 +41,14 @@ Experimental data on density, viscosity, thermal conductivity, vapor pressure, h
 
 ## Installation
 
-ThermophysicalDB.jl requires Julia 1.13 or later. Until the package is registered in the General registry, install it from GitHub:
+ThermophysicalDB.jl requires Julia 1.13 or later. It is registered in the General registry, so it installs like any other package:
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl")
+Pkg.add("ThermophysicalDB")
 ```
+
+To try the development version instead, install it from GitHub with `Pkg.add(url = "https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl")`.
 
 ## A first look
 
@@ -86,7 +88,7 @@ If you use ThermophysicalDB.jl in your work, please cite using the reference giv
 
 ## Contributing
 
-If you want to make contributions of any kind, please first take a look at our [contributing guide directly on GitHub](docs/src/90-contributing.md) or the [contributing page on the website](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev/90-contributing/).
+If you want to make contributions of any kind, please first take a look at our [contributing guide directly on GitHub](docs/src/90-contributing.md) or the [contributing page on the website](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable/90-contributing).
 
 ---
 

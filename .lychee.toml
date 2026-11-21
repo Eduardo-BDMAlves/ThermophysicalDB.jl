@@ -5,9 +5,16 @@ exclude = [
   "^https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable/?$",
   "^https://blog.esciencecenter.nl", # due to a certificate error (cf. #556)
   # Zenodo badges answer with an error until the first release exists
-  "^https://zenodo.org/badge/.*$"
+  "^https://zenodo.org/badge/.*$",
+  # The publisher (Wiley) answers a link checker with 403 although the article is there
+  "^https://doi.org/10.1002/jcc.26842$"
 ]
 
 exclude_path = [
   "docs/build"
 ]
+
+# Transient answers (for example a 503 of GitHub Pages) are retried before failing.
+max_retries = 3
+retry_wait_time = 5
+timeout = 30
