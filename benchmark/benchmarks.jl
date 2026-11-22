@@ -6,8 +6,9 @@
 #
 # Groups: "load" (reading a database that exists), "add" (adding points), "filter" (the filters one
 # after another and in one call, with and without a linked compound database), "units" (the same
-# with the units packages), "digits" (the decimal arithmetic of typed numbers, the cleaning of the
-# noise of a conversion and the rounding of `report = :gum`), "template" (the spreadsheet) and
+# with the units packages), "sort" (`sortby` of `table` and `sort` of a table), "digits" (the
+# decimal arithmetic of typed numbers, the cleaning of the noise of a conversion and the rounding
+# of `report = :gum`), "template" (the spreadsheet) and
 # "outliers". The allocations of every benchmark are the memory that AirspeedVelocity compares;
 # the size of what stays in memory after loading is measured by `memory.jl`.
 #
@@ -413,6 +414,67 @@ for (name, backend) in pairs(BACKENDS)
             T.points(DB; component = KEY, property = PROPERTY, temperature = $limits),
             evals = 1,
             samples = 20,
+        ),
+    )
+end
+
+# ----------------------------------------------------------------------------------
+# sort: the points in order, before the table is built (`sortby`) and in a table that exists
+# ----------------------------------------------------------------------------------
+
+sorting = SUITE["sort"] = BenchmarkGroup()
+const EVERY_POINT = T.points(DB)
+
+for (label, view) in (("property", WHOLE_PROPERTY), ("every_point", EVERY_POINT))
+    group = sorting[label] = BenchmarkGroup()
+    register!(
+        group,
+        "table_unsorted",
+        @benchmarkable(T.table($view), evals = 1, samples = 10)
+    )
+    register!(
+        group,
+        "table_sortby_temperature",
+        @benchmarkable(T.table($view; sortby = :temperature), evals = 1, samples = 10),
+    )
+    register!(
+        group,
+        "table_sortby_property_temperature_desc",
+        @benchmarkable(
+            T.table($view; sortby = [:property, :temperature => :desc]),
+            evals = 1,
+            samples = 10,
+        ),
+    )
+    register!(
+        group,
+        "table_sortby_relative_unc",
+        @benchmarkable(T.table($view; sortby = :relative_unc), evals = 1, samples = 10),
+    )
+    # A key that needs the columns: the table is built and then sorted.
+    register!(
+        group,
+        "table_sortby_components",
+        @benchmarkable(T.table($view; sortby = :components), evals = 1, samples = 10),
+    )
+    register!(
+        group,
+        "sort_built_table_temperature",
+        @benchmarkable(
+            sort(t; by = :temperature),
+            setup = (t = T.table($view)),
+            evals = 1,
+            samples = 10,
+        ),
+    )
+    register!(
+        group,
+        "sortperm_built_table_property_temperature",
+        @benchmarkable(
+            sortperm(t; by = [:property, :temperature]),
+            setup = (t = T.table($view)),
+            evals = 1,
+            samples = 10,
         ),
     )
 end

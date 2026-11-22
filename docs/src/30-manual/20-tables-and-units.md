@@ -232,6 +232,42 @@ Showing the table prints a summary computed at that moment from its columns: the
 t
 ```
 
+## Sorting the points
+
+`sortby` puts the points of a table in order, and `rev = true` reverses the direction. A key is a column name, a pair with a direction (`:desc` or `:asc`) or a list of them, the first being the most important:
+
+```@example tab
+table(v; sortby = :temperature, rev = true)
+```
+
+```@example tab
+table(v; sortby = [:property, :temperature => :desc, :unc_k2])
+```
+
+The sort is stable (equal keys keep the order they had) and the points without a value for a key (`NaN`, empty text, an unknown year) always go last, in both directions, so asking for the smallest uncertainty never starts with a point that has none. `:relative_unc`, `unc_k2 / abs(value)`, is a key that is not a column: it has no unit, so it compares the uncertainty of points of different properties. Sorting by `:value`, `:unc` or `:unc_k2` points that have different units (a density and a pressure) compares unlike numbers and gives a warning; put `:property` first, or use `:relative_unc`.
+
+There are two ways, with the same result:
+
+| Where | How | Cost |
+| :-- | :-- | :-- |
+| Before the table is built | `table(v; sortby = ...)`, when every key is one of `year`, `doi`, `source`, `property`, `method`, `phase`, `temperature`, `pressure`, `value`, `unc`, `unc_k`, `unc_level`, `unc_k2` and `relative_unc` | only the key columns are computed and the table is built once, in its final order |
+| In a table that exists | `sort(t; by = ...)` or `sort!(t; by = ...)`, or `table(v; sortby = ...)` with any other key (`components`, `x1`, `database`, the columns of `details = true`, ...) and for a selection of several databases | the table is copied once more, a column at a time |
+
+```@example tab
+t = table(v)
+sort(t; by = [:property, :temperature])[1:3]
+```
+
+`sortperm(t; by)` gives only the order, to sort several tables the same way or to look at the first points (`t[sortperm(t; by = :relative_unc)[1:10]]`). `sort!(t; by)` sorts the table in place: it needs the order (8 bytes a point) and one spare column at a time instead of a copy of the table, which matters for a selection of millions of points. It changes the columns that `t.temperature` returns, so a column taken from the table, or another table that shares it (`t[[:temperature, :value]]`), is sorted too; the database is never touched, because `table` copies the data into columns of its own. The selection `v` is not reordered either; its order is the one that `union`, `intersect` and `setdiff` need.
+
+## Missing values when a table is shown
+
+The summary of a table ends with a line `missing` that counts the entries that the source does not give (`NaN` or empty text) in `temperature`, `pressure`, `value`, `unc`, `unc_k2`, `method` and `phase`, with their share of the points, or says `none`. The points that are listed after the summary mark such an entry with a blank cell and say so below the list. The compositions are not counted, because an empty `x2` is what a pure compound has.
+
+```@example tab
+t
+```
+
 ## Tables.jl
 
 A `DataView` is itself a [Tables.jl](https://tables.juliadata.org) source, and `table` returns a Tables.jl column table, so anything in the ecosystem accepts them directly:

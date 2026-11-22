@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+- Sorting points (issue 42): `table(v; sortby, rev)` sorts the points by a column (`sortby = :temperature`), by a pair with a direction (`:unc_k2 => :desc`) or by a list of keys (`[:property, :temperature => :desc]`), and `sort(t::PointTable; by, rev)`, `sort!` (in place: the order and one spare column at a time instead of a copy of the table) and `sortperm(t::PointTable; by, rev)` do it on a table that exists
+  - The sort is stable and the points without a value for a key (`NaN`, empty text, an unknown year or number of digits) go last in both directions. `:relative_unc` (`unc_k2 / abs(value)`) is a key that is not a column; sorting by `value`, `unc` or `unc_k2` points of different units warns
+  - When every key can be read from the data (`year`, `doi`, `source`, `property`, `method`, `phase`, `temperature`, `pressure`, `value`, `unc`, `unc_k`, `unc_level`, `unc_k2`, `relative_unc`) the rows are sorted before the columns are built, which needs less time and memory; with another key the table is built and then sorted, with the same result. A selection of several databases is sorted after its parts are joined (`database` is a key). The selection itself is not reordered, and `sort!` changes the columns of a table, never the database
+- A shown table says how many of its `temperature`, `pressure`, `value`, `unc`, `unc_k2`, `method` and `phase` the source does not give (the line `missing` of the summary), and the points listed below mark them as blank cells
+
 ## [0.1.1] - 2026-11-21
 
 - Links that were broken are fixed: the contributing page of the website (the address with a final slash is not served), the documentation of Unitful.jl (moved to JuliaPhysics) and the repository of FlexUnits.jl (moved to Deduction42), in the README, the manual and the issue templates.

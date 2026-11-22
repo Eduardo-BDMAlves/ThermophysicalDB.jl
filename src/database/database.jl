@@ -625,24 +625,26 @@ sole_dataset(db::Database) =
     table(view::DatabaseView; kwargs...)
 
 The columns of [`table`](@ref) of every part, one after the other. When the selection has points
-of several databases the column `database` says which one each point comes from.
+of several databases the column `database` says which one each point comes from. `sortby` and `rev`
+sort the points of all the parts together (`database` is a key too), after they are joined.
 """
-function table(v::DatabaseView; kwargs...)
-    length(v.parts) == 1 && return table(v.parts[1]; kwargs...)
+function table(v::DatabaseView; sortby = nothing, rev::Bool = false, kwargs...)
+    length(v.parts) == 1 && return table(v.parts[1]; sortby, rev, kwargs...)
     tables = [
         (v.database.members[i].name, table(p; kwargs...)) for
         (i, p) in zip(v.index, v.parts) if !isempty(p)
     ]
-    isempty(tables) && return table(v.parts[1]; kwargs...)
+    isempty(tables) && return table(v.parts[1]; sortby, rev, kwargs...)
     first_table = tables[1][2]
     cols = keys(first_table)
     merged = NamedTuple{cols}(map(k -> reduce(vcat, (t[k] for (_, t) in tables)), cols))
     names = reduce(vcat, [fill(n, length(t[first(cols)])) for (n, t) in tables])
-    return PointTable(
+    result = PointTable(
         merge(merged, (; database = names)),
         getfield(first_table, :temperature_unit),
         getfield(first_table, :pressure_unit),
     )
+    return finish_sort(result, sortby, rev, false)
 end
 
 # What works with one database as before, for a `Database` and a `DatabaseView` that have one part.
