@@ -8,13 +8,15 @@ This page takes you from an empty Julia environment to a plotted selection of ex
 
 ## Installation
 
-ThermophysicalDB.jl requires Julia 1.13 or later. Until the package is registered in the General registry, install it from GitHub:
+ThermophysicalDB.jl requires Julia 1.13 or later. It is registered in the General registry, so it installs like any other package:
 
 ```julia-repl
-pkg> add https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl
+pkg> add ThermophysicalDB
 ```
 
-To follow the plotting examples you also want a plotting package. The tutorials of this site use [CairoMakie](https://docs.makie.org/stable/) and [Unitful](https://painterqubits.github.io/Unitful.jl/stable/):
+To try the development version instead, use `pkg> add https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl`.
+
+To follow the plotting examples you also want a plotting package. The tutorials of this site use [CairoMakie](https://docs.makie.org/stable/) and [Unitful](https://juliaphysics.github.io/Unitful.jl/stable/):
 
 ```julia-repl
 pkg> add CairoMakie Unitful

@@ -105,3 +105,66 @@ end
     ]
     @test T.DOWNLOAD_STRATEGIES[3].available() == (T.curl_executable() !== nothing)
 end
+
+@testitem "curl gives up on a stalled transfer and honours a finite timeout" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    args = T.curl_arguments(; progress = false, timeout = Inf)
+    i = findfirst(==("--speed-limit"), args)
+    @test i !== nothing && args[i+1] == "1"
+    j = findfirst(==("--speed-time"), args)
+    @test j !== nothing && args[j+1] == string(T.CURL_STALL_SECONDS)
+    @test "--max-time" ∉ args
+    @test "-s" in args && "-#" ∉ args
+
+    capped = T.curl_arguments(; progress = true, timeout = 300.0)
+    k = findfirst(==("--max-time"), capped)
+    @test k !== nothing && capped[k+1] == "300"
+    @test "-#" in capped
+end
+
+@testitem "the time of one download attempt can be limited with an environment variable" tags =
+    [:unit, :fast] begin
+    T = ThermophysicalDB
+    withenv(T.DOWNLOAD_TIMEOUT_ENV => nothing) do
+        @test T.default_download_timeout() == Inf
+    end
+    withenv(T.DOWNLOAD_TIMEOUT_ENV => "300") do
+        @test T.default_download_timeout() == 300.0
+    end
+    for bad in ("soon", "-5", "0")
+        withenv(T.DOWNLOAD_TIMEOUT_ENV => bad) do
+            @test_logs (:warn, r"positive number of seconds") @test T.default_download_timeout() ==
+                                                                    Inf
+        end
+    end
+end
+
+@testitem "curl continues a file that is already there" tags = [:unit, :fast] begin
+    T = ThermophysicalDB
+    plain = T.curl_arguments(; progress = false, timeout = Inf)
+    @test "-C" ∉ plain
+    resumed = T.curl_arguments(; progress = false, timeout = Inf, resume = true)
+    i = findfirst(==("-C"), resumed)
+    @test i !== nothing && resumed[i+1] == "-"
+    path = "/x/ThermoML.tgz.part"
+    @test T.curl_partial_path(path) == path * ".curl-part"
+end
+
+@testitem "a partial file that the server cannot continue is discarded" tags = [:unit] begin
+    T = ThermophysicalDB
+    function failure(code)
+        cmd = `$(Base.julia_cmd()) --startup-file=no -e "exit($code)"`
+        try
+            run(cmd)
+        catch err
+            return err
+        end
+        return nothing
+    end
+    for code in (22, 33, 36)
+        @test T.unusable_partial(failure(code))
+    end
+    @test !T.unusable_partial(failure(28))
+    @test !T.unusable_partial(ErrorException("not a process"))
+end

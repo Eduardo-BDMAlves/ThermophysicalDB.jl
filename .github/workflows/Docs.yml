@@ -34,6 +34,9 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    # A build takes 7 to 22 minutes. Without a limit a stuck step holds the runner for 6 hours
+    # (the limit of the platform) and uses the minutes of the repository for nothing.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -47,6 +50,32 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
+      - name: Restore the ThermoML archive
+        # The archive (about 190 MB) comes from the NIST servers, which sometimes stall. The
+        # last one that worked is kept here, with the database that is built from it, so that
+        # a run only downloads when NIST has published a newer archive.
+        id: archive-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.local/share/ThermophysicalDB/thermoml
+          key: thermoml-${{ runner.os }}-none
+          restore-keys: |
+            thermoml-${{ runner.os }}-
+      - name: Install or update the ThermoML archive
+        # Uses the package itself: a newer archive is downloaded when NIST has one, and when
+        # that fails the restored archive stays in use. With nothing restored and no download
+        # the step fails here, in minutes, and not in the first example of every page.
+        id: archive
+        timeout-minutes: 20
+        run: |
+          julia --project=docs -e '
+            using ThermophysicalDB
+            manifest = ThermophysicalDB.ensure_archive(; update = :install)
+            open(ENV["GITHUB_OUTPUT"], "a") do io
+                println(io, "key=thermoml-", ENV["RUNNER_OS"], "-", manifest.version, "-", first(manifest.sha256, 12))
+            end'
+        env:
+          THERMOPHYSICALDB_DOWNLOAD_TIMEOUT: "900" # seconds for each try
       - name: Run doctest
         run: |
           julia --project=docs -e '
@@ -61,3 +90,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
           GKSwstype: "100" # https://discourse.julialang.org/t/generation-of-documentation-fails-qt-qpa-xcb-could-not-connect-to-display/60988
+      - name: Save the ThermoML archive
+        # Saved even when the build fails, and after it, so that the database built from the
+        # archive is kept too. Nothing is saved when this archive is the one that was restored.
+        if: ${{ always() && steps.archive.outputs.key != '' && steps.archive.outputs.key != steps.archive-cache.outputs.cache-matched-key }}
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.local/share/ThermophysicalDB/thermoml
+          key: ${{ steps.archive.outputs.key }}

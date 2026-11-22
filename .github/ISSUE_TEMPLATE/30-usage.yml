@@ -11,7 +11,7 @@ body:
 
         - You have checked the [documentation](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl) and haven't found enough information
         - There is not an [existing issue](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/issues) with the same question
-        - You have read the [contributing guide](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev/90-contributing/)
+        - You have read the [contributing guide](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable/90-contributing)
         - You are following the [code of conduct](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/blob/main/CODE_OF_CONDUCT.md)
         The form below should help you in filling out this issue.
   - type: textarea

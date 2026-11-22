@@ -263,7 +263,7 @@ status.latest      # the most recent release known
 status.source      # :remote if NIST answered, :builtin otherwise
 ```
 
-[`update_database!`](@ref) installs the latest archive only if the local one is missing or outdated. Old archives are deleted after a successful installation.
+[`update_database!`](@ref) installs the latest archive only if the local one is missing or outdated. Old archives are deleted after a successful installation. If NIST has a newer archive but it cannot be downloaded (the server is unstable, or the file is not the one NIST published), the archive you have stays in use and a warning says so; the next call tries again. Only when nothing is installed is the error thrown. [`database`](@ref) and [`ensure_archive`](@ref) with `update = :install` behave the same way.
 
 ## Integrity
 
@@ -309,7 +309,9 @@ The archive is served by NIST through a redirect, and some networks, proxies and
 
 - A download makes up to **four attempts**, pausing 2, 5 and 10 seconds between them. Each pause is announced in a warning with the reason for the previous failure.
 - Within each attempt it tries up to **three independent ways** of fetching the file: Julia's own downloader, the same downloader with a browser-style `User-Agent`, and the `curl` program of the operating system (which uses the system's network stack, certificates and proxy settings) when it is available.
-- A partial file is never left behind.
+- A transfer that receives no data is cancelled (after 20 seconds by Julia's downloader, after 30 by `curl`), so a server that accepts the connection and then stops sending cannot hold the download for ever. To also limit a transfer that keeps going slowly, set the environment variable `THERMOPHYSICALDB_DOWNLOAD_TIMEOUT` to the seconds that each try may last (there is no limit by default).
+- What the system `curl` received before a try failed is kept next to the archive (`ThermoML.vYYYY-MM-DD.tgz.part.curl-part`), and its next try continues from there, so a server that stops sending now and then lets the download advance instead of starting again from zero. A later call continues too. The file is moved into place only when the transfer is complete, and it is discarded if the server cannot continue it. Whatever is continued is still checked against the SHA-256 that NIST publishes.
+- A partial file is never left behind in place of the archive.
 
 If every attempt fails, the error lists each try and what went wrong, and says what to do:
 

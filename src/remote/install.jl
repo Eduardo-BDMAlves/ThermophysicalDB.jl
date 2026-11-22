@@ -102,6 +102,33 @@ function installed_manifest(dir::AbstractString)::Union{Nothing,Manifest}
     return manifest
 end
 
+# Installs `release`. When that fails because the download did not complete or the file is not
+# the one NIST published, and an archive is already installed, the installed one stays in use:
+# an instability of the NIST servers must not take away data that works. Returns the manifest in
+# use and whether it is the new one. With nothing installed the error is thrown, since there is
+# nothing to fall back on; other errors (a full disk, a bug) are thrown too.
+function install_or_keep(
+    release::Release,
+    installed::Union{Nothing,Manifest};
+    dir::AbstractString,
+    download,
+)::Tuple{Manifest,Bool}
+    try
+        return install_release(release; dir, download), true
+    catch err
+        installed === nothing && rethrow()
+        err isa Union{DownloadError,ChecksumMismatchError} || rethrow()
+        @warn(
+            "Could not install the newer ThermoML archive; the installed one stays in use. " *
+            "Run `update_database!()` again later.",
+            installed_version = installed.version,
+            latest_version = release.version,
+            reason = brief_error(err),
+        )
+        return installed, false
+    end
+end
+
 """
     UpdateStatus
 
@@ -219,7 +246,8 @@ Make sure a verified ThermoML archive is available locally and return its manife
 downloaded. Otherwise `update` decides what happens when NIST has a newer one:
 
   - `:notify` (default): keep using the local archive and log a warning;
-  - `:install`: download and switch to the newer archive;
+  - `:install`: download and switch to the newer archive; if the download fails (or the file
+    is not the one NIST published) the installed archive stays in use and a warning says so;
   - `:never`: do not even contact NIST.
 """
 function ensure_archive(;
@@ -236,7 +264,10 @@ function ensure_archive(;
     if status.state === :not_installed
         return install_release(status.latest; dir, download)
     elseif status.state === :update_available
-        update === :install && return install_release(status.latest; dir, download)
+        if update === :install
+            manifest, _ = install_or_keep(status.latest, status.installed; dir, download)
+            return manifest
+        end
         installed_version = status.installed.version
         latest_version = status.latest.version
         message =
@@ -254,7 +285,9 @@ end
     update_database!(; dir = thermoml_dir()) -> Manifest
 
 Install the latest ThermoML archive if the local one is missing or outdated; otherwise
-leave things as they are. Returns the manifest of the archive in use.
+leave things as they are. Returns the manifest of the archive in use. If NIST has a newer
+archive but it cannot be downloaded (or does not match its published SHA-256), the installed
+archive stays in use and a warning says so; only when nothing is installed is the error thrown.
 """
 function update_database!(;
     dir::AbstractString = thermoml_dir(),
@@ -263,8 +296,8 @@ function update_database!(;
 )::Manifest
     status = check_update(; dir, fetch, download = check_downloader(download))
     if status.state === :not_installed || status.state === :update_available
-        manifest = install_release(status.latest; dir, download)
-        forget_database!()
+        manifest, switched = install_or_keep(status.latest, status.installed; dir, download)
+        switched && forget_database!()
         return manifest
     end
     if status.state === :up_to_date

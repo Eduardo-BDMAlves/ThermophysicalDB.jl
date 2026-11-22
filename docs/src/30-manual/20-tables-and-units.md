@@ -147,7 +147,7 @@ t = table(v; quantities = DynamicQuantities)
 |---|---|---|
 | [Unitful.jl](https://github.com/JuliaPhysics/Unitful.jl) | `Unitful` | the unit is part of the type, so a column is as compact as a `Vector{Float64}` |
 | [DynamicQuantities.jl](https://github.com/SymbolicML/DynamicQuantities.jl) | `DynamicQuantities` | the unit is a value, and the quantities are converted to SI when they are built |
-| [FlexUnits.jl](https://github.com/Deltares/FlexUnits.jl) | `FlexUnits` | experimental; the quantities are converted to SI when they are built |
+| [FlexUnits.jl](https://github.com/Deduction42/FlexUnits.jl) | `FlexUnits` | experimental; the quantities are converted to SI when they are built |
 
 The data are stored as `Float64` in the units of the archive (K, kPa and the unit of each property); quantities exist only at the boundary of the package, when you give a limit and when you ask for a table. The limits of `points` and the units of `reference_summary` accept the quantities of any loaded package.
 
