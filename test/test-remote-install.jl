@@ -408,3 +408,92 @@ end
         @test status.state === :up_to_date
     end
 end
+
+@testitem "a failed update keeps the installed archive in use" setup = [Fixtures] tags =
+    [:unit] begin
+    using Base.CoreLogging: NullLogger, with_logger
+    T = ThermophysicalDB
+    mktempdir() do tmp
+        tgz = Fixtures.make_tgz(joinpath(tmp, "payload.tgz"), Dict("a.json" => "{}"))
+        digest = T.file_sha256(tgz)
+        good = Fixtures.fake_download(tgz, digest)
+        # the server accepts the connection and then stops sending (what the last runs saw)
+        stalled =
+            (url, dest) ->
+                throw(T.DownloadError(url, ["attempt 1, system curl: Operation too slow"]))
+        # the published digest is not the one of the file
+        wrong = Fixtures.fake_download(tgz, repeat("0", 64))
+        old = Fixtures.make_release("2024-01-01")
+        new = Fixtures.make_release("2025-06-01")
+        dir = joinpath(tmp, "cache")
+
+        installed = with_logger(NullLogger()) do
+            T.ensure_archive(; dir, fetch = () -> old, download = good)
+        end
+        @test installed.version == "2024-01-01"
+
+        function still_the_old_one()
+            @test T.read_manifest(dir) == installed
+            @test isfile(joinpath(dir, old.archive_name))
+            @test !isfile(joinpath(dir, new.archive_name))
+            @test !isfile(joinpath(dir, new.archive_name * ".part"))
+        end
+
+        # ensure_archive(update = :install)
+        for download in (stalled, wrong)
+            manifest =
+                @test_logs (:warn, r"the installed one stays in use") match_mode = :any T.ensure_archive(;
+                    update = :install,
+                    dir,
+                    fetch = () -> new,
+                    download,
+                )
+            @test manifest == installed
+            still_the_old_one()
+        end
+
+        # update_database!
+        for download in (stalled, wrong)
+            manifest =
+                @test_logs (:warn, r"the installed one stays in use") match_mode = :any T.update_database!(;
+                    dir,
+                    fetch = () -> new,
+                    download,
+                )
+            @test manifest == installed
+            still_the_old_one()
+        end
+
+        # the warning says which versions and why
+        logs = Test.TestLogger()
+        with_logger(logs) do
+            T.update_database!(; dir, fetch = () -> new, download = stalled)
+        end
+        warning = only(filter(r -> r.level == Base.CoreLogging.Warn, logs.logs))
+        kw = Dict(warning.kwargs)
+        @test kw[:installed_version] == "2024-01-01"
+        @test kw[:latest_version] == "2025-06-01"
+        @test occursin("could not download", kw[:reason])
+
+        # with nothing installed there is nothing to fall back on
+        empty = joinpath(tmp, "empty")
+        @test_throws T.DownloadError begin
+            with_logger(NullLogger()) do
+                T.ensure_archive(; dir = empty, fetch = () -> new, download = stalled)
+            end
+        end
+        @test_throws T.ChecksumMismatchError begin
+            with_logger(NullLogger()) do
+                T.update_database!(; dir = empty, fetch = () -> new, download = wrong)
+            end
+        end
+
+        # and the next update that works switches to the new archive
+        manifest = with_logger(NullLogger()) do
+            T.update_database!(; dir, fetch = () -> new, download = good)
+        end
+        @test manifest.version == "2025-06-01"
+        @test isfile(joinpath(dir, new.archive_name))
+        @test !isfile(joinpath(dir, old.archive_name))
+    end
+end

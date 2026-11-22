@@ -18,9 +18,10 @@ The ThermoML database, ready to query with [`points`](@ref).
 
 The first call ever downloads the archive from NIST, parses it and saves a binary cache
 next to it, which takes a few minutes. Later sessions only check whether NIST has a newer
-archive (`update` as in [`ensure_archive`](@ref): `:notify` warns, `:install` upgrades,
-`:never` stays offline) and then load the cache, which is much faster than parsing. A
-changed archive or schema version rebuilds the cache automatically.
+archive (`update` as in [`ensure_archive`](@ref): `:notify` warns, `:install` upgrades and
+keeps the installed archive if the download fails, `:never` stays offline) and then load the
+cache, which is much faster than parsing. A changed archive or schema version rebuilds the
+cache automatically.
 
 The databases of your own that were saved with [`save_database`](@ref) are opened too (from
 `databases`, by default the folder `databases` next to `dir`; their tables are read only when a

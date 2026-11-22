@@ -41,6 +41,12 @@ end
 
 const DRAFT = get(ENV, "THERMOPHYSICALDB_DOCS_DRAFT", "false") == "true"
 
+# The examples need the ThermoML archive. It is made available here, once, so that a failed
+# download stops the build at once and says why, instead of failing again (for minutes each
+# time) in the first example of every page. In continuous integration an earlier step installs
+# or updates the archive, so nothing is downloaded here.
+DRAFT || ThermophysicalDB.ensure_archive()
+
 # The phases and the pages of the build are timed and a table of where the time went is logged
 # at the end; THERMOPHYSICALDB_DOCS_TIMING=false turns it off.
 const TIMING = get(ENV, "THERMOPHYSICALDB_DOCS_TIMING", "true") != "false"
