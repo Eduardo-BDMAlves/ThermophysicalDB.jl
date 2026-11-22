@@ -151,6 +151,8 @@ audit_checkpoint
 
 ```@docs
 export_points
+thermoml_phases
+thermoml_phase
 ThermophysicalDB.ExportReport
 ```
 

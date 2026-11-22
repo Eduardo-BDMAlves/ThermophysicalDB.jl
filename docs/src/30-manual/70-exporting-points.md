@@ -180,8 +180,39 @@ The elements follow the order that the schema (`xsd:sequence`) demands, and the 
 - A property without a method is written with the method `method not stated`. The uncertainty of each point is always written; the evaluation of the property (method, level of confidence, coverage factor) only when the method is known, and a warning counts the properties for which a level or a factor was left out.
 - Properties whose name the archive writes with a presentation (a ratio or a difference to a reference state) keep the exact presentation. A composition without a known kind cannot be typed and is not written.
 - The constraints of an experiment and the conditions that are not temperature, pressure or composition (frequency, the composition of a solvent, ...) are kept in the condition table and written as `Constraint`s or `Variable`s with their type, number of digits and phase. The phase of a variable, of a property and of its reference state is written with the compound it refers to (the standard allows one per element), and the solvent of a property as its `RegNum`. The constraints on temperature, pressure and composition are kept as the source stated them (with their digits and phase) and written back as `Constraint`; what a constraint fixes is not repeated as a variable of every point.
+- The phase of a property is written as a name of ThermoML, which has a closed list ([`thermoml_phases`](@ref)). The package keeps the phase as the text you gave, and the export translates a state on the saturation curve, which ThermoML has no word for (see below). A phase with no equivalent is refused, with the closest names.
 - The `TRCRefID` of an article is written only when its four parts (year, first author, second author and the others) are known, because the schema requires all of them.
 - `ReactionData` (3% of the articles) is not supported: the package is about properties of substances and mixtures, not of reactions (the heat of combustion of a substance is a pure-compound property and is supported).
+
+#### Phases and saturation
+
+Data at saturation have no pressure of their own: for a pure compound with two phases in equilibrium only the temperature is free (``F = C - P + 2 = 1``), and the pressure is the saturation pressure ``p_\mathrm{sat}(T)``; for a mixture, the temperature and the composition fix the bubble or the dew pressure. The archive says so with the phases that coexist in the block of data (`PhaseID`: `Liquid` and `Gas`), the phase the value belongs to (`PropPhaseID`) and a missing pressure. A point without a pressure can otherwise be at atmospheric pressure and not reported, and the two are different states for a model, so the phase of your own points says which one it is:
+
+| You write | Phase of the property | Phases of the block of data |
+| :-- | :-- | :-- |
+| `Liquid (saturated)` | `Liquid` | `Liquid`, `Gas` |
+| `Vapor (saturated)` | `Gas` | `Gas`, `Liquid` |
+| `Liquid + Vapor (saturated)` (a property of the two phases) | `Liquid` | `Liquid`, `Gas` |
+| `Vapor` | `Gas` | `Gas` |
+
+Case and spaces do not matter, `Vapour` and `Gas` mean `Vapor`, and `(saturated)` may be left out after a `+`. Any other text must be one of [`thermoml_phases`](@ref) (any case); [`thermoml_phase`](@ref) shows what a text becomes. The text you wrote is kept in the file as `sPhaseDescription`, next to the ThermoML phase, so whoever reads it sees that the point is at saturation.
+
+```@example phases
+using ThermophysicalDB
+thermoml_phase("liquid + vapor (saturated)")
+```
+
+The ThermoML formats refuse a phase that has no equivalent, before anything is written, and say how many points have it and which names are the closest:
+
+```text
+ArgumentError: the ThermoML formats need the phase of a point to have a ThermoML name; these have none:
+  "Liquido" (12 points): the closest phases of ThermoML are "Liquid", "Liquid mixture 1", "Liquid (saturated)"
+```
+
+[`update_points!`](@ref) changes the phase of points that are already in a database of yours (`update_points!(db, sel; phase = "Liquid (saturated)")`), and the template of Excel accepts a phase of your own with a menu that has these names. The other formats keep your text as it is.
+
+!!! note "Saturation in the archive"
+    The archive has no marker of its own: the saturation of its points is in the property (`Vapor or sublimation pressure`, `Molar heat capacity at saturation pressure`, `Boiling temperature at pressure P`), written for the liquid or the crystal with `Gas` as the other phase of the block.
 
 !!! note "Enumerations newer than the schema"
     The archive uses some values (`Metastable liquid`, `Static method`, ...) that are newer than the schema copy in the standard; 20 of 2369 articles sampled fail validation in the archive itself, and the export keeps their text.

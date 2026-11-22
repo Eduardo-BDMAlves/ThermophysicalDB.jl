@@ -74,6 +74,9 @@ const LIST_VALUES = (
     phase = [
         "Liquid",
         "Gas",
+        "Liquid (saturated)",
+        "Vapor (saturated)",
+        "Liquid + Vapor (saturated)",
         "Crystal",
         "Glass",
         "Solution",
@@ -907,7 +910,13 @@ function experiment_sheets!(p::Painter, k::Int)
     )
     label!(p, e, 7, 2, "Phase")
     input!(p, e, 7, 3, 5)
-    list_check!(e, "C7", "list_phase"; hint = "The phases that the databases already use.")
+    list_check!(
+        e,
+        "C7",
+        "list_phase";
+        strict = false,
+        hint = "Pick one or type your own. At saturation write Liquid (saturated), Vapor (saturated) or Liquid + Vapor (saturated); ThermoML names are needed to export to ThermoML.",
+    )
     label!(p, e, 8, 2, "Measurement method")
     input!(p, e, 8, 3, 5)
     list_check!(e, "C8", "list_method"; strict = false, hint = "Pick or type your own.")

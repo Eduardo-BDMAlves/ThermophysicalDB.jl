@@ -192,7 +192,7 @@ An experiment that is left without points goes with them; the references stay. T
 
 ### Changing points
 
-[`update_points!`](@ref) changes columns of the points of a selection: `value`, `temperature`, `pressure`, `unc`, `unc_k`, `unc_level` and the amounts `x1`, `x2`, `x3`. Each one is a number for all the points (`NaN` clears it), a vector with a number for each point, or a function of the current number:
+[`update_points!`](@ref) changes columns of the points of a selection: `value`, `temperature`, `pressure`, `unc`, `unc_k`, `unc_level` and the amounts `x1`, `x2`, `x3`. Each one is a number for all the points (`NaN` clears it), a vector with a number for each point, or a function of the current number. `phase` is text, to say that points are at saturation (`phase = "Liquid (saturated)"`; see [Phases and saturation](@ref)) or to correct a phase:
 
 ```julia
 sel = points(db; source = "my_lab", doi = "10.1000/example")

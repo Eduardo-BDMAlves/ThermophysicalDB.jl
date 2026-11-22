@@ -785,43 +785,6 @@ function sheet_message(message::AbstractString, where_)
     return string(sheet, ", row ", rows[i], ": ", m[3])
 end
 
-# The names of phases that the ThermoML schema accepts (`ePhaseName`).
-const THERMOML_PHASES = Set{String}((
-    "Crystal 5",
-    "Crystal 4",
-    "Crystal 3",
-    "Crystal 2",
-    "Crystal 1",
-    "Crystal",
-    "Crystal of unknown type",
-    "Crystal of intercomponent compound 1",
-    "Crystal of intercomponent compound 2",
-    "Crystal of intercomponent compound 3",
-    "Metastable crystal",
-    "Glass",
-    "Smectic liquid crystal",
-    "Smectic liquid crystal 1",
-    "Smectic liquid crystal 2",
-    "Nematic liquid crystal",
-    "Nematic liquid crystal 1",
-    "Nematic liquid crystal 2",
-    "Cholesteric liquid crystal",
-    "Liquid crystal of unknown type",
-    "Liquid",
-    "Liquid mixture 1",
-    "Liquid mixture 2",
-    "Liquid mixture 3",
-    "Solution",
-    "Solution 1",
-    "Solution 2",
-    "Solution 3",
-    "Solution 4",
-    "Fluid (supercritical or subcritical phases)",
-    "Ideal gas",
-    "Gas",
-    "Air at 1 atmosphere",
-))
-
 # The criteria that the data must meet to be written as a valid ThermoML file, beyond what the
 # package needs to store them. Each failure is a text that says what and where.
 function thermoml_failures(args::TemplateArguments, db::Database)
@@ -846,10 +809,9 @@ function thermoml_failures(args::TemplateArguments, db::Database)
             failures,
             "$sheet: the property \"$(e.property)\" is not in the ThermoML list (name it as in the sheet Properties)",
         )
-        (isempty(e.phase) || e.phase in THERMOML_PHASES) || push!(
-            failures,
-            "$sheet: the phase \"$(e.phase)\" is not a ThermoML phase (for example Liquid, Gas, Crystal, Solution)",
-        )
+        phase = e.phase isa AbstractString ? String(e.phase) : ""
+        (isempty(strip(phase)) || phase_meaning(phase) !== nothing) ||
+            push!(failures, "$sheet: " * unknown_phase_message(phase))
         n = length(e.components)
         if n > 1
             short = 0
