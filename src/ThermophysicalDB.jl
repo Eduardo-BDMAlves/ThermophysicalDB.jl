@@ -73,6 +73,7 @@ include("export/check.jl")
 include("export/purity.jl")
 include("export/summary.jl")
 include("export/points.jl")
+include("export/phases.jl")
 include("export/thermoml.jl")
 include("export/conditions.jl")
 include("outliers/stats.jl")
@@ -189,6 +190,8 @@ export COMPOSITION_SCALES,
     set_database_dir!,
     set_uncertainty!,
     table,
+    thermoml_phase,
+    thermoml_phases,
     uncertainty_table,
     update_database!,
     verify_audit_log,

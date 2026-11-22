@@ -37,6 +37,7 @@ mutable struct ThermomlContext
     row_conditions::Dict{Int32,Vector{Int32}}          # variables of the selected points
     derived_digits::Int
     levels_without_method::Int
+    phase_meanings::Dict{Int32,PhaseMeaning}   # what ThermoML calls each phase of the points
 end
 
 function ThermomlContext(view::DataView)
@@ -73,6 +74,7 @@ function ThermomlContext(view::DataView)
         Dict{Int32,Vector{Int32}}(),
         0,
         0,
+        phase_meanings(view),
     )
     cd = ds.conditions
     for i in eachindex(cd.row)
@@ -337,8 +339,9 @@ function reg_nums(text::AbstractString, local_number)
 end
 
 # The schema allows one `RegNum` in a phase of a property: the first compound is kept.
-function phase_object(name, phase, text, local_number)
+function phase_object(name, phase, text, local_number; description = "")
     o = JObject(name => phase)
+    isempty(description) || add!(o, "sPhaseDescription", description)
     regnum = reg_nums(text, local_number)
     isempty(regnum) || add!(o, "RegNum", first(regnum))
     return o
@@ -371,11 +374,17 @@ function thermoml_property(
     component = property_component(context, e, local_number, extras)
     component == 0 || add!(method_id, "RegNum", JObject("nOrgNum" => component))
     p = JObject("nPropNumber" => variant.number, "Property-MethodID" => method_id)
-    phase = pool_string(ds.phases, variant.phase)
-    isempty(phase) || add!(
+    meaning = get(context.phase_meanings, variant.phase, nothing)
+    meaning === nothing || add!(
         p,
         "PropPhaseID",
-        phase_object("ePropPhase", phase, extra_string(extras, "phase_ids"), local_number),
+        phase_object(
+            "ePropPhase",
+            meaning.name,
+            extra_string(extras, "phase_ids"),
+            local_number;
+            description = meaning.description,
+        ),
     )
     presentation = extra_string(extras, "presentation")
     add!(p, "ePresentation", isempty(presentation) ? "Direct value, X" : presentation)
@@ -577,11 +586,23 @@ function thermoml_experiment(
         isempty(phase_text) || append!(names, split(phase_text, "; "))
         if isempty(names)
             for variant in variants
-                p = pool_string(ds.phases, variant.phase)
-                isempty(p) || p in names || push!(names, p)
+                meaning = get(context.phase_meanings, variant.phase, nothing)
+                meaning === nothing && continue
+                for p in meaning.system
+                    p in names || push!(names, p)
+                end
             end
         end
         append!(phases, (name, NO_ID) for name in names)
+    end
+    # a state on the saturation curve has the phases in equilibrium in the block of data, which
+    # is how the archive says that a point has no pressure because it is saturated
+    for variant in variants
+        meaning = get(context.phase_meanings, variant.phase, nothing)
+        (meaning !== nothing && meaning.saturated) || continue
+        for p in meaning.system
+            any(entry -> first(entry) == p, phases) || push!(phases, (p, NO_ID))
+        end
     end
     if !isempty(phases)
         # one `PhaseID` per phase and component: the schema allows a single `RegNum` in each

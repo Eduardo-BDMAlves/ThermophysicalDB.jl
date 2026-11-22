@@ -121,10 +121,11 @@ end
 # ----------------------------------------------------------------------------------
 
 const UPDATE_COLUMNS =
-    (:value, :temperature, :pressure, :unc, :unc_k, :unc_level, :x1, :x2, :x3)
+    (:value, :temperature, :pressure, :unc, :unc_k, :unc_level, :x1, :x2, :x3, :phase)
 
 # What a change of a column needs to be checked: the message and the test of one number.
 function column_check(name::Symbol)
+    name === :phase && return ("is a phase", x -> true)
     name === :value && return ("must be a finite number", x -> isfinite(x))
     name === :temperature &&
         return ("is in K and must be positive (NaN to clear it)", x -> isnan(x) || x > 0)
@@ -204,6 +205,60 @@ function new_numbers(
     )
 end
 
+# The new phases of the `n` selected points as codes of the pool of phases (as numbers, like the
+# other columns): a text, a vector with one text for each point of the selection or a function of
+# the current text. An empty text clears the phase. A phase that the pool does not have is added to
+# it, and stays there even if the change is refused later (a pool entry that no point uses is not
+# shown anywhere).
+function new_phases(
+    ds::Dataset,
+    given,
+    old::Vector{Float64},
+    offset::Integer,
+    total::Integer,
+)
+    n = length(old)
+    texts = if given isa AbstractString
+        fill(String(given), n)
+    elseif given isa AbstractVector
+        length(given) == total || throw(
+            ArgumentError(
+                "phase has $(length(given)) texts for $total selected points; give one text or one per point",
+            ),
+        )
+        all(x -> x isa AbstractString, given) || throw(
+            ArgumentError("phase must be a text, a vector of texts or a function"),
+        )
+        String[given[offset+i] for i = 1:n]
+    elseif given isa Function
+        out = Vector{String}(undef, n)
+        for i = 1:n
+            current = pool_string(ds.phases, Int32(old[i]))
+            y = given(current)
+            y isa AbstractString || throw(
+                ArgumentError(
+                    "the function for phase must return a text, it returned $(repr(y)) for $(repr(current))",
+                ),
+            )
+            out[i] = String(y)
+        end
+        out
+    else
+        throw(
+            ArgumentError(
+                "phase must be a text, a vector of texts or a function of the current text, got $(typeof(given))",
+            ),
+        )
+    end
+    codes = Dict{String,Float64}()
+    return Float64[
+        get!(codes, text) do
+            clean = String(strip(text))
+            isempty(clean) ? Float64(NO_ID) : Float64(intern!(ds.phases, clean))
+        end for text in texts
+    ]
+end
+
 function write_column!(
     ds::Dataset,
     name::Symbol,
@@ -211,6 +266,12 @@ function write_column!(
     values::Vector{Float64},
 )
     m = ds.measurements
+    if name === :phase
+        @inbounds for (k, r) in enumerate(rows)
+            m.phase[r] = Int32(values[k])
+        end
+        return nothing
+    end
     col, digits = if name === :value
         (m.value, m.digits)
     elseif name === :temperature
@@ -277,7 +338,7 @@ end
 
 """
     update_points!(db, selection; value, temperature, pressure, unc, unc_k, unc_level,
-                   x1, x2, x3, on_conflict = :ask, rules) -> NamedTuple
+                   x1, x2, x3, phase, on_conflict = :ask, rules) -> NamedTuple
 
 Change columns of the points of `selection` (the result of [`points`](@ref)), in the databases of your
 own that hold them. Each keyword is one of:
@@ -294,6 +355,11 @@ rules as when a point is added, so a mistake changes nothing. The digits that th
 number that changes are forgotten (a number written with fewer digits in the source is no longer
 that number). The uncertainties of the conditions (`uncertainty_table`) are not changed.
 
+`phase` is text: the same for every point (`phase = "Liquid (saturated)"`; `""` clears it), a
+vector with one text for each point, or a function of the current text. It is how a point is
+said to be on the saturation curve, and what [`thermoml_phase`](@ref) translates when the points
+are exported to ThermoML; the text is not checked here, so you can use a phase of your own.
+
 Nothing is renumbered, so what you hold from before stays valid. If a change makes a point repeat
 another one (see [`duplicates`](@ref)) that did not repeat it before, `on_conflict` says what to do:
 `:ask` (default; asks in a terminal session, an error in a script), `:keep` (keep the change, with a
@@ -304,6 +370,7 @@ warning) or `:error` (undo it). The change is in memory until [`save_database`](
 sel = points(db; source = "my_lab", doi = "10.1000/example")
 update_points!(db, sel; value = v -> v * 1.002)   # a calibration factor
 update_points!(db, sel; pressure = 101.325)       # one number for all
+update_points!(db, sel; phase = "Liquid (saturated)")   # the points are at saturation
 ```
 """
 function update_points!(
@@ -342,7 +409,9 @@ function update_points!(
         for (name, given) in changes
             given === nothing && continue
             old = column_values(ds, name, p.rows)
-            new = new_numbers(name, given, old, offset, total)
+            new =
+                name === :phase ? new_phases(ds, given, old, offset, total) :
+                new_numbers(name, given, old, offset, total)
             what, ok = column_check(name)
             for (k, x) in enumerate(new)
                 ok(x) || throw(
