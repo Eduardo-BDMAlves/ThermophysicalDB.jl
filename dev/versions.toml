@@ -25,6 +25,6 @@ Unitful = "1.29.0"
 XLSX = "0.13.4"
 
 [thermophysicaldb]
-commit = "644d5dc790dc5b9a2f5011d67ac71714b4409335"
+commit = "97d4a45d7054a2cb50cd45a7030fb4697017b3b9"
 uncommitted_changes = false
 version = "0.1.1"
