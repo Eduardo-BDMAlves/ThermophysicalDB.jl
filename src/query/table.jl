@@ -33,7 +33,8 @@ function k2_uncertainty(unc, k, level, policy)
 end
 
 """
-    table(view; units = :native, policy = :nominal, quantities = nothing) -> PointTable
+    table(view; units = :native, policy = :nominal, quantities = nothing, sortby = nothing,
+          rev = false) -> PointTable
 
 Materialise a [`DataView`](@ref) as a [`PointTable`](@ref): the columns of the selection (a
 valid Tables.jl table, so `DataFrame(table(v))` works), indexed like a data frame
@@ -82,12 +83,26 @@ does not (a symbol that is not known here), the units package converts. `tempera
 and `pressure_unit` give the columns `temperature` and `pressure` in any unit of those
 quantities, as text (`"degC"`, `"degF"`, `"mK"`, `"bar"`, `"mbar"`, `"psi"`, `"N/m2"`) or as
 a unit object; `pressure_unit` cannot be combined with `units = :si`.
+
+`sortby` sorts the points: a column name (`sortby = :temperature`), a pair with a direction
+(`:unc_k2 => :desc`) or a list of them, the first being the most important
+(`sortby = [:property, :temperature]`); `rev = true` reverses the keys given without a
+direction, and `:relative_unc` (`unc_k2 / abs(value)`) is a key too. The sort is stable, and the
+points without a value for a key (`NaN`, empty text) go last. When every key is one of `year`,
+`doi`, `source`, `property`, `method`, `phase`, `temperature`, `pressure`, `value`, `unc`,
+`unc_k`, `unc_level`, `unc_k2` and `relative_unc`, the points are sorted before the columns are
+built, which takes less time and memory. With another key (`components`, `x1`, `database`, a
+column of `details = true`, ...) the table is built and then sorted by `sort(t; by)`, and so it
+is for a selection of several databases; the result is the same. The selection itself is not
+reordered. [`sort`](@ref Base.sort(::ThermophysicalDB.PointTable)) tells more about the keys.
 """
 function table(
     view::DataView;
     units::Symbol = :native,
     policy::Symbol = :nominal,
     quantities = nothing,
+    sortby = nothing,
+    rev::Bool = false,
     unit = nothing,
     temperature_unit = nothing,
     pressure_unit = nothing,
@@ -140,6 +155,28 @@ function table(
     end
     pressure_factor = units === :si ? 1.0e3 : 1.0
 
+    # With keys that can be read from the data the rows are sorted here, so the columns are built
+    # in their final order; the view that goes on has its rows out of the ascending order that
+    # the set operations of a `DataView` need, and is only used by this function.
+    presorted = false
+    if sortby !== nothing
+        sort_order = sort_keys(sortby, rev)
+        if presortable(sort_order)
+            ordered = presorted_rows(
+                view,
+                sort_order,
+                factor,
+                offset,
+                unit_of,
+                pressure_factor,
+                policy,
+            )
+            view = DataView(ds, ordered)
+            rows = view.rows
+            presorted = true
+        end
+    end
+
     label = Vector{String}(undef, length(ex))
     kinds = Vector{String}(undef, length(ex))
     seen = falses(length(ex))
@@ -189,9 +226,7 @@ function table(
             x[j][i] = m.composition[j][r]
         end
         o = offset[p]
-        value[i] =
-            f == 1.0 && iszero(o) ? m.value[r] :
-            clean_float(iszero(o) ? m.value[r] * f : muladd(m.value[r], f, o))
+        value[i] = scaled_value(m.value[r], f, o)
         unit[i] = unit_of[p]
         unc[i] = f == 1.0 ? m.unc[r] : clean_float(m.unc[r] * f)
         unc_k[i] = m.unc_k[r]
@@ -274,13 +309,19 @@ function table(
     end
     temperature_unit = t_choice === nothing ? "K" : t_choice.text
     pressure_unit = p_choice !== nothing ? p_choice.text : units === :si ? "Pa" : "kPa"
-    backend === nothing && return PointTable(columns, temperature_unit, pressure_unit)
-    return PointTable(
-        attach_units(columns, units, backend, chosen, t_choice, p_choice),
-        temperature_unit,
-        pressure_unit,
-    )
+    result =
+        backend === nothing ? PointTable(columns, temperature_unit, pressure_unit) :
+        PointTable(
+            attach_units(columns, units, backend, chosen, t_choice, p_choice),
+            temperature_unit,
+            pressure_unit,
+        )
+    return finish_sort(result, sortby, rev, presorted)
 end
+
+# A value in the unit asked for: `f` is the scale and `o` the offset of the conversion.
+@inline scaled_value(x, f, o) =
+    f == 1.0 && iszero(o) ? x : clean_float(iszero(o) ? x * f : muladd(x, f, o))
 
 # The unit asked for the temperature or the pressure: as text, converted by the exact
 # arithmetic of the package (kelvin and kilopascal are the native units; degC and degF have an
@@ -520,5 +561,7 @@ function print_points(io::IO, cols, n::Integer, hidden::Integer)
         println(io, join((pad(cells[keep[k]][i], k) for k in eachindex(keep)), "  "))
     end
     hidden > 0 && println(io, "… and ", hidden, " more points")
+    blank = any(j -> any(isempty, cells[j]), keep)
+    blank && println(io, "(a blank cell is a value that the source does not give)")
     return nothing
 end

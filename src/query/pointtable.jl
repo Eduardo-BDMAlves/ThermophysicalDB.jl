@@ -303,6 +303,25 @@ end
 
 const SUMMARY_GROUPS = 6
 
+# The columns where an entry that is not given is `NaN` or an empty text; the compositions are
+# left out, because for a pure compound or a binary the last ones are empty by construction.
+const MISSING_CHECKED = (:temperature, :pressure, :value, :unc, :unc_k2, :method, :phase)
+
+# How many entries of the columns above are not given, as "unc 120 (2.4 %), ...", or "none".
+function missing_text(t::PointTable)
+    n = nrows(t)
+    parts = String[]
+    for name in MISSING_CHECKED
+        haskey(t, name) || continue
+        count = sum(missing_entry, column(t, name))
+        count == 0 && continue
+        share = round(100 * count / n; sigdigits = 2)
+        shown = isinteger(share) ? string(Int(share)) : string(share)
+        push!(parts, string(name, " ", count, " (", shown, " %)"))
+    end
+    return isempty(parts) ? "none (NaN or empty text)" : join(parts, ", ")
+end
+
 function print_summary(io::IO, t::PointTable)
     n = nrows(t)
     println(io, "PointTable: ", n, " points × ", ncols(t), " columns")
@@ -353,6 +372,8 @@ function print_summary(io::IO, t::PointTable)
         text = range_text(finite_range(column(t, name)))
         isempty(text) || push!(lines, label => text)
     end
+    any(name -> haskey(t, name), MISSING_CHECKED) &&
+        push!(lines, "missing" => missing_text(t))
     width = maximum(length ∘ first, lines; init = 0)
     for (label, text) in lines
         println(io, "  ", rpad(label, width), "  ", text)

@@ -46,6 +46,9 @@ measurement_methods
 DataView
 table
 PointTable
+Base.sort(::ThermophysicalDB.PointTable)
+Base.sort!(::ThermophysicalDB.PointTable)
+Base.sortperm(::ThermophysicalDB.PointTable)
 sample_table
 purity_step_table
 condition_table
@@ -189,5 +192,5 @@ These docstrings document the implementation. They are not part of the public in
 ```@autodocs
 Modules = [ThermophysicalDB]
 Public = false
-Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.TemplateData, ThermophysicalDB.TemplateExperiment, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult, ThermophysicalDB.Registry, ThermophysicalDB.Catalog, ThermophysicalDB.loaded_tables, ThermophysicalDB.LAZY_FIELDS, Base.union, Base.intersect, Base.setdiff))
+Filter = x -> !any(y -> x === y, (ThermophysicalDB.Dataset, ThermophysicalDB.TemplateData, ThermophysicalDB.TemplateExperiment, ThermophysicalDB.CompoundMatches, ThermophysicalDB.CompoundLinks, ThermophysicalDB.CompoundRecords, ThermophysicalDB.PubChemError, ThermophysicalDB.ExportReport, ThermophysicalDB.ReferenceSummary, ThermophysicalDB.BibtexReport, ThermophysicalDB.OutlierResult, ThermophysicalDB.Registry, ThermophysicalDB.Catalog, ThermophysicalDB.loaded_tables, ThermophysicalDB.LAZY_FIELDS, Base.union, Base.intersect, Base.setdiff, Base.sort, Base.sort!, Base.sortperm))
 ```
