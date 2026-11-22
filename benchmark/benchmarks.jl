@@ -430,7 +430,7 @@ for (label, view) in (("property", WHOLE_PROPERTY), ("every_point", EVERY_POINT)
     register!(
         group,
         "table_unsorted",
-        @benchmarkable(T.table($view), evals = 1, samples = 10)
+        @benchmarkable(T.table($view), evals = 1, samples = 10),
     )
     register!(
         group,
