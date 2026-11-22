@@ -161,6 +161,9 @@ function property_matcher(list::AbstractVector)
     matchers = property_matcher.(list)
     return p -> any(m -> m(p), matchers)
 end
+# What `measured_properties` returns can be given as it is.
+property_matcher(listing::NamedTuple{(:property, :points)}) =
+    property_matcher(listing.property)
 
 function property_mask(ds::Dataset, property)
     property === nothing && return trues(length(ds.properties))

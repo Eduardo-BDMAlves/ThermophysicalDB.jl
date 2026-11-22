@@ -43,6 +43,7 @@ find_compounds
 ThermophysicalDB.CompoundMatches
 phases
 measurement_methods
+measured_properties
 DataView
 table
 PointTable
