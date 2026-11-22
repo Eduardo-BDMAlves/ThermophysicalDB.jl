@@ -149,11 +149,25 @@ points(db; component = "water", exact = true, property = r"[Vv]iscosity") |> len
 points(db; component = "water", exact = true, property = ["Mass density", "Speed of sound"]) |> length
 ```
 
-To find out which properties exist for a substance, ask the table of its points:
+[`measured_properties`](@ref) lists the properties that a selection (or a database) has, with the number of points, the most frequent first, without listing any point. `search` narrows the list: text that the label contains (any case), a `Regex`, a function of the label, or a vector of any of these (a property is kept when any matches).
 
 ```@example sel
-unique(table(points(db; component = "water", exact = true)).property)
+measured_properties(points(db; component = "water", exact = true))
 ```
+
+```@example sel
+# everything about viscosity or about the speed of sound, anywhere in the database
+found = measured_properties(db; search = ["viscosity", r"[Ss]peed of sound"])
+first(found.property, 3)
+```
+
+What it returns goes straight to `property`, so every property found is selected at once:
+
+```@example sel
+length(points(db; component = "water", exact = true, property = found))
+```
+
+A search that matches nothing gives empty columns, and `points` with an empty list of properties is an `ArgumentError`.
 
 ## Temperature and pressure
 

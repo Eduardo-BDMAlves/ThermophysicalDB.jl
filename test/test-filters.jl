@@ -278,3 +278,48 @@ end
     @test phases(db).phase == ["Gas", "Liquid"] && phases(db).points == [8, 7]
     @test measurement_methods(points(db; duplicate = true)).points == [8, 7]
 end
+
+@testitem "measured_properties lists and searches the properties" setup = [FilterData] tags =
+    [:unit, :fast] begin
+    using ThermophysicalDB: ThermophysicalDB, points, measured_properties, table
+    T = ThermophysicalDB
+    ds = FilterData.build()
+    all_of = measured_properties(ds)
+    @test all_of.property == ["Mass density", "Thermal conductivity"]
+    @test all_of.points == [7, 4]
+    @test keys(all_of) == (:property, :points)
+
+    # text (a substring, any case), a regular expression, a function and a vector
+    @test measured_properties(ds; search = "DENS").property == ["Mass density"]
+    @test measured_properties(ds; search = " conduct ").points == [4]   # spaces around are ignored
+    @test measured_properties(ds; search = "conduct").points == [4]
+    @test measured_properties(ds; search = r"^Thermal").property == ["Thermal conductivity"]
+    @test measured_properties(ds; search = p -> endswith(p, "density")).points == [7]
+    @test measured_properties(ds; search = ["density", "conduct"]) == all_of
+    @test measured_properties(ds; search = "").property == all_of.property
+    @test measured_properties(ds; search = "critical") ==
+          (property = String[], points = Int[])
+    @test_throws TypeError measured_properties(ds; search = p -> 1)
+
+    # a selection only counts its own points
+    gas = points(ds; phase = "gas")
+    @test measured_properties(gas) == (property = ["Thermal conductivity"], points = [4])
+
+    # it goes straight to `points`, as the result or as its column
+    found = measured_properties(ds; search = ["density", "conduct"])
+    @test length(points(ds; property = found)) == 11
+    @test length(points(ds; property = found.property)) == 11
+    @test length(points(ds; property = measured_properties(ds; search = "conduct"))) == 4
+    @test_throws ArgumentError points(ds; property = measured_properties(ds; search = "x"))
+
+    # databases add the counts of their members by label
+    db = T.Database([
+        T.Member("a"; kind = :thermoml, dataset = ds),
+        T.Member("b"; kind = :user, dataset = FilterData.build(; liquids = false)),
+    ])
+    @test measured_properties(db) ==
+          (property = ["Thermal conductivity", "Mass density"], points = [8, 7])
+    @test measured_properties(db; search = "density").points == [7]
+    @test measured_properties(points(db; duplicate = true); search = "conduct").points ==
+          [8]
+end

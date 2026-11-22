@@ -715,6 +715,12 @@ end
 # Which phases and methods there are (see `query/filters.jl`)
 # ----------------------------------------------------------------------------------
 
+measured_properties(v::DatabaseView; search = nothing) =
+    joined_count_table(:property, [measured_properties(p; search) for p in parts(v)])
+measured_properties(db::Database; search = nothing) = joined_count_table(
+    :property,
+    [measured_properties(member_dataset(m); search) for m in db.members],
+)
 phases(v::DatabaseView) = joined_count_table(:phase, phases.(parts(v)))
 measurement_methods(v::DatabaseView) =
     joined_count_table(:method, measurement_methods.(parts(v)))

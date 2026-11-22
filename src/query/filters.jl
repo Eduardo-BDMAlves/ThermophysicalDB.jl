@@ -364,6 +364,58 @@ measurement_methods(view::DataView) = count_table(
 )
 measurement_methods(ds::Dataset) = measurement_methods(DataView(ds))
 
+# What `measured_properties(...; search)` looks for in the label of a property: text that the
+# label contains (any case), a regular expression, a predicate of the label, or a list of any.
+search_matcher(text::AbstractString) =
+    (needle = lowercase(strip(text)); p -> occursin(needle, lowercase(p)))
+search_matcher(pattern::Regex) = p -> occursin(pattern, p)
+search_matcher(predicate::Function) = p -> predicate(p)::Bool
+function search_matcher(list::AbstractVector)
+    matchers = search_matcher.(list)
+    return p -> any(m -> m(p), matchers)
+end
+
+"""
+    measured_properties(source; search = nothing) -> NamedTuple
+
+The properties that the points of a dataset, a selection ([`DataView`](@ref),
+[`DatabaseView`](@ref)) or a database have, as the columns `property` (the label that the
+keyword `property` of [`points`](@ref) takes) and `points` (how many points have it), the most
+frequent first. It lists names, not points.
+
+`search` keeps the properties whose label matches: text that the label contains (any case:
+`"critical"`), a `Regex`, a function of the label that returns `true` or `false`, or a vector of
+any of these (a property is kept when any of them matches). A search that matches nothing gives
+empty columns.
+
+The column `property`, or the result itself, can be given to `points` to select all of them at
+once:
+
+```julia
+critical = measured_properties(db; search = "critical")
+points(db; component = "water", exact = true, property = critical.property)
+points(db; property = critical)                  # the same
+```
+"""
+function measured_properties(view::DataView; search = nothing)
+    ds = view.dataset
+    labels = ds.properties.label
+    counts = zeros(Int, length(labels))
+    codes = ds.measurements.property
+    for r in view.rows
+        counts[Int(codes[r])] += 1
+    end
+    keep = search === nothing ? Returns(true) : search_matcher(search)
+    order = [i for i in eachindex(labels) if counts[i] > 0 && keep(labels[i])]
+    sort!(order; by = i -> (-counts[i], labels[i]))
+    return (
+        property = String[labels[i] for i in order],
+        points = Int[counts[i] for i in order],
+    )
+end
+measured_properties(ds::Dataset; search = nothing) =
+    measured_properties(DataView(ds); search)
+
 # Several datasets have pools of their own: the counts are added by text.
 function joined_count_table(name::Symbol, tables)
     totals = Dict{String,Int}()
