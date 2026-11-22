@@ -304,6 +304,13 @@ function figure_comparison(
     )
 end
 
+# A mask with the given rows.
+function rows_mask(rows::AbstractVector{<:Integer}, n::Integer)
+    mask = falses(n)
+    mask[rows] .= true
+    return mask
+end
+
 # The keywords that are options of the figure and the ones that filter the selection.
 const OPTION_KEYS = (:style, :colormap, :unitformat, :uncertainty, :marker_by)
 function split_options(kwargs)
@@ -369,7 +376,7 @@ function figure_lines(
         level[c] .= m
     end
     keep = findall(isfinite, level)
-    sub = keep == 1:length(d) ? d : subset(d, [isfinite(l) for l in level])
+    sub = keep == 1:length(d) ? d : subset_data(d, [isfinite(l) for l in level])
     cond_keep = level[keep]
     groups = point_groups(sub, o.marker_by)
     layers = group_layers(o.style, groups, xs[keep], ys[keep]; color = cond_keep)
@@ -669,7 +676,7 @@ function figure_xpt(
     base = findall(.!mask)
     layers = Layer[]
     if !isempty(base)
-        sub = length(base) == length(d) ? d : subset(d, .!mask)
+        sub = length(base) == length(d) ? d : subset_data(d, .!mask)
         groups = point_groups(sub, o.marker_by)
         append!(layers, group_layers(o.style, groups, xs[base], ys[base]; color = cs[base]))
     end
@@ -803,7 +810,7 @@ function figure_facets(
     else
         only_property(d)
         [
-            (g.label, subset(d, [i in Set(g.rows) for i = 1:length(d)])) for
+            (g.label, subset_data(d, rows_mask(g.rows, length(d)))) for
             g in point_groups(d, by; maxgroups = maxpanels)
         ]
     end
@@ -853,7 +860,7 @@ function figure_facets(
     tags = panel_tags(n, panel_labels, n > 1)
     panels = [with_tag(p, tags[i]) for (i, p) in enumerate(panels)]
     colorbar =
-        limits === nothing ? nothing :
+        (color === nothing || limits === nothing) ? nothing :
         ColorbarSpec(
             variable_label(d, color; format = o.format),
             o.style.colormap,

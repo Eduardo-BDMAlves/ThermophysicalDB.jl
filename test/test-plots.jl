@@ -257,7 +257,7 @@ end
         for g in point_groups(d, :reference)
             mask[g.rows[1:3]] .= true
         end
-        return ThermophysicalDB.subset(d, mask)
+        return ThermophysicalDB.subset_data(d, mask)
     end
     res = only(plot_residuals(d; model = truth, spec = true).panels)
     @test res.xticks[2] == ["10.1/a", "10.1/b", "10.1/c"]

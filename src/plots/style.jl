@@ -45,7 +45,7 @@ const MARKERS = [
 # (see `docs/DocsSetup.jl`): made for a dark panel.
 const NEON_COLORS =
     ["#4f6bff", "#ff7a1a", "#2fe0ff", "#ffd36b", "#ff2f3f", "#c8ff4d", "#a98bff", "#58ff7a"]
-const NEON_GRADIENT = ["#3347ff", "#6f8cff", "#f2f5ff", "#ff7a1a", "#ff2f3f"]
+const NEON_GRADIENT = ["#3347ff", "#8a3fc0", "#ff2f3f", "#ff7a1a"]
 const NEON_MARKERS = [:circle, :utriangle, :rect, :diamond, :dtriangle, :star5]
 
 """
@@ -157,8 +157,8 @@ function stored_defaults()
     raw isa AbstractDict || return Dict{Symbol,Any}()
     out = Dict{Symbol,Any}()
     for (k, v) in raw
-        key = Symbol(k)
-        haskey(DEFAULT_SETTINGS, key) || continue
+        key = Symbol(k)::Symbol
+        key in keys(DEFAULT_SETTINGS) || continue
         value = v == "" ? nothing : Symbol(v)
         try
             out[key] = check_default(key, value)

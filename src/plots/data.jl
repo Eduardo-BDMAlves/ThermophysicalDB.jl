@@ -98,7 +98,7 @@ function plotdata(
 end
 
 # The part of the data in a mask (a table with those rows, the calculated values of them).
-function subset(d::PlotData, mask::AbstractVector{Bool})
+function subset_data(d::PlotData, mask::AbstractVector{Bool})
     t = d.table[mask]
     return PlotData(t, d.calc === nothing ? nothing : d.calc[mask])
 end
@@ -106,7 +106,7 @@ end
 # One data set per property, for the facets.
 function split_properties(d::PlotData)
     col = column(d, :property)
-    return [(name, subset(d, col .== name)) for name in unique(col)]
+    return [(name, subset_data(d, col .== name)) for name in unique(col)]
 end
 
 # ----------------------------------------------------------------------------------

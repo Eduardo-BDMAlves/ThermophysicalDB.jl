@@ -52,7 +52,9 @@ end
 function unit_term(token::AbstractString, sign::Int)
     m = match(r"^([^\d^\-]+)\^?(-?\d+)?$", token)
     m === nothing && return nothing
-    name, power = m[1], m[2] === nothing ? 1 : parse(Int, m[2])
+    name = String(m[1]::SubString{String})
+    exponent = m[2]
+    power = exponent === nothing ? 1 : parse(Int, exponent)
     power *= sign
     base = get(UNIT_TEX, name, string(raw"\mathrm{", name, "}"))
     power == 1 && return base
