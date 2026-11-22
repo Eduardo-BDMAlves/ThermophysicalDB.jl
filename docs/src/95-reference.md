@@ -171,6 +171,31 @@ ThermophysicalDB.ReferenceSummary
 ThermophysicalDB.BibtexReport
 ```
 
+## Figures
+
+```@docs
+plotdata
+plot_comparison
+plot_isotherms
+plot_isobars
+plot_parity
+plot_residuals
+plot_xpt
+plot_facets
+plot_by_reference
+render
+PlotData
+FigureSpec
+plot_defaults
+reset_plot_defaults!
+plot_style
+PlotStyle
+axis_label
+register_symbol!
+deviation
+DeviationSpec
+```
+
 ## Detecting outliers
 
 ```@docs

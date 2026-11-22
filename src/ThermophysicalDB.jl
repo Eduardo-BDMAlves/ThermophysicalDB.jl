@@ -100,6 +100,15 @@ include("database/remove.jl")
 include("database/conflicts.jl")
 include("database/edit.jl")
 include("database/template.jl")
+include("plots/symbols_table.jl")
+include("plots/labels.jl")
+include("plots/deviation.jl")
+include("plots/kde.jl")
+include("plots/style.jl")
+include("plots/spec.jl")
+include("plots/data.jl")
+include("plots/builders.jl")
+include("plots/api.jl")
 include("precompile.jl")
 
 export COMPOSITION_SCALES,
@@ -142,6 +151,26 @@ export COMPOSITION_SCALES,
     convert_composition,
     DataView,
     PointTable,
+    DeviationSpec,
+    FigureSpec,
+    PlotData,
+    PlotStyle,
+    axis_label,
+    deviation,
+    plot_by_reference,
+    plot_comparison,
+    plot_defaults,
+    plot_facets,
+    plot_isobars,
+    plot_isotherms,
+    plot_parity,
+    plot_residuals,
+    plot_style,
+    plot_xpt,
+    plotdata,
+    register_symbol!,
+    render,
+    reset_plot_defaults!,
     UncertaintyTerm,
     audit_checkpoint,
     audit_log,
