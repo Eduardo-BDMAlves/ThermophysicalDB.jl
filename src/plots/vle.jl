@@ -420,7 +420,7 @@ function figure_vle(
         nrows = cld(n, nc),
         ncols = nc,
         style = o.style,
-        size = (360 * nc + 140, 320 * cld(n, nc)),
+        size = grid_size(nc, cld(n, nc); legend = true),
     )
 end
 
@@ -705,5 +705,11 @@ function figure_saturation(
     n = length(panels)
     tags = panel_tags(n, panel_labels, n > 1)
     panels = [with_tag(p, tags[i]) for (i, p) in enumerate(panels)]
-    return FigureSpec(; panels, nrows = 1, ncols = n, style, size = (420 * n + 120, 400))
+    return FigureSpec(;
+        panels,
+        nrows = 1,
+        ncols = n,
+        style,
+        size = (480 * n + LEGEND_PIXELS, 420),
+    )
 end

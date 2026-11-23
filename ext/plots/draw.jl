@@ -224,7 +224,9 @@ end
 
 # More entries than this have no room inside a panel: they go to a panel of their own, at the right.
 const MAX_INNER_LEGEND = 6
-const LEGEND_WIDTH = 0.3
+
+# The share of the width that a shared legend takes: the pixels that the builders reserve for it.
+legend_width(spec::T.FigureSpec) = clamp(T.LEGEND_PIXELS / spec.size[1], 0.2, 0.35)
 
 @recipe function f(spec::T.FigureSpec)
     style = spec.style
@@ -234,14 +236,15 @@ const LEGEND_WIDTH = 0.3
     # With a shared legend the grid has one more column; panel i is at (row, column) of the old one.
     slot(i) = shared ? ((i - 1) ÷ nc) * (nc + 1) + (i - 1) % nc + 1 : i
     if shared
-        layout := Plots.grid(
-            nr,
-            nc + 1;
-            widths = vcat(fill((1 - LEGEND_WIDTH) / nc, nc), LEGEND_WIDTH),
-        )
-        size := (round(Int, spec.size[1] / (1 - LEGEND_WIDTH)), spec.size[2])
+        lw = legend_width(spec)
+        layout := Plots.grid(nr, nc + 1; widths = vcat(fill((1 - lw) / nc, nc), lw))
+        size := spec.size
     else
-        layout := (nr, nc)
+        if length(spec.heights) == nr
+            layout := Plots.grid(nr, nc; heights = spec.heights ./ sum(spec.heights))
+        else
+            layout := (nr, nc)
+        end
         size := spec.size
     end
     background_color := color_of(style.background)
@@ -252,6 +255,9 @@ const LEGEND_WIDTH = 0.3
     tickfontsize := 8
     guidefontsize := 10
     titlefontsize := 10
+    left_margin := 6 * Plots.mm
+    bottom_margin := 4 * Plots.mm
+    right_margin := 3 * Plots.mm
     for (k, panel) in enumerate(spec.panels)
         sub = subplot_attributes(spec, panel)
         shared && (sub[:legend] = false)

@@ -419,6 +419,26 @@ end
     end
 end
 
+@testitem "the comparison takes the relative heights of its panels" setup = [PlotSamples] tags =
+    [:unit] begin
+    using ThermophysicalDB
+    d = PlotSamples.data()
+    truth = PlotSamples.truth
+    default = ThermophysicalDB.figure_comparison(d; model = truth)
+    @test default.heights == [3.0, 1.0]
+    wide = ThermophysicalDB.figure_comparison(d; model = truth, heights = (4, 1))
+    @test wide.heights == [4.0, 1.0]
+    @test_throws ArgumentError ThermophysicalDB.figure_comparison(
+        d;
+        model = truth,
+        heights = (0, 1),
+    )
+    # The grids of panels leave room for the legend and the colour bar.
+    plain = ThermophysicalDB.figure_facets(d; by = :reference)
+    coloured = ThermophysicalDB.figure_facets(d; by = :reference, color = :temperature)
+    @test coloured.size[1] > plain.size[1]
+end
+
 @testitem "the Makie extension draws every figure" setup = [PlotSamples] tags = [:unit] begin
     using ThermophysicalDB
     using CairoMakie

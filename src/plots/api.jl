@@ -30,6 +30,8 @@ default; `args = (:temperature,)` gives `model(T)`, `args = (:temperature, :x1)`
 given to [`plotdata`](@ref) as `calc`. `deviation` is one of $(DEVIATION_KINDS) (see
 [`DeviationSpec`](@ref); `deviation_unit`, `absolute_value`, `alpha` and `epsilon` are its
 options). The points of the deviation panel show their uncertainty as `uncertainty` says.
+`heights = (3, 1)` are the relative heights of the two panels (75 % for the values, 25 % for the
+deviations); `heights = (4, 1)` gives 80 % and 20 %.
 
 $PLOT_COMMON
 """

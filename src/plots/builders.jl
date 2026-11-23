@@ -224,6 +224,19 @@ end
 # Comparison with a model: values and deviations
 # ----------------------------------------------------------------------------------
 
+# The relative heights of the panels of a comparison: the values and the deviations.
+const DEFAULT_COMPARISON_HEIGHTS = (3, 1)
+
+# The size in pixels of a cell of a grid of panels, and what the legend and the colour bar take.
+const CELL_SIZE = (440, 380)
+const LEGEND_PIXELS = 220
+const COLORBAR_PIXELS = 100
+
+grid_size(nc, nr; legend::Bool = false, colorbar::Bool = false) = (
+    CELL_SIZE[1] * nc + (legend ? LEGEND_PIXELS : 0) + (colorbar ? COLORBAR_PIXELS : 0),
+    CELL_SIZE[2] * nr,
+)
+
 """
     figure_comparison(data; x = :temperature, model, args, deviation, ...) -> FigureSpec
 
@@ -243,8 +256,12 @@ function figure_comparison(
     alpha::Real = 0.01,
     epsilon::Real = 1.0e-4,
     panel_labels = :auto,
+    heights::Tuple{<:Real,<:Real} = DEFAULT_COMPARISON_HEIGHTS,
     kwargs...,
 )
+    all(>(0), heights) || throw(
+        ArgumentError("`heights` are the positive relative heights of the two panels"),
+    )
     opts, filters = split_options(kwargs)
     d = prepare_data(data, unit_keywords(x => xunit, :value => yunit); filters...)
     o = resolve_options(; opts...)
@@ -306,8 +323,8 @@ function figure_comparison(
         nrows = 2,
         ncols = 1,
         style = o.style,
-        heights = [3.0, 2.0],
-        size = (640, 640),
+        heights = Float64[heights[1], heights[2]],
+        size = (640, 720),
         sharex = true,
     )
 end
@@ -888,6 +905,11 @@ function figure_facets(
         ncols = nc,
         style = o.style,
         colorbar,
-        size = (340 * nc + (colorbar === nothing ? 0 : 80), 300 * nr),
+        size = grid_size(
+            nc,
+            nr;
+            legend = any(p -> p.legend, panels),
+            colorbar = colorbar !== nothing,
+        ),
     )
 end
