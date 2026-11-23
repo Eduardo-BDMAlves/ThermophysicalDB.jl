@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-22
+
 - Figures (issue 43, first part): the core that does not need a plotting package. `plotdata(selection; ...)` prepares the points once (the columns of `table`, with the exact units of `unit`, `temperature_unit` and `pressure_unit`) and every figure takes it, or the selection itself with the same filters as `points`; a model is a function of the conditions in SI (`model(p, T)`, or `args = (:temperature,)`, `(:temperature, :x1)`) that returns the value in the unit of the data, or the calculated values are given as `calc`, and it runs once for the same conditions
   - `plot_comparison` (values and deviations), `plot_isotherms`, `plot_isobars`, `plot_parity` (bands of the deviation of your choice), `plot_residuals` (violin with the points and the quartiles, box or both; a group with fewer than 10 points gets a box), `plot_xpt` (plane of temperature and pressure coloured by the value, by count, with the references to highlight as stars), `plot_facets` and `plot_by_reference` (panels tagged (a), (b), ... with one colour bar). Each builds a `FigureSpec` (`spec = true` returns it) that the extension of a backend draws with `render`
   - Axes are labelled in LaTeX with the symbol of the property (`\rho`, `c_p`, ...; `register_symbol!` changes one) and the unit in the format of `unitformat` (`:square` by default, `:round`, `:slash` or a function); the markers tell the references apart (`marker_by`), filled and then open
@@ -169,6 +171,7 @@ and this project adheres to [Semantic Versioning].
 
 <!-- Versions -->
 
-[unreleased]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/releases/tag/v0.1.0

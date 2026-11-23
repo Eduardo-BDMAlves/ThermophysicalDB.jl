@@ -178,24 +178,25 @@ sat = plotdata(db; component = "water", pure = true, exact = true, temperature_u
 plot_saturation(sat; style = :default)
 ```
 
-## Excess properties and the literature
+## Composition and the literature
 
-`plot_excess` draws one panel for each excess property against the mole fraction, with every reference in its own marker; `plot_years` counts the points of each year of publication and their cumulative number. `plot_deviation_map` colours the points in the plane of two conditions by the deviation of a model, and `plot_ternary` draws a system of three components in a triangle.
+`plot_excess` draws one panel for each property against the mole fraction of the first component, with every reference in its own marker (it is made for the excess properties of mixtures, and any property of a binary can be drawn this way; the first component is the one that each article lists first, so look at the `components` column when articles order them differently); `plot_years` counts the points of each year of publication and their cumulative number. `plot_deviation_map` colours the points in the plane of two conditions by the deviation of a model, and `plot_ternary` draws a system of three components in a triangle.
 
 ```@example figures
-excess = plotdata(
+binary = plotdata(
     db;
     component = ["ethanol", "water"],
+    match = :all,
     exact = true,
-    property = r"[Ee]xcess (molar )?volume",
+    property = ["Viscosity", "Mass density"],
+    temperature = (15u"°C", 45u"°C"),
     temperature_unit = "K",
-    pressure_unit = "kPa",
 )
-plot_excess(excess; color = :temperature, style = :default)
+plot_excess(binary; color = :temperature, style = :default)
 ```
 
 ```@example figures
-plot_years(excess; style = :default)
+plot_years(binary; style = :default)
 ```
 
 ## Your own layout and the other package

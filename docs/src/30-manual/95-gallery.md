@@ -50,10 +50,11 @@ many = plotdata(
 )
 vle = plotdata(db; component = ["ethanol", "water"], exact = true, pressure_unit = "kPa", temperature_unit = "K")
 sat = plotdata(db; component = "water", pure = true, exact = true, temperature_unit = "K")
-excess = plotdata(
+binary = plotdata(
     db;
-    component = ["ethanol", "water"], exact = true,
-    property = r"[Ee]xcess (molar )?volume", temperature_unit = "K", pressure_unit = "kPa",
+    component = ["ethanol", "water"], match = :all, exact = true,
+    property = ["Viscosity", "Mass density"],
+    temperature = (15u"°C", 45u"°C"), temperature_unit = "K",
 )
 ```
 
@@ -213,20 +214,20 @@ With Plots (GR):
 plot_saturation(sat, backend = :plots)
 ```
 
-## Excess properties
+## Composition
 
-`plot_excess`: the excess properties against the composition, with every reference.
+`plot_excess`: one panel for each property against the mole fraction (made for excess properties), with every reference.
 
 With CairoMakie:
 
 ```@example gallery
-plot_excess(excess; color = :temperature, backend = :makie)
+plot_excess(binary; color = :temperature, backend = :makie)
 ```
 
 With Plots (GR):
 
 ```@example gallery
-plot_excess(excess; color = :temperature, backend = :plots)
+plot_excess(binary; color = :temperature, backend = :plots)
 ```
 
 ## Literature by year
@@ -236,11 +237,11 @@ plot_excess(excess; color = :temperature, backend = :plots)
 With CairoMakie:
 
 ```@example gallery
-plot_years(excess, backend = :makie)
+plot_years(binary, backend = :makie)
 ```
 
 With Plots (GR):
 
 ```@example gallery
-plot_years(excess, backend = :plots)
+plot_years(binary, backend = :plots)
 ```

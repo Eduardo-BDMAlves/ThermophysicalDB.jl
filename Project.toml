@@ -1,6 +1,6 @@
 name = "ThermophysicalDB"
 uuid = "ca26f490-bc68-4489-97cc-95a4c39097e5"
-version = "0.1.1"
+version = "0.1.3"
 authors = ["Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>"]
 
 [workspace]
