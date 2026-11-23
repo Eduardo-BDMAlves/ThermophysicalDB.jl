@@ -199,6 +199,31 @@ plot_excess(binary; color = :temperature, style = :default)
 plot_years(binary; style = :default)
 ```
 
+A system of three components is drawn in a triangle. The data below are synthetic (a density that changes smoothly with the composition), because ternary systems are few in the archive:
+
+```@example figures
+# Synthetic compositions of three components (the archive's ternary systems are few and
+# sparse), to show the diagram: a density that changes smoothly with the composition.
+n = 90
+a = [(i * 0.6180339887) % 1 for i in 1:n]
+b = [(1 - a[i]) * ((i * 0.7548776662) % 1) for i in 1:n]
+ternary = plotdata(
+    ThermophysicalDB.PointTable(
+        (;
+            source = fill("synthetic", n), doi = repeat(["10.0/a", "10.0/b", "10.0/c"], n ÷ 3),
+            year = fill(Int16(2020), n), components = fill("water + ethanol + glycerol", n),
+            xkind = fill("Mole fraction", n), property = fill("Mass density", n),
+            method = fill("", n), phase = fill("Liquid", n), temperature = fill(298.15, n),
+            pressure = fill(101.325, n), x1 = a, x2 = b, x3 = 1 .- a .- b,
+            value = 800 .+ 300 .* a .+ 80 .* (1 .- a .- b), unit = fill("kg/m3", n),
+            unc_k2 = fill(NaN, n),
+        ),
+        "K", "kPa",
+    ),
+)
+plot_ternary(ternary; style = :default)
+```
+
 ## Your own layout and the other package
 
 In Makie the figures also fill a position of a layout of yours, with the same keywords: `plot_comparison!(fig[1, 1], d; model = kell)`.

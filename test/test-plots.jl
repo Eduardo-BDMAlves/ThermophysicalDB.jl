@@ -794,26 +794,46 @@ end
     @test cumulative.x[1] == 1990.0 && cumulative.x[end] == 2020.0
     @test length(plot_years(d; cumulative = false, spec = true).panels) == 1
 
-    # Excess: the mole fraction on the x axis, one panel for each property.
+    # Excess: the fraction of one component on the x axis, whatever the order of the articles;
+    # only the points with a mole fraction.
     n = 12
+    xs = collect(range(0.1, 0.9; length = 6))
     cols = (;
         source = fill("x", n),
         doi = repeat(["10.1/a", "10.1/b"], 6),
         year = fill(Int16(2000), n),
-        components = fill("a + b", n),
-        xkind = fill("", n),
+        # The second article lists the system the other way round: x1 is then water.
+        components = repeat(["a + b", "b + a"], 6),
+        xkind = vcat(fill("Mole fraction", 10), fill("Molality", 2)),
         property = repeat(["Excess molar volume", "Excess molar enthalpy"], inner = 6),
         method = fill("", n),
         phase = fill("Liquid", n),
         temperature = fill(298.15, n),
         pressure = fill(101.325, n),
-        x1 = repeat(collect(range(0.1, 0.9; length = 6)), 2),
-        value = [x * (1 - x) for x in repeat(collect(range(0.1, 0.9; length = 6)), 2)],
+        x1 = repeat(xs, 2),
+        x2 = 1 .- repeat(xs, 2),
+        value = [x * (1 - x) for x in repeat(xs, 2)],
         unit = repeat(["m3/mol", "J/mol"], inner = 6),
         unc_k2 = fill(NaN, n),
     )
     ex = plot_excess(plotdata(PointTable(cols, "K", "kPa")); spec = true)
-    @test length(ex.panels) == 2 && all(p -> p.xlabel == "x_1", ex.panels)
+    @test length(ex.panels) == 2 && all(p -> p.xlabel == raw"x_{\mathrm{a}}", ex.panels)
+    # 10 mole-fraction points (the molality ones are left out) and the order is undone:
+    # the points of "b + a" have x_a = 1 - x1.
+    drawn = [(l.x, l.y) for p in ex.panels for l in p.layers if l.kind === :scatter]
+    @test sum(length(x) for (x, _) in drawn) == 10
+    @test all(0 < v < 1 for (x, _) in drawn for v in x)
+    # Both orders give the same values of x_a (the others would be 0.26, 0.58 and 0.9).
+    @test sort(unique(round.(vcat((x for (x, _) in drawn)...); digits = 6))) ==
+          [0.1, 0.42, 0.74]
+    @test length(
+        plot_excess(
+            plotdata(PointTable(cols, "K", "kPa"));
+            xkind = nothing,
+            color = :temperature,
+            spec = true,
+        ).panels,
+    ) == 2
 
     # Ternary: the triangle, its labels and the points in its plane.
     m = 10
