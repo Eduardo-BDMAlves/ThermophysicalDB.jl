@@ -19,6 +19,8 @@ end
 
 # output
 T.parse_unit(::FlexUnitsBackend, text::AbstractString) = Registry.uparse(text)
+# The units of the figures are written as text (the package prints a unit as it was parsed).
+T.plot_unit_text(::FlexUnitsBackend, unit) = string(unit)
 T.attach_unit(::FlexUnitsBackend, column::AbstractVector{Float64}, unit) = column .* unit
 
 # input: `ustrip(unit, x)` checks the dimension and applies the scale and the offset

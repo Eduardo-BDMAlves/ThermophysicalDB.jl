@@ -1,6 +1,6 @@
 name = "ThermophysicalDB"
 uuid = "ca26f490-bc68-4489-97cc-95a4c39097e5"
-version = "0.1.1"
+version = "0.1.3"
 authors = ["Eduardo Bader Dalfovo Mohr Alves <eduardo.alves@polo.ufsc.br>"]
 
 [workspace]
@@ -14,6 +14,7 @@ Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 FileWatching = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
@@ -29,6 +30,9 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [weakdeps]
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
 FlexUnits = "76e01b6b-c995-4ce6-8559-91e72a3d4e95"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
 ZipArchives = "49080126-0e18-4c2a-b176-c102e4b3760c"
@@ -36,6 +40,8 @@ ZipArchives = "49080126-0e18-4c2a-b176-c102e4b3760c"
 [extensions]
 ThermophysicalDBDynamicQuantitiesExt = "DynamicQuantities"
 ThermophysicalDBFlexUnitsExt = "FlexUnits"
+ThermophysicalDBMakieExt = "Makie"
+ThermophysicalDBPlotsExt = ["Plots", "RecipesBase"]
 ThermophysicalDBUnitfulExt = "Unitful"
 ThermophysicalDBXLSXExt = ["XLSX", "ZipArchives"]
 
@@ -59,6 +65,10 @@ Unicode = "1.0.0"
 UUIDs = "1"
 DynamicQuantities = "1"
 FlexUnits = "0.6"
+LaTeXStrings = "1.3"
+Makie = "0.24"
+Plots = "1.40"
+RecipesBase = "1"
 Unitful = "1"
 XLSX = "0.10, 0.11, 0.12, 0.13"
 YAML = "0.4.17"

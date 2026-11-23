@@ -38,6 +38,7 @@ Experimental data on density, viscosity, thermal conductivity, vapor pressure, h
 - **Two databases.** The experimental points (ThermoML) and the nomenclature and base properties of the compounds (names, CAS number, PubChem CID, SMILES, InChI, molar mass) are two separate databases, linked on demand. A compound can be named by any of them, and when a name is ambiguous the user chooses; the ThermoML data are never changed.
 - **Cite what you use.** A selection exports its BibTeX file and a summary table of the articles behind it (LaTeX, Markdown or CSV).
 - **Extensible.** The same schema is meant to hold other databases, including your own local data.
+- **Standardized figures.** Ready-made plots (comparison with a model, parity, isotherms, distribution of the deviations, vapour–liquid equilibrium, ...) with the same look, labels and units every time, drawn with Makie or Plots, so that publications and comparisons between different works are easier.
 
 ## Installation
 
@@ -66,6 +67,16 @@ v = points(
 )
 
 t = table(v; quantities = Unitful)   # Tables.jl columns: temperature, pressure, value, unc_k2, doi, year, ...
+```
+
+The same selection can be drawn with the standardized figures of the package (with `using CairoMakie`, `GLMakie` or `Plots`), so that the plots of different works look alike and are easy to compare:
+
+```julia
+using CairoMakie
+
+plot_xpt(v)                      # where the data are, in temperature and pressure
+plot_isotherms(v)                # one line for each temperature
+plot_comparison(v; model = f)    # values and deviations of a model f(p, T), in SI
 ```
 
 The [documentation](https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/dev) has a getting-started guide and tutorials that go from a plot of hexane conductivity to comparing the measured density of water with IAPWS-95, and hexane and CO₂ data with the equations of state of [Clapeyron.jl](https://github.com/ClapeyronThermo/Clapeyron.jl).

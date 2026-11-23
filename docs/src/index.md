@@ -35,6 +35,8 @@ features:
     details: The experimental points (ThermoML) and the nomenclature of the compounds (names, CAS, PubChem CID, SMILES, InChI, molar mass) are two separate databases, joined by `database()`. Name a compound by any of them; when a name is ambiguous you choose.
   - title: Extensible and versatile
     details: Capacity to add your own data to a local database formatted according to the same standard used in other databases. Customize the parameters of interest and how to interact with them.
+  - title: Standardized figures
+    details: Ready-made plots with the same look, labels and units every time (comparison with a model, parity, isotherms, distribution of the deviations, vapour–liquid equilibrium and more), drawn with Makie or Plots, to ease publications and comparisons between different works.
 ---
 ```
 
@@ -113,6 +115,7 @@ The articles of the whole documentation, with a download of the BibTeX file, are
   <a class="tdb-card" href="20-tutorials/40-mixtures"><strong>Binary mixtures</strong><span>The viscosity of ethanol + water against composition.</span></a>
   <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against SRK, PR, tcPR and PC-SAFT from Clapeyron.jl.</span></a>
   <a class="tdb-card" href="20-tutorials/60-co2-critical-point"><strong>Carbon dioxide</strong><span>Data and equations of state around the critical point.</span></a>
+  <a class="tdb-card" href="30-manual/90-figures"><strong>Figures</strong><span>Standardized plots with Makie or Plots, and a gallery with every figure in both.</span></a>
   <a class="tdb-card" href="30-manual/35-compounds"><strong>Compounds</strong><span>The compound database and how to find a compound by any name, CAS number, CID, SMILES or InChI.</span></a>
   <a class="tdb-card" href="30-manual/30-uncertainty"><strong>Uncertainty</strong><span>What k = 2 means here and how each point is rescaled.</span></a>
   <a class="tdb-card" href="30-manual/40-data-management"><strong>Updates and cache</strong><span>Where the data live and what to do when the download fails.</span></a>

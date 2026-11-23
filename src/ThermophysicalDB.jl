@@ -13,6 +13,7 @@ using Downloads: Downloads
 using FileWatching: FileWatching
 using JLD2: JLD2
 using JSON: JSON
+using LaTeXStrings: LaTeXStrings
 using LinearAlgebra: I, LAPACK, Symmetric, cholesky!, issuccess, lu
 using Preferences: Preferences
 using SHA: SHA
@@ -100,6 +101,17 @@ include("database/remove.jl")
 include("database/conflicts.jl")
 include("database/edit.jl")
 include("database/template.jl")
+include("plots/symbols_table.jl")
+include("plots/labels.jl")
+include("plots/deviation.jl")
+include("plots/kde.jl")
+include("plots/style.jl")
+include("plots/spec.jl")
+include("plots/data.jl")
+include("plots/builders.jl")
+include("plots/vle.jl")
+include("plots/extra.jl")
+include("plots/api.jl")
 include("precompile.jl")
 
 export COMPOSITION_SCALES,
@@ -142,6 +154,52 @@ export COMPOSITION_SCALES,
     convert_composition,
     DataView,
     PointTable,
+    DeviationSpec,
+    FigureSpec,
+    PlotData,
+    PlotStyle,
+    axis_label,
+    deviation,
+    EquilibriumPoints,
+    equilibrium,
+    plot_by_reference,
+    plot_deviation_map,
+    plot_deviation_map!,
+    plot_excess,
+    plot_excess!,
+    plot_ternary,
+    plot_ternary!,
+    plot_years,
+    plot_years!,
+    plot_by_reference!,
+    plot_pxy!,
+    plot_saturation!,
+    plot_txy!,
+    plot_xy!,
+    plot_comparison!,
+    plot_facets!,
+    plot_isobars!,
+    plot_isotherms!,
+    plot_parity!,
+    plot_residuals!,
+    plot_xpt!,
+    plot_comparison,
+    plot_defaults,
+    plot_facets,
+    plot_isobars,
+    plot_isotherms,
+    plot_parity,
+    plot_pxy,
+    plot_residuals,
+    plot_saturation,
+    plot_style,
+    plot_txy,
+    plot_xpt,
+    plot_xy,
+    plotdata,
+    register_symbol!,
+    render,
+    reset_plot_defaults!,
     UncertaintyTerm,
     audit_checkpoint,
     audit_log,
