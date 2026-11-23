@@ -60,7 +60,7 @@ end
 
 # --- the individual ways of downloading -------------------------------------------------
 
-function download_default(url, dest; progress, timeout)
+function download_default(url, dest::AbstractString; progress, timeout)
     if progress
         Downloads.download(url, dest; timeout, progress = progress_printer(basename(dest)))
     else
@@ -70,7 +70,7 @@ function download_default(url, dest; progress, timeout)
 end
 
 # Some servers answer scripted clients differently from browsers.
-function download_with_user_agent(url, dest; progress, timeout)
+function download_with_user_agent(url, dest::AbstractString; progress, timeout)
     headers = ["User-Agent" => DOWNLOAD_USER_AGENT]
     if progress
         Downloads.download(
