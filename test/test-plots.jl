@@ -284,9 +284,23 @@ end
     @test [p.title for p in fac.panels] == ["10.1/a", "10.1/b", "10.1/c"]
     colored = plot_facets(d; by = :reference, color = :pressure, spec = true)
     @test colored.colorbar.limits == (100.0, 10000.0)
-    # The backend is needed to draw.
-    @test_throws ArgumentError plot_comparison(d; model = truth)
-    @test_throws ArgumentError plot_comparison(d; model = truth, backend = :makie)
+    # The backend is needed to draw (the test runner may have loaded the extensions already).
+    saved = copy(ThermophysicalDB.BACKENDS)
+    empty!(ThermophysicalDB.BACKENDS)
+    try
+        @test_throws ArgumentError plot_comparison(d; model = truth)
+        @test_throws ArgumentError plot_comparison(d; model = truth, backend = :makie)
+        ThermophysicalDB.register_backend!(:makie, spec -> :makie_figure)
+        @test plot_comparison(d; model = truth) === :makie_figure
+        ThermophysicalDB.register_backend!(:plots, spec -> :plots_figure)
+        # With two backends loaded one is chosen.
+        @test_throws ArgumentError plot_comparison(d; model = truth)
+        @test plot_comparison(d; model = truth, backend = :plots) === :plots_figure
+        @test_throws ArgumentError ThermophysicalDB.register_backend!(:nope, identity)
+    finally
+        empty!(ThermophysicalDB.BACKENDS)
+        merge!(ThermophysicalDB.BACKENDS, saved)
+    end
     # A mistake in the options is an error, not a silent default.
     @test_throws ArgumentError plot_isotherms(d; unitformat = :nope, spec = true)
     @test_throws ArgumentError plot_isotherms(d; uncertainty = :nope, spec = true)
@@ -370,4 +384,116 @@ end
     @test seen[1] ≈ 101325.0 && seen[2] ≈ 295.0
     # Units belong to the data when it is already prepared.
     @test_throws ArgumentError plot_xpt(d; xunit = "degC", spec = true)
+end
+
+@testmodule PlotSamples begin
+    using ThermophysicalDB: PointTable, plotdata
+
+    truth(p, T) = 1000 - 0.5 * (T - 300) + 1.0e-5 * p
+
+    function data(; n = 60)
+        temperature = repeat([290.0, 300.0, 310.0, 320.0], inner = cld(n, 4))[1:n]
+        pressure = repeat([100.0, 5000.0, 10000.0], cld(n, 3))[1:n]
+        doi = repeat(["10.1/a", "10.1/b", "10.1/c"], cld(n, 3))[1:n]
+        value =
+            [truth(pressure[i] * 1.0e3, temperature[i]) * (1 + 0.002 * sin(i)) for i = 1:n]
+        cols = (;
+            source = fill("x", n),
+            doi,
+            year = Int16[
+                doi[i] == "10.1/a" ? 1990 : doi[i] == "10.1/b" ? 2005 : 2020 for i = 1:n
+            ],
+            components = fill("water", n),
+            xkind = fill("", n),
+            property = fill("Mass density", n),
+            method = fill("", n),
+            phase = fill("Liquid", n),
+            temperature,
+            pressure,
+            x1 = fill(NaN, n),
+            value,
+            unit = fill("kg/m3", n),
+            unc_k2 = fill(0.5, n),
+        )
+        return plotdata(PointTable(cols, "K", "kPa"))
+    end
+end
+
+@testitem "the Makie extension draws every figure" setup = [PlotSamples] tags = [:unit] begin
+    using ThermophysicalDB
+    using CairoMakie
+
+    d = PlotSamples.data()
+    truth = PlotSamples.truth
+    @test haskey(ThermophysicalDB.BACKENDS, :makie)
+    figures = [
+        plot_comparison(d; model = truth),
+        plot_comparison(d; model = truth, deviation = :smape, style = :neon),
+        plot_isotherms(d; model = truth),
+        plot_isobars(d),
+        plot_parity(d; model = truth, bands = [1, 2]),
+        plot_residuals(d; model = truth),
+        plot_residuals(d; model = truth, kind = :both),
+        plot_xpt(d; highlight = "10.1/c"),
+        plot_xpt(d; color = :count),
+        plot_facets(d; by = :reference, color = :pressure),
+        plot_by_reference(d),
+    ]
+    @test all(f -> f isa CairoMakie.Makie.Figure, figures)
+    # They are drawn: the figure can be written as a vector file.
+    mktempdir() do dir
+        path = joinpath(dir, "figure.svg")
+        save(path, first(figures))
+        @test filesize(path) > 1000
+    end
+    # The labels are LaTeX.
+    axes = [c for c in first(figures).content if c isa CairoMakie.Makie.Axis]
+    @test length(axes) == 2
+    @test axes[1].ylabel[] isa CairoMakie.Makie.LaTeXStrings.LaTeXString
+
+    # A position of the user's layout.
+    fig = Figure()
+    ax = plot_parity!(fig[1, 1], d; model = truth)
+    ax2 = plot_xpt!(fig[1, 2], d)
+    @test ax isa Vector && ax2 isa Vector && length(ax) == 1
+
+    # A colour map by name, reversed with `_r`, and one given as colours.
+    @test plot_xpt(d; colormap = :vik) isa CairoMakie.Makie.Figure
+    @test plot_xpt(
+        d;
+        style = ThermophysicalDB.plot_style(:default; colormap = ["#000000", "#ffffff"]),
+    ) isa CairoMakie.Makie.Figure
+end
+
+@testitem "the Plots extension draws every figure" setup = [PlotSamples] tags = [:unit] begin
+    using ThermophysicalDB
+    import Plots
+
+    d = PlotSamples.data()
+    truth = PlotSamples.truth
+    @test haskey(ThermophysicalDB.BACKENDS, :plots)
+    ThermophysicalDB.plot_defaults(backend = :plots)
+    try
+        figures = [
+            plot_comparison(d; model = truth),
+            plot_isotherms(d; model = truth),
+            plot_parity(d; model = truth),
+            plot_residuals(d; model = truth),
+            plot_xpt(d; highlight = "10.1/c"),
+            plot_xpt(d; color = :count),
+            plot_by_reference(d; color = :pressure),
+        ]
+        @test all(f -> f isa Plots.Plot, figures)
+        mktempdir() do dir
+            path = joinpath(dir, "figure.svg")
+            Plots.savefig(first(figures), path)
+            @test filesize(path) > 1000
+        end
+        # The recipe: `plot(data; kind, options)`.
+        p = Plots.plot(d; kind = :parity, options = (model = truth,))
+        @test p isa Plots.Plot
+        @test_throws ArgumentError Plots.plot(d; kind = :nope)
+    finally
+        empty!(ThermophysicalDB.PLOT_DEFAULTS)
+    end
 end

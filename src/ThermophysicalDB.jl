@@ -13,6 +13,7 @@ using Downloads: Downloads
 using FileWatching: FileWatching
 using JLD2: JLD2
 using JSON: JSON
+using LaTeXStrings: LaTeXStrings
 using LinearAlgebra: I, LAPACK, Symmetric, cholesky!, issuccess, lu
 using Preferences: Preferences
 using SHA: SHA
@@ -158,6 +159,14 @@ export COMPOSITION_SCALES,
     axis_label,
     deviation,
     plot_by_reference,
+    plot_by_reference!,
+    plot_comparison!,
+    plot_facets!,
+    plot_isobars!,
+    plot_isotherms!,
+    plot_parity!,
+    plot_residuals!,
+    plot_xpt!,
     plot_comparison,
     plot_defaults,
     plot_facets,

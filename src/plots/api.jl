@@ -108,3 +108,27 @@ One panel for each reference of one property; [`plot_facets`](@ref) with `by = :
 $PLOT_COMMON
 """
 plot_by_reference(data; kwargs...) = draw(figure_facets, data; by = :reference, kwargs...)
+
+# The same figures in a position of a layout of your own (Makie): `plot_comparison!(fig[1, 2], data;
+# ...)`. The methods are in the extension of Makie.
+for name in (
+    :plot_comparison!,
+    :plot_isotherms!,
+    :plot_isobars!,
+    :plot_parity!,
+    :plot_residuals!,
+    :plot_xpt!,
+    :plot_facets!,
+    :plot_by_reference!,
+)
+    @eval begin
+        """
+            $($(string(name)))(position, data; kwargs...) -> Vector{Axis}
+
+        The figure of [`$($(string(name)[1:(end-1)]))`](@ref) drawn in a position of a Makie layout
+        (`fig[1, 2]`, a `GridLayout`), so that several figures share one `Figure`; it takes the
+        same keywords and returns the axes. It needs Makie (`using CairoMakie`).
+        """
+        function $name end
+    end
+end

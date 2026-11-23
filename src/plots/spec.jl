@@ -49,7 +49,8 @@ end
 An axes: its `layers`, the LaTeX of `xlabel` and `ylabel`, a `title` (empty by default), the
 `tag` of the panel (`"(a)"`), the scales (`:linear`, `:log10`), `xticks` as `(positions, labels)`
 for a categorical axis, the colour bar and whether it has a legend. `colorrange` is the range
-of the values that the numeric colours of its layers use.
+of the values that the numeric colours of its layers use and `limits` the `(xlow, xhigh,
+ylow, yhigh)` of the axes when they are not those of the layers.
 """
 Base.@kwdef struct PanelSpec
     layers::Vector{Layer} = Layer[]
@@ -65,6 +66,7 @@ Base.@kwdef struct PanelSpec
     aspect_equal::Bool = false
     colormap::Union{Symbol,Vector{String}} = SEQUENTIAL_COLORMAP
     colorrange::Union{Nothing,NTuple{2,Float64}} = nothing
+    limits::Union{Nothing,NTuple{4,Float64}} = nothing
 end
 
 """

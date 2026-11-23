@@ -183,6 +183,14 @@ plot_residuals
 plot_xpt
 plot_facets
 plot_by_reference
+plot_comparison!
+plot_isotherms!
+plot_isobars!
+plot_parity!
+plot_residuals!
+plot_xpt!
+plot_facets!
+plot_by_reference!
 render
 PlotData
 FigureSpec

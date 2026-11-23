@@ -462,7 +462,8 @@ function figure_parity(
                     linestyle = :dash,
                     width = 1.0,
                     alpha = 0.6,
-                    label = s == 1 ? string("\\pm ", b, raw"\,\%") : "",
+                    label = s == 1 ? string("\\pm ", isinteger(b) ? Int(b) : b, raw"\,\%") :
+                            "",
                 ),
             )
         end
@@ -474,8 +475,15 @@ function figure_parity(
         ylabel = axis_label(string(symbol, raw"_{\mathrm{exp}}"), unit; format = o.format),
         aspect_equal = true,
         colormap = o.style.colormap,
+        limits = parity_limits(lo, hi),
     )
     return FigureSpec(; panels = [panel], style = o.style, size = (560, 560))
+end
+
+# The same limits on both axes, a little wider than the values.
+function parity_limits(lo::Real, hi::Real)
+    pad = 0.05 * (hi == lo ? max(abs(hi), 1.0) : hi - lo)
+    return (lo - pad, hi + pad, lo - pad, hi + pad)
 end
 
 # ----------------------------------------------------------------------------------
