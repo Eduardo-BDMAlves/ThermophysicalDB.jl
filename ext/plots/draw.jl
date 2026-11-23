@@ -131,7 +131,8 @@ function layer_series(layer::T.Layer, panel::T.PanelSpec, style::T.PlotStyle, sp
     elseif kind === :text
         c = layer_colors(layer, panel, style, 1)
         c isa AbstractVector && (c = c[1])
-        size = layer.size > 0 ? layer.size : style.fontsize * 0.8
+        size =
+            max(5, round(Int, (layer.size > 0 ? layer.size : style.fontsize * 0.8) * 0.65))
         attrs[:seriestype] = :scatter
         attrs[:markersize] = 0
         attrs[:markerstrokewidth] = 0
@@ -208,10 +209,41 @@ function subplot_attributes(spec::T.FigureSpec, panel::T.PanelSpec)
     return a
 end
 
+# The entries of the legends of all the panels, once each: (label, layer).
+function legend_entries(spec::T.FigureSpec)
+    seen = Set{String}()
+    entries = Tuple{String,T.Layer}[]
+    for panel in spec.panels, layer in panel.layers
+        isempty(layer.label) && continue
+        layer.label in seen && continue
+        push!(seen, layer.label)
+        push!(entries, (layer.label, layer))
+    end
+    return entries
+end
+
+# More entries than this have no room inside a panel: they go to a panel of their own, at the right.
+const MAX_INNER_LEGEND = 6
+const LEGEND_WIDTH = 0.3
+
 @recipe function f(spec::T.FigureSpec)
     style = spec.style
-    layout := (spec.nrows, spec.ncols)
-    size := spec.size
+    entries = legend_entries(spec)
+    shared = length(entries) > MAX_INNER_LEGEND && any(p -> p.legend, spec.panels)
+    nr, nc = spec.nrows, spec.ncols
+    # With a shared legend the grid has one more column; panel i is at (row, column) of the old one.
+    slot(i) = shared ? ((i - 1) ÷ nc) * (nc + 1) + (i - 1) % nc + 1 : i
+    if shared
+        layout := Plots.grid(
+            nr,
+            nc + 1;
+            widths = vcat(fill((1 - LEGEND_WIDTH) / nc, nc), LEGEND_WIDTH),
+        )
+        size := (round(Int, spec.size[1] / (1 - LEGEND_WIDTH)), spec.size[2])
+    else
+        layout := (nr, nc)
+        size := spec.size
+    end
     background_color := color_of(style.background)
     foreground_color := color_of(style.foreground)
     legend := false
@@ -222,9 +254,10 @@ end
     titlefontsize := 10
     for (k, panel) in enumerate(spec.panels)
         sub = subplot_attributes(spec, panel)
+        shared && (sub[:legend] = false)
         for (j, layer) in enumerate(panel.layers)
             @series begin
-                subplot := k
+                subplot := slot(k)
                 merge!(plotattributes, sub)
                 x, y, z, attrs =
                     layer_series(layer, panel, style, panel_span(panel, layer.kind))
@@ -235,11 +268,68 @@ end
         bar = panel.colorbar === nothing ? spec.colorbar : panel.colorbar
         if bar !== nothing && !isempty(panel.layers)
             @series begin
-                subplot := k
+                subplot := slot(k)
                 x, y, attrs = bar_series(bar, first(panel.layers))
                 merge!(plotattributes, sub)
                 merge!(plotattributes, attrs)
                 (x, y)
+            end
+        end
+    end
+    if shared
+        used = Set(slot(k) for k in eachindex(spec.panels))
+        blank = Dict{Symbol,Any}(
+            :framestyle => :none,
+            :legend => false,
+            :xlims => (1, 2),
+            :ylims => (1, 2),
+            :colorbar => false,
+            :label => "",
+        )
+        # The empty places of the grid and the first place of the last column, for the legend.
+        for position = 1:(nr*(nc+1))
+            position in used && continue
+            col = (position - 1) % (nc + 1) + 1
+            (col == nc + 1 && position == nc + 1) && continue
+            @series begin
+                subplot := position
+                merge!(plotattributes, blank)
+                seriestype := :scatter
+                markersize := 0
+                ([0.0], [0.0])
+            end
+        end
+        for (label, layer) in entries
+            @series begin
+                subplot := nc + 1
+                merge!(plotattributes, blank)
+                plotattributes[:legend] = :left
+                plotattributes[:legend_font_pointsize] = 7
+                plotattributes[:foreground_color_legend] = Plots.RGBA(0, 0, 0, 0)
+                plotattributes[:background_color_legend] = Plots.RGBA(0, 0, 0, 0)
+                plotattributes[:label] = tex_label(label)
+                c =
+                    layer.color isa AbstractString ? visible_color(layer.color) :
+                    color_of(style.foreground)
+                if layer.kind === :scatter
+                    seriestype := :scatter
+                    marker := layer.marker
+                    markersize := 4
+                    if layer.filled
+                        markercolor := c
+                        markerstrokewidth := 0
+                    else
+                        markercolor := Plots.RGBA(0, 0, 0, 0)
+                        markerstrokecolor := c
+                        markerstrokewidth := 1.2
+                    end
+                else
+                    seriestype := :path
+                    linecolor := c
+                    linewidth := layer.width > 0 ? layer.width : style.linewidth
+                    linestyle := layer.linestyle
+                end
+                ([0.0], [0.0])
             end
         end
     end

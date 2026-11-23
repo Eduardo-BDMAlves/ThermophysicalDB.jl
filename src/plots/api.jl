@@ -178,10 +178,14 @@ $PLOT_COMMON
 plot_deviation_map(data; kwargs...) = draw(figure_deviation_map, data; kwargs...)
 
 """
-    plot_excess(data; x = :x1, color = nothing, ...)
+    plot_excess(data; fraction_of = nothing, xkind = "Mole fraction", color = nothing, ...)
 
 The excess properties of a mixture against its composition: one panel for each property (select
 them with `property = [...]`, as in `property = ["Excess molar volume", "Excess molar enthalpy"]`),
+the x axis being the fraction of one component (`fraction_of`, the first component of the most
+frequent system by default; the articles list the components in their own order, so it is taken
+from `x1`, `x2` or `x3` as each system has it) and only the points whose composition is of the kind
+`xkind` (`nothing` keeps all),
 with the points of every reference, each with its marker. `color = :temperature` colours them
 by temperature; it is [`plot_facets`](@ref) with the mole fraction on the x axis.
 

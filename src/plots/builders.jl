@@ -802,7 +802,7 @@ all the panels. The panels are tagged (a), (b), ... See [`plot_facets`](@ref) an
 function figure_facets(
     data;
     by::Symbol = :property,
-    x::Symbol = :temperature,
+    x::Union{Symbol,ComputedVariable} = :temperature,
     color::Union{Nothing,Symbol} = nothing,
     ncols::Union{Nothing,Integer} = nothing,
     maxpanels::Integer = 12,

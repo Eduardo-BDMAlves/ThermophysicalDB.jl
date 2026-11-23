@@ -35,6 +35,8 @@ features:
     details: The experimental points (ThermoML) and the nomenclature of the compounds (names, CAS, PubChem CID, SMILES, InChI, molar mass) are two separate databases, joined by `database()`. Name a compound by any of them; when a name is ambiguous you choose.
   - title: Extensible and versatile
     details: Capacity to add your own data to a local database formatted according to the same standard used in other databases. Customize the parameters of interest and how to interact with them.
+  - title: Standardized figures
+    details: Ready-made plots with the same look, labels and units every time (comparison with a model, parity, isotherms, distribution of the deviations, vapour–liquid equilibrium and more), drawn with Makie or Plots, to ease publications and comparisons between different works.
 ---
 ```
 
@@ -85,16 +87,6 @@ Colorbar(fig[1, 2], sc; label = "p [MPa]");
 ```@example home
 fig # hide
 ```
-
-### Standardized figures
-
-The package also draws standardized figures (comparison with a model, parity, isotherms, distribution of the deviations, vapour–liquid equilibrium and more), with the same look, labels and units every time, so that publications and comparisons between different works are easier. With [Makie](https://docs.makie.org) or [Plots](https://docs.juliaplots.org) loaded, the selection above is one call:
-
-```julia
-plot_xpt(v)    # where the data are, in temperature and pressure
-```
-
-See the [figures manual](@ref manual_figures) and the [gallery](@ref figure_gallery), with every figure in both packages.
 
 ### Sources of the data
 

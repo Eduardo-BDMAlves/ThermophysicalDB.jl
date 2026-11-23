@@ -2,6 +2,8 @@ exclude = [
   "@ref",
   "@[Cc]ite.*",
   "^https://github.com/.*/releases/tag/v.*$",
+  # The comparison with a tag that is created at the release answers 404 until then
+  "^https://github.com/.*/compare/v.*$",
   "^https://eduardo-bdmalves.github.io/ThermophysicalDB.jl/stable/?$",
   "^https://blog.esciencecenter.nl", # due to a certificate error (cf. #556)
   # Zenodo badges answer with an error until the first release exists

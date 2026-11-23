@@ -62,10 +62,61 @@ end
 # Excess properties against the composition
 # ----------------------------------------------------------------------------------
 
-# One panel for each property, with the mole fraction of the first component on the x axis; the
-# points of every reference are in the panel (a line at zero shows where the excess changes sign).
-function figure_excess(data; x::Symbol = :x1, kwargs...)
-    return figure_facets(data; x, kwargs...)
+# One panel for each property against the composition of one component of the mixture. The
+# articles list the components in their own order, so the fraction is the one of `fraction_of`
+# (the first component of the most frequent system by default), taken from `x1`, `x2` or `x3`
+# according to where each system has it; only the points whose composition is of the kind `xkind`
+# (a mole fraction by default; `nothing` keeps all) are drawn.
+function figure_excess(
+    data;
+    fraction_of::Union{Nothing,AbstractString} = nothing,
+    xkind::Union{Nothing,AbstractString} = "Mole fraction",
+    color::Union{Nothing,Symbol} = nothing,
+    cunit = nothing,
+    ncols::Union{Nothing,Integer} = nothing,
+    maxpanels::Integer = 12,
+    panel_labels = :auto,
+    kwargs...,
+)
+    opts, filters = split_options(kwargs)
+    d = prepare_data(data, unit_keywords(color => cunit); filters...)
+    if xkind !== nothing
+        kinds = column(d, :xkind)
+        keep = [String(k) == xkind for k in kinds]
+        any(keep) || throw(
+            ArgumentError(
+                "no point has its composition as $(repr(xkind)); the kinds of the data are $(join(unique(String.(kinds)), "; ")) (`xkind = nothing` draws all)",
+            ),
+        )
+        d = all(keep) ? d : subset_data(d, keep)
+    end
+    names = String.(column(d, :components))
+    component = if fraction_of === nothing
+        counts = Dict{String,Int}()
+        for n in names
+            counts[n] = get(counts, n, 0) + 1
+        end
+        first(split(first(sort!(collect(counts); by = last, rev = true))[1], '+'))
+    else
+        fraction_of
+    end
+    component = String(strip(component))
+    function fraction(piece::PlotData)
+        comps = String.(column(piece, :components))
+        out = fill(NaN, length(piece))
+        absent = fill(NaN, length(piece))
+        columns = map((:x1, :x2, :x3)) do name
+            hasproperty(parent(piece.table), name) ? column(piece, name) : absent
+        end
+        for i in eachindex(out)
+            parts = String.(strip.(split(comps[i], '+')))
+            k = findfirst(==(component), parts)
+            k === nothing || (out[i] = columns[k][i])
+        end
+        return out
+    end
+    x = ComputedVariable(string("x_{", roman_text(component), "}"), fraction)
+    return figure_facets(d; x, color, ncols, maxpanels, panel_labels, opts...)
 end
 
 # ----------------------------------------------------------------------------------

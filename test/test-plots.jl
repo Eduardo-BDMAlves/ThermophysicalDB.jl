@@ -426,45 +426,54 @@ end
     d = PlotSamples.data()
     truth = PlotSamples.truth
     @test haskey(ThermophysicalDB.BACKENDS, :makie)
-    figures = [
-        plot_comparison(d; model = truth),
-        plot_comparison(d; model = truth, deviation = :smape, style = :neon),
-        plot_isotherms(d; model = truth),
-        plot_isobars(d),
-        plot_parity(d; model = truth, bands = [1, 2]),
-        plot_residuals(d; model = truth),
-        plot_residuals(d; model = truth, kind = :both),
-        plot_xpt(d; highlight = "10.1/c"),
-        plot_xpt(d; color = :count),
-        plot_facets(d; by = :reference, color = :pressure),
-        plot_by_reference(d),
-        plot_deviation_map(d; model = truth),
-        plot_years(d),
-    ]
-    @test all(f -> f isa CairoMakie.Makie.Figure, figures)
-    # They are drawn: the figure can be written as a vector file.
-    mktempdir() do dir
-        path = joinpath(dir, "figure.svg")
-        save(path, first(figures))
-        @test filesize(path) > 1000
+    # Both backends can be loaded in the same process (other test items): choose one.
+    ThermophysicalDB.plot_defaults(backend = :makie)
+    try
+        figures = [
+            plot_comparison(d; model = truth),
+            plot_comparison(d; model = truth, deviation = :smape, style = :neon),
+            plot_isotherms(d; model = truth),
+            plot_isobars(d),
+            plot_parity(d; model = truth, bands = [1, 2]),
+            plot_residuals(d; model = truth),
+            plot_residuals(d; model = truth, kind = :both),
+            plot_xpt(d; highlight = "10.1/c"),
+            plot_xpt(d; color = :count),
+            plot_facets(d; by = :reference, color = :pressure),
+            plot_by_reference(d),
+            plot_deviation_map(d; model = truth),
+            plot_years(d),
+        ]
+        @test all(f -> f isa CairoMakie.Makie.Figure, figures)
+        # They are drawn: the figure can be written as a vector file.
+        mktempdir() do dir
+            path = joinpath(dir, "figure.svg")
+            save(path, first(figures))
+            @test filesize(path) > 1000
+        end
+        # The labels are LaTeX.
+        axes = [c for c in first(figures).content if c isa CairoMakie.Makie.Axis]
+        @test length(axes) == 2
+        @test axes[1].ylabel[] isa CairoMakie.Makie.LaTeXStrings.LaTeXString
+
+        # A position of the user's layout.
+        fig = Figure()
+        ax = plot_parity!(fig[1, 1], d; model = truth)
+        ax2 = plot_xpt!(fig[1, 2], d)
+        @test ax isa Vector && ax2 isa Vector && length(ax) == 1
+
+        # A colour map by name, reversed with `_r`, and one given as colours.
+        @test plot_xpt(d; colormap = :vik) isa CairoMakie.Makie.Figure
+        @test plot_xpt(
+            d;
+            style = ThermophysicalDB.plot_style(
+                :default;
+                colormap = ["#000000", "#ffffff"],
+            ),
+        ) isa CairoMakie.Makie.Figure
+    finally
+        empty!(ThermophysicalDB.PLOT_DEFAULTS)
     end
-    # The labels are LaTeX.
-    axes = [c for c in first(figures).content if c isa CairoMakie.Makie.Axis]
-    @test length(axes) == 2
-    @test axes[1].ylabel[] isa CairoMakie.Makie.LaTeXStrings.LaTeXString
-
-    # A position of the user's layout.
-    fig = Figure()
-    ax = plot_parity!(fig[1, 1], d; model = truth)
-    ax2 = plot_xpt!(fig[1, 2], d)
-    @test ax isa Vector && ax2 isa Vector && length(ax) == 1
-
-    # A colour map by name, reversed with `_r`, and one given as colours.
-    @test plot_xpt(d; colormap = :vik) isa CairoMakie.Makie.Figure
-    @test plot_xpt(
-        d;
-        style = ThermophysicalDB.plot_style(:default; colormap = ["#000000", "#ffffff"]),
-    ) isa CairoMakie.Makie.Figure
 end
 
 @testitem "the Plots extension draws every figure" setup = [PlotSamples] tags = [:unit] begin

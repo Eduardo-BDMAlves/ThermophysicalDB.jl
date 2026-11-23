@@ -338,6 +338,14 @@ function variable_label(d::PlotData, name::Symbol; format = :square)
     return roman_text(String(name))
 end
 
+# A variable that is computed from the data (the label, the function of the data), for the axes.
+struct ComputedVariable
+    label::String
+    f::Function
+end
+variable_label(::PlotData, v::ComputedVariable; format = :square) = v.label
+variable_values(d::PlotData, v::ComputedVariable) = Float64.(v.f(d))
+
 # The values of a variable of the table as numbers.
 function variable_values(d::PlotData, name::Symbol)
     name === :calc && throw(ArgumentError(":calc needs a model"))

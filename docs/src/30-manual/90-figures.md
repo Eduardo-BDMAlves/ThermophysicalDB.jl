@@ -55,7 +55,7 @@ d
 
 ## Units of the axes and of the colour bars
 
-The units are chosen where the data are prepared, and the axes, the colour bars and the labels follow. Give them to [`plotdata`](@ref) (`temperature_unit`, `pressure_unit`, `unit` for the value) or, when a figure takes a selection, as `xunit`, `yunit` and `cunit` (the colour) of the figure. They are text (`"degC"`, `"MPa"`, `"mPa s"`) or a unit of [Unitful.jl](https://painterqubits.github.io/Unitful.jl/stable/) or [FlexUnits.jl](https://github.com/Deduction42/FlexUnits.jl), and the conversion is exact in either case. The quantities of [DynamicQuantities.jl](https://symbolicml.org/DynamicQuantities.jl/stable/) keep no text of their units (everything is stored in SI), so for that package give the unit as text. A model always receives SI, whatever the units of the figure.
+The units are chosen where the data are prepared, and the axes, the colour bars and the labels follow. Give them to [`plotdata`](@ref) (`temperature_unit`, `pressure_unit`, `unit` for the value) or, when a figure takes a selection, as `xunit`, `yunit` and `cunit` (the colour) of the figure. They are text (`"degC"`, `"MPa"`, `"mPa s"`) or a unit of [Unitful.jl](https://github.com/JuliaPhysics/Unitful.jl) or [FlexUnits.jl](https://github.com/Deduction42/FlexUnits.jl), and the conversion is exact in either case. The quantities of [DynamicQuantities.jl](https://github.com/SymbolicML/DynamicQuantities.jl) keep no text of their units (everything is stored in SI), so for that package give the unit as text. A model always receives SI, whatever the units of the figure.
 
 ```@example figures
 plot_xpt(
