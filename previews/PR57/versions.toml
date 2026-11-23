@@ -12,7 +12,7 @@ version = "2020-09-30"
 [documentation_tooling]
 Documenter = "1.20.0"
 DocumenterCitations = "1.5.0"
-DocumenterVitepress = "0.3.9"
+DocumenterVitepress = "0.3.10"
 LiveServer = "1.5.0"
 
 [packages]
@@ -26,6 +26,6 @@ Unitful = "1.29.0"
 XLSX = "0.13.4"
 
 [thermophysicaldb]
-commit = "e4a3da0aa975af4189931c43c58482ceafa2ba2f"
+commit = "dcb67dee8ab6200dcc6c8306b4de8cdbd5872e8b"
 uncommitted_changes = false
 version = "0.1.3"
