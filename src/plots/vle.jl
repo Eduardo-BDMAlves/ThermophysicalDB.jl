@@ -332,11 +332,18 @@ function figure_vle(
     tolerance = tol === nothing ? (by === :temperature ? 0.5 : 0.01) : tol
     secs = sections(e, by, tolerance, at)
     isempty(secs) && throw(ArgumentError("no section of the data is at $(at)"))
-    length(secs) <= maxpanels || throw(
-        ArgumentError(
-            "the data have $(length(secs)) sections; choose some with `at = ...` or raise `maxpanels` (now $maxpanels)",
-        ),
-    )
+    if length(secs) > maxpanels
+        at === nothing || throw(
+            ArgumentError(
+                "`at` selects $(length(secs)) sections; give fewer or raise `maxpanels` (now $maxpanels)",
+            ),
+        )
+        # Without `at`, the sections with most points are drawn, in the order of their condition.
+        total = length(secs)
+        richest = sort!(sortperm(length.(secs); rev = true)[1:maxpanels])
+        secs = secs[richest]
+        @info "the data have $total sections; the $maxpanels with most points are drawn (choose with `at = ...` or raise `maxpanels`)"
+    end
     cond = by === :temperature ? e.temperature : e.pressure
     value = by === :temperature ? e.pressure : e.temperature
     panels = PanelSpec[]

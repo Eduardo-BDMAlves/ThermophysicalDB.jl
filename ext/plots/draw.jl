@@ -128,6 +128,17 @@ function layer_series(layer::T.Layer, panel::T.PanelSpec, style::T.PlotStyle, sp
         attrs[:linewidth] = layer.width > 0 ? layer.width : 1.0
         xlo, xhi = span
         return [xlo, xhi], fill(layer.y[1], 2), nothing, attrs
+    elseif kind === :text
+        c = layer_colors(layer, panel, style, 1)
+        c isa AbstractVector && (c = c[1])
+        size = layer.size > 0 ? layer.size : style.fontsize * 0.8
+        attrs[:seriestype] = :scatter
+        attrs[:markersize] = 0
+        attrs[:markerstrokewidth] = 0
+        attrs[:markeralpha] = 0
+        attrs[:label] = ""
+        attrs[:series_annotations] =
+            [Plots.text(s, size, with_alpha(c, layer.alpha)) for s in layer.text]
     elseif kind === :vline
         c = layer_colors(layer, panel, style, 1)
         attrs[:seriestype] = :path
@@ -185,6 +196,7 @@ function subplot_attributes(spec::T.FigureSpec, panel::T.PanelSpec)
         :colorbar => (panel.colorbar !== nothing || spec.colorbar !== nothing),
     )
     panel.aspect_equal && (a[:aspect_ratio] = :equal)
+    panel.frame || (a[:framestyle] = :none)
     if panel.limits !== nothing
         any(isnan, panel.limits[1:2]) || (a[:xlims] = panel.limits[1:2])
         any(isnan, panel.limits[3:4]) || (a[:ylims] = panel.limits[3:4])
@@ -250,6 +262,10 @@ const KINDS = (
     txy = (d; kw...) -> T.figure_vle(d, :pressure; kw...),
     xy = T.figure_xy,
     saturation = T.figure_saturation,
+    deviation_map = T.figure_deviation_map,
+    excess = T.figure_excess,
+    ternary = T.figure_ternary,
+    years = T.figure_years,
 )
 
 @recipe function f(data::T.PlotData; kind = :xpt, options = NamedTuple())

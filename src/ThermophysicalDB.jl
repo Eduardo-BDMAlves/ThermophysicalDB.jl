@@ -110,6 +110,7 @@ include("plots/spec.jl")
 include("plots/data.jl")
 include("plots/builders.jl")
 include("plots/vle.jl")
+include("plots/extra.jl")
 include("plots/api.jl")
 include("precompile.jl")
 
@@ -162,6 +163,14 @@ export COMPOSITION_SCALES,
     EquilibriumPoints,
     equilibrium,
     plot_by_reference,
+    plot_deviation_map,
+    plot_deviation_map!,
+    plot_excess,
+    plot_excess!,
+    plot_ternary,
+    plot_ternary!,
+    plot_years,
+    plot_years!,
     plot_by_reference!,
     plot_pxy!,
     plot_saturation!,

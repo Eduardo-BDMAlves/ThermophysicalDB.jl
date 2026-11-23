@@ -438,6 +438,8 @@ end
         plot_xpt(d; color = :count),
         plot_facets(d; by = :reference, color = :pressure),
         plot_by_reference(d),
+        plot_deviation_map(d; model = truth),
+        plot_years(d),
     ]
     @test all(f -> f isa CairoMakie.Makie.Figure, figures)
     # They are drawn: the figure can be written as a vector file.
@@ -482,6 +484,8 @@ end
             plot_xpt(d; highlight = "10.1/c"),
             plot_xpt(d; color = :count),
             plot_by_reference(d; color = :pressure),
+            plot_deviation_map(d; model = truth),
+            plot_years(d),
         ]
         @test all(f -> f isa Plots.Plot, figures)
         mktempdir() do dir
@@ -640,7 +644,10 @@ end
     one = plot_pxy(d; at = 300.0, spec = true)
     @test length(one.panels) == 1 && one.panels[1].title == "T = 300 K"
     @test_throws ArgumentError plot_pxy(d; at = 123.0, spec = true)
-    @test_throws ArgumentError plot_pxy(d; maxpanels = 1, spec = true)
+    # More sections than `maxpanels`: the richest are kept (with `at`, it is an error).
+    few = @test_logs (:info,) match_mode = :any plot_pxy(d; maxpanels = 1, spec = true)
+    @test length(few.panels) == 1
+    @test_throws ArgumentError plot_pxy(d; at = [300.0, 320.0], maxpanels = 1, spec = true)
     # A model: (p, y) at the temperature and the composition; its lines are in the figure.
     model(T, x) = (1.0e3 * (100 + T / 10 + 50x), min(0.99, x + 0.15))
     with_model = plot_pxy(d; at = 300.0, model, spec = true)
@@ -747,4 +754,100 @@ end
     @test length(
         plot_saturation(plotdata(t); saturated_only = false, spec = true).panels[1].layers[1].x,
     ) == 4
+end
+
+@testitem "the second cycle: deviation map, excess, ternary and years" setup = [PlotSamples] tags =
+    [:unit, :fast] begin
+    using ThermophysicalDB:
+        ThermophysicalDB,
+        PointTable,
+        plotdata,
+        plot_deviation_map,
+        plot_excess,
+        plot_ternary,
+        plot_years,
+        FigureSpec
+
+    d = PlotSamples.data()
+    truth = PlotSamples.truth
+
+    # Deviation map: the colour is the deviation, centred on zero with the diverging map.
+    fig = plot_deviation_map(d; model = truth, spec = true)
+    panel = only(fig.panels)
+    @test fig isa FigureSpec && panel.colorbar !== nothing
+    @test panel.colorrange[1] == -panel.colorrange[2] && panel.colorrange[2] > 0
+    @test panel.colormap == ThermophysicalDB.plot_style(:default).diverging
+    @test panel.xlabel == raw"T\;[\mathrm{K}]" && panel.ylabel == raw"p\;[\mathrm{kPa}]"
+    @test sum(length(l.x) for l in panel.layers) == length(d)
+    absolute = only(
+        plot_deviation_map(d; model = truth, absolute_value = true, spec = true).panels,
+    )
+    @test absolute.colorrange[1] == 0.0
+    @test only(plot_deviation_map(d; model = truth, limit = 5, spec = true).panels).colorrange ==
+          (-5.0, 5.0)
+
+    # Years: the bars of each year and the cumulative number.
+    yfig = plot_years(d; spec = true)
+    @test length(yfig.panels) == 2 && yfig.panels[1].layers[1].kind === :polygon
+    cumulative = yfig.panels[2].layers[1]
+    @test cumulative.y[end] == length(d) && issorted(cumulative.y)
+    @test cumulative.x[1] == 1990.0 && cumulative.x[end] == 2020.0
+    @test length(plot_years(d; cumulative = false, spec = true).panels) == 1
+
+    # Excess: the mole fraction on the x axis, one panel for each property.
+    n = 12
+    cols = (;
+        source = fill("x", n),
+        doi = repeat(["10.1/a", "10.1/b"], 6),
+        year = fill(Int16(2000), n),
+        components = fill("a + b", n),
+        xkind = fill("", n),
+        property = repeat(["Excess molar volume", "Excess molar enthalpy"], inner = 6),
+        method = fill("", n),
+        phase = fill("Liquid", n),
+        temperature = fill(298.15, n),
+        pressure = fill(101.325, n),
+        x1 = repeat(collect(range(0.1, 0.9; length = 6)), 2),
+        value = [x * (1 - x) for x in repeat(collect(range(0.1, 0.9; length = 6)), 2)],
+        unit = repeat(["m3/mol", "J/mol"], inner = 6),
+        unc_k2 = fill(NaN, n),
+    )
+    ex = plot_excess(plotdata(PointTable(cols, "K", "kPa")); spec = true)
+    @test length(ex.panels) == 2 && all(p -> p.xlabel == "x_1", ex.panels)
+
+    # Ternary: the triangle, its labels and the points in its plane.
+    m = 10
+    x1 = collect(range(0.05, 0.6; length = m))
+    x2 = fill(0.3, m)
+    tcols = (;
+        source = fill("x", m),
+        doi = fill("10.1/t", m),
+        year = fill(Int16(2010), m),
+        components = fill("a + b + c", m),
+        xkind = fill("", m),
+        property = fill("Mass density", m),
+        method = fill("", m),
+        phase = fill("Liquid", m),
+        temperature = fill(300.0, m),
+        pressure = fill(101.0, m),
+        x1,
+        x2,
+        x3 = fill(NaN, m),
+        value = 800 .+ 100 .* x1,
+        unit = fill("kg/m3", m),
+        unc_k2 = fill(NaN, m),
+    )
+    td = plotdata(PointTable(tcols, "K", "kPa"))
+    tfig = plot_ternary(td; spec = true)
+    tp = only(tfig.panels)
+    @test !tp.frame && tp.aspect_equal && tp.colorbar !== nothing
+    texts = [l for l in tp.layers if l.kind === :text]
+    @test length(texts) == 2 && texts[2].text == ["a", "b", "c"]
+    points = only(l for l in tp.layers if l.kind === :scatter)
+    # The third fraction is what is left; the point of x = (0.05, 0.3, 0.65) is near the top.
+    @test points.y[1] ≈ 0.65 * sqrt(3) / 2 && points.x[1] ≈ 0.3 + 0.65 / 2
+    @test points.y[end] ≈ 0.1 * sqrt(3) / 2
+    @test_throws ArgumentError plot_ternary(td; components = "a + b", spec = true)
+    # A binary system is refused.
+    @test_throws ArgumentError plot_ternary(d; spec = true)
 end

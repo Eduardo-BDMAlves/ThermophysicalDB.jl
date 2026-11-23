@@ -164,6 +164,54 @@ $PLOT_COMMON
 """
 plot_saturation(data; kwargs...) = draw(figure_saturation, data; kwargs...)
 
+"""
+    plot_deviation_map(data; model, x = :temperature, y = :pressure, deviation = :relative, ...)
+
+The deviation of a model from the data in the plane of two conditions: each point is coloured by
+its deviation, with a colour map centred on zero (`vik`) whose range is the largest deviation
+(`limit` sets it). It shows where in temperature and pressure a model is good. The
+options of the deviation are those of [`plot_comparison`](@ref); with `absolute_value = true`
+the map starts at zero.
+
+$PLOT_COMMON
+"""
+plot_deviation_map(data; kwargs...) = draw(figure_deviation_map, data; kwargs...)
+
+"""
+    plot_excess(data; x = :x1, color = nothing, ...)
+
+The excess properties of a mixture against its composition: one panel for each property (select
+them with `property = [...]`, as in `property = ["Excess molar volume", "Excess molar enthalpy"]`),
+with the points of every reference, each with its marker. `color = :temperature` colours them
+by temperature; it is [`plot_facets`](@ref) with the mole fraction on the x axis.
+
+$PLOT_COMMON
+"""
+plot_excess(data; kwargs...) = draw(figure_excess, data; kwargs...)
+
+"""
+    plot_ternary(data; color = :value, components = nothing, grid = 5, ...)
+
+A system of three components in a triangle (the first component at the lower left, the second at
+the lower right and the third at the top), the points coloured by `color`. The compositions are
+the mole fractions `x1`, `x2` and `x3` (the one that is not given is what is left to 1). With
+several systems in the selection the most frequent is drawn, or the one that `components`
+names, as the points give it (`"A + B + C"`).
+
+$PLOT_COMMON
+"""
+plot_ternary(data; kwargs...) = draw(figure_ternary, data; kwargs...)
+
+"""
+    plot_years(data; cumulative = true, ...)
+
+The number of points of each year of publication, and beside it the cumulative number: the growth
+of the literature on what was selected. Points of an unknown year are left out.
+
+$PLOT_COMMON
+"""
+plot_years(data; kwargs...) = draw(figure_years, data; kwargs...)
+
 # The same figures in a position of a layout of your own (Makie): `plot_comparison!(fig[1, 2], data;
 # ...)`. The methods are in the extension of Makie.
 for name in (
@@ -179,6 +227,10 @@ for name in (
     :plot_txy!,
     :plot_xy!,
     :plot_saturation!,
+    :plot_deviation_map!,
+    :plot_excess!,
+    :plot_ternary!,
+    :plot_years!,
 )
     @eval begin
         """

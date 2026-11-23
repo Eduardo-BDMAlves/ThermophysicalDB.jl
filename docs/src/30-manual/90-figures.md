@@ -154,6 +154,26 @@ sat = plotdata(db; component = "water", pure = true, exact = true, temperature_u
 plot_saturation(sat; style = :default)
 ```
 
+## Excess properties and the literature
+
+`plot_excess` draws one panel for each excess property against the mole fraction, with every reference in its own marker; `plot_years` counts the points of each year of publication and their cumulative number. `plot_deviation_map` colours the points in the plane of two conditions by the deviation of a model, and `plot_ternary` draws a system of three components in a triangle.
+
+```@example figures
+excess = plotdata(
+    db;
+    component = ["ethanol", "water"],
+    exact = true,
+    property = "Excess molar volume",
+    temperature_unit = "K",
+    pressure_unit = "kPa",
+)
+plot_excess(excess; color = :temperature, style = :default)
+```
+
+```@example figures
+plot_years(excess; style = :default)
+```
+
 ## Your own layout and the other package
 
 In Makie the figures also fill a position of a layout of yours, with the same keywords: `plot_comparison!(fig[1, 1], d; model = kell)`.

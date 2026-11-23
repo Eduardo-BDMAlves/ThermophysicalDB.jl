@@ -187,6 +187,10 @@ plot_pxy
 plot_txy
 plot_xy
 plot_saturation
+plot_deviation_map
+plot_excess
+plot_ternary
+plot_years
 EquilibriumPoints
 equilibrium
 plot_comparison!
@@ -201,6 +205,10 @@ plot_pxy!
 plot_txy!
 plot_xy!
 plot_saturation!
+plot_deviation_map!
+plot_excess!
+plot_ternary!
+plot_years!
 render
 PlotData
 FigureSpec

@@ -38,6 +38,14 @@ T.plot_txy!(position::POSITION, data; kwargs...) =
     draw_into!(position, T.figure_vle(data, :pressure; kwargs...))
 T.plot_xy!(position::POSITION, data; kwargs...) =
     draw_into!(position, T.figure_xy(data; kwargs...))
+T.plot_deviation_map!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_deviation_map(data; kwargs...))
+T.plot_excess!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_excess(data; kwargs...))
+T.plot_ternary!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_ternary(data; kwargs...))
+T.plot_years!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_years(data; kwargs...))
 T.plot_saturation!(position::POSITION, data; kwargs...) =
     draw_into!(position, T.figure_saturation(data; kwargs...))
 

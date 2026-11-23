@@ -148,6 +148,17 @@ function draw_layer!(ax, layer::T.Layer, panel::T.PanelSpec, style::T.PlotStyle)
             linestyle = layer.linestyle,
             linewidth = layer.width > 0 ? layer.width : 1.0,
         )
+    elseif kind === :text
+        c, _ = layer_colors(layer, panel, style, 1)
+        Makie.text!(
+            ax,
+            layer.x,
+            layer.y;
+            text = layer.text,
+            color = with_alpha(c, layer.alpha),
+            align = (:center, :center),
+            fontsize = layer.size > 0 ? layer.size : style.fontsize * 0.8,
+        )
     elseif kind === :vline
         c, _ = layer_colors(layer, panel, style, 1)
         Makie.vlines!(
@@ -177,6 +188,8 @@ function axis_of(cell, panel::T.PanelSpec, style::T.PlotStyle)
     )
     panel.aspect_equal && (kwargs[:aspect] = Makie.DataAspect())
     ax = Makie.Axis(cell; kwargs...)
+    panel.frame || Makie.hidedecorations!(ax)
+    panel.frame || Makie.hidespines!(ax)
     if panel.xticks !== nothing
         ax.xticks = (panel.xticks[1], panel.xticks[2])
         ax.xticklabelrotation = pi / 6
