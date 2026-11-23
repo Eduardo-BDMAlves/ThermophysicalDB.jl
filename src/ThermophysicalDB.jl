@@ -109,6 +109,7 @@ include("plots/style.jl")
 include("plots/spec.jl")
 include("plots/data.jl")
 include("plots/builders.jl")
+include("plots/vle.jl")
 include("plots/api.jl")
 include("precompile.jl")
 
@@ -158,8 +159,14 @@ export COMPOSITION_SCALES,
     PlotStyle,
     axis_label,
     deviation,
+    EquilibriumPoints,
+    equilibrium,
     plot_by_reference,
     plot_by_reference!,
+    plot_pxy!,
+    plot_saturation!,
+    plot_txy!,
+    plot_xy!,
     plot_comparison!,
     plot_facets!,
     plot_isobars!,
@@ -173,9 +180,13 @@ export COMPOSITION_SCALES,
     plot_isobars,
     plot_isotherms,
     plot_parity,
+    plot_pxy,
     plot_residuals,
+    plot_saturation,
     plot_style,
+    plot_txy,
     plot_xpt,
+    plot_xy,
     plotdata,
     register_symbol!,
     render,

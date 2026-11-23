@@ -109,6 +109,61 @@ $PLOT_COMMON
 """
 plot_by_reference(data; kwargs...) = draw(figure_facets, data; by = :reference, kwargs...)
 
+"""
+    plot_pxy(data; at = nothing, model = nothing, ...)
+
+Pressure against composition of a mixture at constant temperature (P-x-y): one panel for each
+isotherm (temperatures within `tol`, 0.5 in the unit of the temperature; `at = 298.15` or a list
+chooses some). The liquid composition (bubble line) is drawn with filled markers and the vapour
+one (dew line) with open markers, the shape telling the reference. The mole fraction is the one
+of the first component. `data` is a selection of one mixture (the properties of the equilibrium
+are chosen for you) or a [`PlotData`](@ref) with them; the rows of the archive that make a point
+are put together by `equilibrium` ([`EquilibriumPoints`](@ref)).
+
+A `model` is `model(T, x)` in SI (`T` in K, `x` the liquid mole fraction of the first
+component) that returns `(p, y)`, the bubble pressure in Pa and the vapour composition, as the
+bubble-point functions of Clapeyron.jl give; it draws the bubble line (continuous) and the dew
+line (dashed).
+
+$PLOT_COMMON
+"""
+plot_pxy(data; kwargs...) =
+    draw((d; kw...) -> figure_vle(d, :temperature; kw...), data; kwargs...)
+
+"""
+    plot_txy(data; at = nothing, model = nothing, ...)
+
+Temperature against composition at constant pressure (T-x-y), one panel for each isobar
+(pressures within a relative `tol`, 1 % by default); like [`plot_pxy`](@ref). `model(p, x)`
+returns `(T, y)` with `p` in Pa and `T` in K.
+
+$PLOT_COMMON
+"""
+plot_txy(data; kwargs...) =
+    draw((d; kw...) -> figure_vle(d, :pressure; kw...), data; kwargs...)
+
+"""
+    plot_xy(data; color = :auto, ...)
+
+The composition of the vapour against the one of the liquid, with the diagonal; the points are
+coloured by the temperature or the pressure (`color`, whichever varies when `:auto`).
+
+$PLOT_COMMON
+"""
+plot_xy(data; kwargs...) = draw(figure_xy, data; kwargs...)
+
+"""
+    plot_saturation(data; density = "Mass density", ...)
+
+The saturation line of a pure fluid: the density of the liquid (filled) and of the gas (open)
+against the temperature, for the points that state no pressure (they are at saturation;
+`saturated_only = false` takes all), with the critical point of each reference as a star, and
+beside it the vapour pressure against `1000 / T` with the critical pressures as stars.
+
+$PLOT_COMMON
+"""
+plot_saturation(data; kwargs...) = draw(figure_saturation, data; kwargs...)
+
 # The same figures in a position of a layout of your own (Makie): `plot_comparison!(fig[1, 2], data;
 # ...)`. The methods are in the extension of Makie.
 for name in (
@@ -120,6 +175,10 @@ for name in (
     :plot_xpt!,
     :plot_facets!,
     :plot_by_reference!,
+    :plot_pxy!,
+    :plot_txy!,
+    :plot_xy!,
+    :plot_saturation!,
 )
     @eval begin
         """

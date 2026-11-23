@@ -128,6 +128,32 @@ plot_facets(
 )
 ```
 
+## Mixtures and saturation
+
+The vapour–liquid equilibrium of a binary is drawn from the rows of the archive that give the bubble pressure (or the boiling temperature) and the compositions; `equilibrium` joins them by reference, temperature (or pressure) and liquid composition, so a point has its vapour composition when the reference reports it. `plot_pxy` makes a panel for each isotherm (filled markers for the bubble curve `x`, open ones for the dew curve `y`), `plot_txy` one for each isobar, and `plot_xy` draws the vapour against the liquid composition, coloured by temperature.
+
+```@example figures
+vle = plotdata(
+    db;
+    component = ["ethanol", "water"],
+    exact = true,
+    pressure_unit = "kPa",
+    temperature_unit = "K",
+)
+plot_pxy(vle; maxpanels = 3, style = :default)
+```
+
+```@example figures
+plot_xy(vle; style = :default)
+```
+
+`plot_saturation` shows the density of the liquid (filled) and of the gas (open) against the temperature, with a star for the critical point of each reference, and the vapour pressure as `ln p` against `1000 / T`, where the Clausius–Clapeyron relation makes a nearly straight line:
+
+```@example figures
+sat = plotdata(db; component = "water", pure = true, exact = true, temperature_unit = "K")
+plot_saturation(sat; style = :default)
+```
+
 ## Your own layout and the other package
 
 In Makie the figures also fill a position of a layout of yours, with the same keywords: `plot_comparison!(fig[1, 1], d; model = kell)`.

@@ -186,8 +186,8 @@ function subplot_attributes(spec::T.FigureSpec, panel::T.PanelSpec)
     )
     panel.aspect_equal && (a[:aspect_ratio] = :equal)
     if panel.limits !== nothing
-        a[:xlims] = panel.limits[1:2]
-        a[:ylims] = panel.limits[3:4]
+        any(isnan, panel.limits[1:2]) || (a[:xlims] = panel.limits[1:2])
+        any(isnan, panel.limits[3:4]) || (a[:ylims] = panel.limits[3:4])
     end
     if panel.xticks !== nothing
         a[:xticks] = (panel.xticks[1], panel.xticks[2])
@@ -246,6 +246,10 @@ const KINDS = (
     xpt = T.figure_xpt,
     facets = T.figure_facets,
     by_reference = (d; kw...) -> T.figure_facets(d; by = :reference, kw...),
+    pxy = (d; kw...) -> T.figure_vle(d, :temperature; kw...),
+    txy = (d; kw...) -> T.figure_vle(d, :pressure; kw...),
+    xy = T.figure_xy,
+    saturation = T.figure_saturation,
 )
 
 @recipe function f(data::T.PlotData; kind = :xpt, options = NamedTuple())

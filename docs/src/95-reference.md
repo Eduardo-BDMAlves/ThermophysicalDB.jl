@@ -183,6 +183,12 @@ plot_residuals
 plot_xpt
 plot_facets
 plot_by_reference
+plot_pxy
+plot_txy
+plot_xy
+plot_saturation
+EquilibriumPoints
+equilibrium
 plot_comparison!
 plot_isotherms!
 plot_isobars!
@@ -191,6 +197,10 @@ plot_residuals!
 plot_xpt!
 plot_facets!
 plot_by_reference!
+plot_pxy!
+plot_txy!
+plot_xy!
+plot_saturation!
 render
 PlotData
 FigureSpec

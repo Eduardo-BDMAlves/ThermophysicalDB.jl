@@ -32,6 +32,15 @@ T.plot_facets!(position::POSITION, data; kwargs...) =
 T.plot_by_reference!(position::POSITION, data; kwargs...) =
     draw_into!(position, T.figure_facets(data; by = :reference, kwargs...))
 
+T.plot_pxy!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_vle(data, :temperature; kwargs...))
+T.plot_txy!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_vle(data, :pressure; kwargs...))
+T.plot_xy!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_xy(data; kwargs...))
+T.plot_saturation!(position::POSITION, data; kwargs...) =
+    draw_into!(position, T.figure_saturation(data; kwargs...))
+
 function __init__()
     T.register_backend!(:makie, draw_figure)
     return nothing

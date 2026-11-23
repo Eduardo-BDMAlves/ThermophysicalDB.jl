@@ -497,3 +497,254 @@ end
         empty!(ThermophysicalDB.PLOT_DEFAULTS)
     end
 end
+
+# The three ways in which the archive writes an equilibrium point.
+@testmodule VleSamples begin
+    using ThermophysicalDB: PointTable, plotdata
+
+    function rows()
+        cols = Dict(
+            k => Any[] for k in (
+                :doi,
+                :year,
+                :components,
+                :property,
+                :phase,
+                :temperature,
+                :pressure,
+                :x1,
+                :value,
+                :unit,
+            )
+        )
+        function add(doi, property, phase, T, p, x1, value, unit)
+            push!(cols[:doi], doi)
+            push!(cols[:year], Int16(2000))
+            push!(cols[:components], "a + b")
+            push!(cols[:property], property)
+            push!(cols[:phase], phase)
+            push!(cols[:temperature], T)
+            push!(cols[:pressure], p)
+            push!(cols[:x1], x1)
+            push!(cols[:value], value)
+            push!(cols[:unit], unit)
+        end
+        # Bubble pressures at two temperatures with the vapour composition (x1 and T match).
+        for T in (300.0, 320.0), x in (0.2, 0.5, 0.8)
+            add(
+                "10.1/p",
+                "Vapor or sublimation pressure",
+                "Liquid",
+                T,
+                NaN,
+                x,
+                100 + T / 10 + 50x,
+                "kPa",
+            )
+            add("10.1/p", "Mole fraction", "Gas", T, NaN, x, min(0.99, x + 0.15), "")
+        end
+        # Boiling temperatures at 101.325 kPa (x1 and p match), temperature in kelvin.
+        for x in (0.1, 0.4, 0.7)
+            add(
+                "10.1/t",
+                "Boiling temperature at pressure P",
+                "Liquid",
+                NaN,
+                101.325,
+                x,
+                380 - 30x,
+                "K",
+            )
+            add(
+                "10.1/t",
+                "Mole fraction",
+                "Liquid",
+                NaN,
+                101.325,
+                x,
+                min(0.99, x + 0.1),
+                "",
+            )
+        end
+        # Compositions only: the liquid and the gas at a temperature and a pressure.
+        add("10.1/c", "Mole fraction", "Liquid", 298.15, 500.0, NaN, 0.3, "")
+        add("10.1/c", "Mole fraction", "Gas", 298.15, 500.0, NaN, 0.9, "")
+        add("10.1/c", "Mole fraction", "Liquid", 298.15, 900.0, NaN, 0.5, "")
+        n = length(cols[:doi])
+        columns = (;
+            source = fill("x", n),
+            doi = String.(cols[:doi]),
+            year = Int16.(cols[:year]),
+            components = String.(cols[:components]),
+            xkind = fill("", n),
+            property = String.(cols[:property]),
+            method = fill("", n),
+            phase = String.(cols[:phase]),
+            temperature = Float64.(cols[:temperature]),
+            pressure = Float64.(cols[:pressure]),
+            x1 = Float64.(cols[:x1]),
+            value = Float64.(cols[:value]),
+            unit = String.(cols[:unit]),
+            unc_k2 = fill(NaN, n),
+        )
+        return columns
+    end
+    data(; temperature_unit = "K", pressure_unit = "kPa") =
+        plotdata(PointTable(rows(), temperature_unit, pressure_unit))
+end
+
+@testitem "equilibrium points are put together from the rows of the archive" setup =
+    [VleSamples] tags = [:unit, :fast] begin
+    using ThermophysicalDB:
+        ThermophysicalDB, equilibrium, plot_pxy, plot_txy, plot_xy, FigureSpec
+
+    d = VleSamples.data()
+    e = equilibrium(d)
+    # 6 bubble pressures + 3 boiling temperatures + 2 composition points (one with only the liquid).
+    @test length(e) == 6 + 3 + 2
+    byref(doi) = findall(==(doi), e.doi)
+    p = byref("10.1/p")
+    @test all(isfinite, e.y[p]) && all(isfinite, e.pressure[p])
+    @test sort(e.pressure[p]) ≈
+          sort([100 + T / 10 + 50x for T in (300.0, 320.0) for x in (0.2, 0.5, 0.8)])
+    @test e.y[p[1]] ≈ min(0.99, e.x[p[1]] + 0.15)
+    t = byref("10.1/t")
+    @test all(==(101.325), e.pressure[t]) &&
+          all(isfinite, e.temperature[t]) &&
+          all(isfinite, e.y[t])
+    c = byref("10.1/c")
+    @test length(c) == 2
+    paired = c[findfirst(i -> isfinite(e.x[i]) && isfinite(e.y[i]), c)]
+    @test e.x[paired] == 0.3 && e.y[paired] == 0.9 && e.pressure[paired] == 500.0
+    half = c[findfirst(i -> isnan(e.y[i]), c)]
+    @test e.x[half] == 0.5 && e.pressure[half] == 900.0
+
+    # A boiling temperature is converted to the temperature unit of the table.
+    ec = equilibrium(VleSamples.data(temperature_unit = "degC"))
+    tt = findall(==("10.1/t"), ec.doi)
+    @test sort(ec.temperature[tt]) ≈ sort([380 - 30x - 273.15 for x in (0.1, 0.4, 0.7)])
+    @test ThermophysicalDB.convert_pressure(1.0, "MPa", "kPa") == 1000.0
+    @test ThermophysicalDB.convert_temperature(300.0, "K", "degC") ≈ 26.85
+
+    # P-x-y: a panel for each isotherm (300 and 320 K and the 298.15 K one).
+    fig = plot_pxy(d; spec = true)
+    @test fig isa FigureSpec && length(fig.panels) == 3
+    @test all(
+        p -> p.xlabel == raw"x_1,\,y_1" && p.ylabel == raw"p\;[\mathrm{kPa}]",
+        fig.panels,
+    )
+    @test [p.tag for p in fig.panels] == ["(a)", "(b)", "(c)"]
+    @test any(l -> l.label == "bubble (x)", fig.panels[1].layers) &&
+          any(l -> l.label == "dew (y)", fig.panels[1].layers)
+    @test any(!l.filled && isempty(l.label) && !isempty(l.x) for l in fig.panels[1].layers)
+    one = plot_pxy(d; at = 300.0, spec = true)
+    @test length(one.panels) == 1 && one.panels[1].title == "T = 300 K"
+    @test_throws ArgumentError plot_pxy(d; at = 123.0, spec = true)
+    @test_throws ArgumentError plot_pxy(d; maxpanels = 1, spec = true)
+    # A model: (p, y) at the temperature and the composition; its lines are in the figure.
+    model(T, x) = (1.0e3 * (100 + T / 10 + 50x), min(0.99, x + 0.15))
+    with_model = plot_pxy(d; at = 300.0, model, spec = true)
+    @test count(l -> l.kind === :lines, with_model.panels[1].layers) == 2
+
+    # T-x-y: the isobar of 101.325 kPa, from the boiling temperatures.
+    tfig = plot_txy(d; at = 101.325, spec = true)
+    @test length(tfig.panels) == 1 && tfig.panels[1].ylabel == raw"T\;[\mathrm{K}]"
+    @test tfig.panels[1].title == "p = 101.33 kPa" ||
+          startswith(tfig.panels[1].title, "p = 101.3")
+    tmodel(p, x) = (380 - 30x, min(0.99, x + 0.1))
+    @test count(
+        l -> l.kind === :lines,
+        plot_txy(d; at = 101.325, model = tmodel, spec = true).panels[1].layers,
+    ) == 2
+
+    # x-y: the points that have both compositions, coloured by the temperature.
+    xy = only(plot_xy(d; spec = true).panels)
+    @test xy.aspect_equal && xy.xlabel == "x_1" && xy.colorbar !== nothing
+    @test sum(length(l.x) for l in xy.layers if l.kind === :scatter) == 6 + 3 + 1
+    # Data without the properties are refused.
+    density = ThermophysicalDB.PointTable((;
+        source = ["x"],
+        doi = ["d"],
+        year = Int16[1],
+        components = ["a"],
+        xkind = [""],
+        property = ["Mass density"],
+        method = [""],
+        phase = [""],
+        temperature = [300.0],
+        pressure = [100.0],
+        x1 = [NaN],
+        value = [1.0],
+        unit = ["kg/m3"],
+        unc_k2 = [NaN],
+    ),)
+    @test_throws ArgumentError plot_xy(ThermophysicalDB.plotdata(density); spec = true)
+end
+
+@testitem "the saturation figure pairs the critical points of each reference" tags =
+    [:unit, :fast] begin
+    using ThermophysicalDB: ThermophysicalDB, PointTable, plotdata, plot_saturation
+
+    rows = Any[]
+    add(doi, property, phase, T, p, value, unit) =
+        push!(rows, (doi, property, phase, T, p, value, unit))
+    for T in (250.0, 280.0, 300.0)
+        add("10.1/a", "Mass density", "Liquid", T, NaN, 700 - 0.8 * (T - 250), "kg/m3")
+        add("10.1/a", "Mass density", "Gas", T, NaN, 2 + 0.05 * (T - 250), "kg/m3")
+        add(
+            "10.1/a",
+            "Vapor or sublimation pressure",
+            "Liquid",
+            T,
+            NaN,
+            10 * exp((T - 250) / 30),
+            "kPa",
+        )
+    end
+    # A density with a pressure is not at saturation.
+    add("10.1/a", "Mass density", "Liquid", 260.0, 5000.0, 690.0, "kg/m3")
+    add("10.1/a", "Critical temperature", "", NaN, NaN, 400.0, "K")
+    add("10.1/a", "Critical density", "", NaN, NaN, 250.0, "kg/m3")
+    add("10.1/a", "Critical pressure", "", NaN, NaN, 4000.0, "kPa")
+    add("10.1/b", "Critical temperature", "", NaN, NaN, 402.0, "K")
+    add("10.1/b", "Critical density", "", NaN, NaN, 245.0, "kg/m3")
+    n = length(rows)
+    col(i) = [r[i] for r in rows]
+    t = PointTable(
+        (;
+            source = fill("x", n),
+            doi = String.(col(1)),
+            year = fill(Int16(2000), n),
+            components = fill("a", n),
+            xkind = fill("", n),
+            property = String.(col(2)),
+            method = fill("", n),
+            phase = String.(col(3)),
+            temperature = Float64.(col(4)),
+            pressure = Float64.(col(5)),
+            x1 = fill(NaN, n),
+            value = Float64.(col(6)),
+            unit = String.(col(7)),
+            unc_k2 = fill(NaN, n),
+        ),
+        "K",
+        "kPa",
+    )
+    fig = plot_saturation(plotdata(t); spec = true)
+    @test length(fig.panels) == 2
+    rho, ps = fig.panels
+    @test rho.ylabel == raw"\rho\;[\mathrm{kg}\,\mathrm{m}^{-3}]"
+    liquid = only(l for l in rho.layers if l.label == "liquid")
+    @test length(liquid.x) == 3 && liquid.filled          # the one with a pressure is left out
+    gas = only(l for l in rho.layers if l.label == "gas")
+    @test !gas.filled
+    stars = [l for l in rho.layers if l.marker === :star5]
+    @test length(stars) == 2 && sort([only(l.x) for l in stars]) == [400.0, 402.0]
+    @test sort([only(l.y) for l in stars]) == [245.0, 250.0]
+    @test ps.yscale === :log10 && ps.xlabel == raw"1000\,/\,T\;[\mathrm{K}^{-1}]"
+    pstar = only(l for l in ps.layers if l.marker === :star5)       # only 10.1/a gives a critical pressure
+    @test only(pstar.x) ≈ 1000 / 400 && only(pstar.y) == 4000.0
+    @test length(
+        plot_saturation(plotdata(t); saturated_only = false, spec = true).panels[1].layers[1].x,
+    ) == 4
+end

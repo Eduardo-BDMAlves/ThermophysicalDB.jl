@@ -278,7 +278,7 @@ function draw_into!(position, spec::T.FigureSpec)
             draw_layer!(ax, layer, panel, style)
         end
         if panel.limits !== nothing
-            xlo, xhi, ylo, yhi = panel.limits
+            xlo, xhi, ylo, yhi = map(v -> isnan(v) ? nothing : v, panel.limits)
             Makie.limits!(ax, xlo, xhi, ylo, yhi)
         end
         if !isempty(panel.tag)
