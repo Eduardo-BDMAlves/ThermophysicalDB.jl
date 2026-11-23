@@ -62,6 +62,25 @@ function value_unit(d::PlotData, property::AbstractString)
     return column(d, :unit)[i]
 end
 
+# A unit given to a figure, as text: a text or a symbol stays, a unit of Unitful or FlexUnits is
+# written as text that the exact parser reads (so the axes and the colour bars are converted
+# exactly, as with text), and the quantities of DynamicQuantities, which keep no unit
+# (everything is stored in SI), are asked for as text.
+plot_unit(::Nothing) = nothing
+plot_unit(unit::AbstractString) = String(unit)
+plot_unit(unit::Symbol) = String(unit)
+function plot_unit(unit)
+    backend = backend_of(unit)
+    text = plot_unit_text(backend, unit)
+    text === nothing && throw(
+        ArgumentError(
+            "a unit of $(parentmodule(typeof(unit))) cannot be used for an axis because the package keeps no text of its units (it stores SI); give the unit as text, for example \"MPa\" or \"kg/m3\"",
+        ),
+    )
+    return text
+end
+plot_unit_text(backend, unit) = unit_text(backend, unit)
+
 """
     plotdata(source; property, ..., unit, temperature_unit, pressure_unit, calc = nothing,
              sortby = [:doi, :temperature]) -> PlotData
@@ -70,7 +89,8 @@ Prepare the points for the figures. `source` is a selection ([`DataView`](@ref),
 [`Database`](@ref) view, a dataset) or a [`PointTable`](@ref); the keywords of [`points`](@ref)
 (`component`, `property`, `temperature`, `doi`, ...) filter it first, and `unit`,
 `temperature_unit` and `pressure_unit` are the ones of [`table`](@ref) (exact, without floating
-point error). `calc` is a vector of calculated values in the unit of the table, one per point,
+point error): text (`"MPa"`, `"degC"`, `"mPa s"`), or a unit of Unitful or FlexUnits, which is
+read as text; the columns of a figure are always plain numbers. `calc` is a vector of calculated values in the unit of the table, one per point,
 for a figure to compare with. Building it once and giving it to several figures saves the
 work of the table.
 """
@@ -84,6 +104,9 @@ function plotdata(
     kwargs...,
 )
     source isa PlotData && return source
+    unit = plot_unit(unit)
+    temperature_unit = plot_unit(temperature_unit)
+    pressure_unit = plot_unit(pressure_unit)
     if source isa PointTable
         isempty(kwargs) || throw(
             ArgumentError(

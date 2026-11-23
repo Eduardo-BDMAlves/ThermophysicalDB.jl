@@ -851,3 +851,50 @@ end
     # A binary system is refused.
     @test_throws ArgumentError plot_ternary(d; spec = true)
 end
+
+@testitem "the axes and the colour bars take units of the units packages" setup =
+    [FilterData] tags = [:unit, :fast] begin
+    using ThermophysicalDB: ThermophysicalDB, DataView, plot_xpt, plot_isotherms, plotdata
+    using Unitful: Unitful
+    using DynamicQuantities: DynamicQuantities as DQ
+    using FlexUnits: FlexUnits as FU
+
+    view = DataView(FilterData.build())
+    common = (; property = "Mass density", component = "water", spec = true)
+    # Text, Unitful and FlexUnits give the same figure: the same numbers and the same labels.
+    text = only(plot_xpt(view; common..., xunit = "degC", yunit = "bar").panels)
+    unitful = only(
+        plot_xpt(view; common..., xunit = Unitful.u"°C", yunit = Unitful.u"bar").panels,
+    )
+    @test unitful.xlabel == text.xlabel && unitful.ylabel == text.ylabel
+    @test only(unitful.layers).x == only(text.layers).x
+    @test only(unitful.layers).y == only(text.layers).y
+    flex = only(
+        plot_xpt(
+            view;
+            common...,
+            xunit = FU.UnitRegistry.uparse("K"),
+            yunit = FU.UnitRegistry.uparse("bar"),
+        ).panels,
+    )
+    @test flex.xlabel == raw"T\;[\mathrm{K}]" && flex.ylabel == text.ylabel
+    @test only(flex.layers).y == only(text.layers).y
+
+    # The colour bar and the value of a property.
+    bar = plot_isotherms(view; common..., cunit = Unitful.u"°C").panels[1].colorbar
+    @test bar.label == raw"T\;[{}^{\circ}\mathrm{C}]" && bar.limits[1] < 100
+    d = plotdata(
+        view;
+        property = "Mass density",
+        component = "water",
+        unit = Unitful.u"g/cm^3",
+    )
+    @test ThermophysicalDB.column(d, :value) isa Vector{Float64}
+    @test ThermophysicalDB.value_unit(d, "Mass density") == "g cm^-3"
+
+    # A selection with no points says so.
+    @test_throws ArgumentError plot_xpt(view; property = "Nothing like this", spec = true)
+
+    # DynamicQuantities keeps no text of its units: the error says to use text.
+    @test_throws ArgumentError plot_xpt(view; common..., xunit = DQ.uparse("K"))
+end

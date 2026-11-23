@@ -10,8 +10,9 @@ const MAX_UNCERTAINTY_BARS = 300
 # The units that the keywords of the axes ask for, as the keywords of `plotdata`.
 function unit_keywords(pairs...)
     kw = Dict{Symbol,Any}()
-    for (variable, unit) in pairs
-        unit === nothing && continue
+    for (variable, given) in pairs
+        given === nothing && continue
+        unit = plot_unit(given)
         key =
             variable === :temperature ? :temperature_unit :
             variable === :pressure ? :pressure_unit :
@@ -36,15 +37,22 @@ end
 # The data of a figure: the given `PlotData`, or the selection prepared with the units that the
 # axes ask for.
 function prepare_data(data, units::NamedTuple; filters...)
-    if data isa PlotData
+    d = if data isa PlotData
         (isempty(units) && isempty(filters)) || throw(
             ArgumentError(
                 "units and filters belong to `plotdata`; give them there, or give the selection to the figure",
             ),
         )
-        return data
+        data
+    else
+        plotdata(data; units..., filters...)
     end
-    return plotdata(data; units..., filters...)
+    length(d) == 0 && throw(
+        ArgumentError(
+            "the selection has no points to draw: check the component, the property name (`measured_properties` lists them) and the limits",
+        ),
+    )
+    return d
 end
 
 # The options that every figure resolves against the defaults of the session.

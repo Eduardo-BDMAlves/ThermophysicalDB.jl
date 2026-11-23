@@ -103,14 +103,16 @@ mean(t.value), extrema(t.temperature)
 
 ## Plot it
 
+The package draws standardized figures, with the same look, labels and units every time. [`plotdata`](@ref) prepares a selection once, in the units you want on the axes, and the figures take it:
+
 ```@example gs
 using CairoMakie
 
-fig = Figure(size = (720, 420))
-ax = Axis(fig[1, 1]; xlabel = "T [K]", ylabel = "η [mPa s]", title = "Viscosity of ethanol")
-scatter!(ax, t.temperature, t.value .* 1e3; markersize = 10)
-fig
+d = plotdata(v2; unit = "mPa*s", temperature_unit = "degC")
+plot_facets(d; marker_by = nothing, backend = :makie, style = :neon)
 ```
+
+The same call draws with [Plots](https://docs.juliaplots.org) after `using Plots` (`backend = :plots`). The [figures manual](@ref manual_figures) explains every figure, the units of the axes and the colour bars, and the [gallery](@ref figure_gallery) shows them all in both packages. The columns of `t` are plain vectors too, so nothing stops you from drawing with Makie directly.
 
 !!! tip "Next steps"
     - The [tutorials](20-tutorials/10-hexane-conductivity.md) walk through complete analyses with real data.

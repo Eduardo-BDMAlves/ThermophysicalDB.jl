@@ -21,6 +21,10 @@ plot_defaults(backend = :makie, style = :neon)
 | [`plot_residuals`](@ref) | distribution of the deviations of each reference |
 | [`plot_xpt`](@ref) | where the data are in temperature and pressure |
 | [`plot_facets`](@ref), [`plot_by_reference`](@ref) | one panel for each property, or for each reference |
+| [`plot_pxy`](@ref), [`plot_txy`](@ref), [`plot_xy`](@ref), [`plot_saturation`](@ref) | vapour–liquid equilibrium and saturation |
+| [`plot_deviation_map`](@ref), [`plot_excess`](@ref), [`plot_ternary`](@ref), [`plot_years`](@ref) | deviation in the plane of two conditions, excess properties, three components, points by year |
+
+Every figure of this page is also in the [gallery](@ref figure_gallery), drawn with both packages.
 
 ## Data and a model
 
@@ -47,6 +51,26 @@ function kell(p, T)
     return num / (1 + 16.879850e-3t)
 end
 d
+```
+
+## Units of the axes and of the colour bars
+
+The units are chosen where the data are prepared, and the axes, the colour bars and the labels follow. Give them to [`plotdata`](@ref) (`temperature_unit`, `pressure_unit`, `unit` for the value) or, when a figure takes a selection, as `xunit`, `yunit` and `cunit` (the colour) of the figure. They are text (`"degC"`, `"MPa"`, `"mPa s"`) or a unit of [Unitful.jl](https://painterqubits.github.io/Unitful.jl/stable/) or [FlexUnits.jl](https://github.com/Deduction42/FlexUnits.jl), and the conversion is exact in either case. The quantities of [DynamicQuantities.jl](https://symbolicml.org/DynamicQuantities.jl/stable/) keep no text of their units (everything is stored in SI), so for that package give the unit as text. A model always receives SI, whatever the units of the figure.
+
+```@example figures
+plot_xpt(
+    db;
+    component = "water",
+    pure = true,
+    exact = true,
+    property = "Mass density",
+    phase = "Liquid",
+    xunit = u"°C",         # the same as "degC"
+    yunit = "MPa",
+    cunit = u"g/cm^3",     # the colour bar, converted as well
+    style = :default,
+    marker_by = nothing,
+)
 ```
 
 ## Values and deviations
@@ -163,7 +187,7 @@ excess = plotdata(
     db;
     component = ["ethanol", "water"],
     exact = true,
-    property = "Excess molar volume",
+    property = r"[Ee]xcess (molar )?volume",
     temperature_unit = "K",
     pressure_unit = "kPa",
 )

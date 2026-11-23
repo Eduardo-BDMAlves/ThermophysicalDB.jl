@@ -86,6 +86,16 @@ Colorbar(fig[1, 2], sc; label = "p [MPa]");
 fig # hide
 ```
 
+### Standardized figures
+
+The package also draws standardized figures (comparison with a model, parity, isotherms, distribution of the deviations, vapour–liquid equilibrium and more), with the same look, labels and units every time, so that publications and comparisons between different works are easier. With [Makie](https://docs.makie.org) or [Plots](https://docs.juliaplots.org) loaded, the selection above is one call:
+
+```julia
+plot_xpt(v)    # where the data are, in temperature and pressure
+```
+
+See the [figures manual](@ref manual_figures) and the [gallery](@ref figure_gallery), with every figure in both packages.
+
 ### Sources of the data
 
 ```@raw html
@@ -113,6 +123,7 @@ The articles of the whole documentation, with a download of the BibTeX file, are
   <a class="tdb-card" href="20-tutorials/40-mixtures"><strong>Binary mixtures</strong><span>The viscosity of ethanol + water against composition.</span></a>
   <a class="tdb-card" href="20-tutorials/50-eos-comparison"><strong>Equations of state</strong><span>Hexane data against SRK, PR, tcPR and PC-SAFT from Clapeyron.jl.</span></a>
   <a class="tdb-card" href="20-tutorials/60-co2-critical-point"><strong>Carbon dioxide</strong><span>Data and equations of state around the critical point.</span></a>
+  <a class="tdb-card" href="30-manual/90-figures"><strong>Figures</strong><span>Standardized plots with Makie or Plots, and a gallery with every figure in both.</span></a>
   <a class="tdb-card" href="30-manual/35-compounds"><strong>Compounds</strong><span>The compound database and how to find a compound by any name, CAS number, CID, SMILES or InChI.</span></a>
   <a class="tdb-card" href="30-manual/30-uncertainty"><strong>Uncertainty</strong><span>What k = 2 means here and how each point is rescaled.</span></a>
   <a class="tdb-card" href="30-manual/40-data-management"><strong>Updates and cache</strong><span>Where the data live and what to do when the download fails.</span></a>
