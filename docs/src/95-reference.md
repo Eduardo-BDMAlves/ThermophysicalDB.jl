@@ -95,6 +95,9 @@ clear_database!
 created_at
 modified_at
 set_priority!
+Publication
+set_publication!
+publication
 databases_dir
 resolve_compound
 ReferenceRef

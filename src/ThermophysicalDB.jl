@@ -86,11 +86,13 @@ include("outliers/trend.jl")
 include("outliers/surface.jl")
 include("outliers/detect.jl")
 include("outliers/pipeline.jl")
+include("database/publication.jl")
 include("database/members.jl")
 include("database/registry.jl")
 include("database/inputs.jl")
 include("database/repeats.jl")
 include("database/database.jl")
+include("database/export.jl")
 include("compounds/linked.jl")
 include("database/duplicates.jl")
 include("query/combine.jl")
@@ -149,6 +151,9 @@ export COMPOSITION_SCALES,
     created_at,
     modified_at,
     set_priority!,
+    Publication,
+    set_publication!,
+    publication,
     CompositionConversion,
     CompoundDB,
     convert_composition,

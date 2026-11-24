@@ -161,6 +161,10 @@ The rows are ordered by year, then by month (when the DOI entry has it), then by
 of the entry. The keys are those of [`bibtex`](@ref); the keywords `online`, `cache`,
 `refresh`, `include_source`, `include_package` and `progress` act as there. `policy` is passed to the
 conversion of uncertainties to ``k = 2`` (see [`table`](@ref)).
+
+For a selection of a [`Database`](@ref) that holds the data of the user, see
+[`Publication`](@ref): `this_work` and `cite` say how those data are referred to, and all of them
+make one row for each property, whatever the number of their references.
 """
 function reference_summary(
     view::DataView;
@@ -170,11 +174,13 @@ function reference_summary(
     method_length::Integer = 24,
     purity_digits::Integer = 6,
     policy::Symbol = :nominal,
+    bibliography::Union{Nothing,Bibliography} = nothing,
+    collapse::Union{Nothing,Integer} = nothing,
     kwargs...,
 )
     statistic in (:median, :mean) ||
         throw(ArgumentError("statistic must be :median or :mean, got :$statistic"))
-    bib = collect_bibliography(view; kwargs...)
+    bib = bibliography === nothing ? collect_bibliography(view; kwargs...) : bibliography
     ds = view.dataset
     m, ex, rf, pr = ds.measurements, ds.experiments, ds.references, ds.properties
 
@@ -201,6 +207,7 @@ function reference_summary(
     for r in view.rows
         e = m.experiment[r]
         ref = ex.reference[e]
+        collapse === nothing || (ref = Int32(collapse))
         ref == NO_ID && continue
         p = m.property[r]
         key = (ref, p)
@@ -264,7 +271,7 @@ function reference_summary(
     years = Int[
         something(
             tryparse(Int, something(field_value(entry_of(g), "year"), "")),
-            Int(rf.year[group_ref[g]]),
+            collapse === nothing ? Int(rf.year[group_ref[g]]) : 0,
         ) for g in eachindex(group_ref)
     ]
     months =
@@ -288,7 +295,10 @@ function reference_summary(
     from_T, from_p = NativeTemperature(), NativePressure()
     columns = (;
         key = keys_[order],
-        doi = String[rf.doi[group_ref[g]] for g in order],
+        doi = String[
+            collapse === nothing ? rf.doi[group_ref[g]] :
+            something(field_value(entry_of(g), "doi"), "") for g in order
+        ],
         year = years[order],
         month = months[order],
         citation = String[citation_text(entry_of(g)) for g in order],
@@ -441,7 +451,10 @@ function cell_value(
     dash = latex ? "--" : "–"
     if col === :reference
         reference === :key && return esc(c.key[i])
-        reference === :cite && latex && return string("\\cite{", c.key[i], "}")
+        reference === :cite &&
+            latex &&
+            !(c.key[i] in getfield(s, :bibliography).uncited) &&
+            return string("\\cite{", c.key[i], "}")
         return esc(c.citation[i])
     end
     col === :property && return esc(c.property[i])
@@ -735,7 +748,10 @@ function write_references(
     table = (;),
     kwargs...,
 )
-    s = reference_summary(view; kwargs...)
+    return write_summary_files(prefix, reference_summary(view; kwargs...), formats, table)
+end
+
+function write_summary_files(prefix::AbstractString, s::ReferenceSummary, formats, table)
     for format in formats
         if format === :bib
             write(string(prefix, ".bib"), bibtex(s))

@@ -621,14 +621,70 @@ sole_dataset(db::Database) =
         ),
     )
 
+# The publication that a table is asked to call the data of the user: `:auto` is the one of the
+# database (none when it was not set), `false` or `nothing` none, `true` the one of the database or
+# a default one, and a `Publication` is that one.
+function work_publication(db::Database, this_work)
+    this_work === :auto && return publication(db)
+    (this_work === false || this_work === nothing) && return nothing
+    this_work === true && return something(publication(db), Publication())
+    this_work isa Publication && return this_work
+    throw(
+        ArgumentError(
+            "this_work is :auto, true, false, nothing or a Publication, got $(repr(this_work))",
+        ),
+    )
+end
+
+# The column `work`: what each point is, the label of the publication for the points of a
+# database of kind `:user` and "$(LITERATURE_LABEL)" for all the others.
+function work_column(db::Database, index, parts, pub::Publication)
+    return reduce(
+        vcat,
+        [
+            fill(db.members[i].kind === :user ? pub.label : LITERATURE_LABEL, length(p)) for
+            (i, p) in zip(index, parts) if !isempty(p)
+        ];
+        init = String[],
+    )
+end
+
+function with_work(t::PointTable, labels::Vector{String})
+    length(labels) == nrows(t) || throw(
+        ArgumentError("the table has $(nrows(t)) points and the labels $(length(labels))"),
+    )
+    return with_columns(t, merge(parent(t), (; work = labels)))
+end
+
 """
-    table(view::DatabaseView; kwargs...)
+    table(view::DatabaseView; this_work = :auto, kwargs...)
 
 The columns of [`table`](@ref) of every part, one after the other. When the selection has points
 of several databases the column `database` says which one each point comes from. `sortby` and `rev`
-sort the points of all the parts together (`database` is a key too), after they are joined.
+sort the points of all the parts together (`database` and `work` are keys too), after they are
+joined.
+
+When the database has a [`Publication`](@ref) ([`set_publication!`](@ref)), the table has the
+column `work`: the label of the publication (by default "This work") for the points of the
+databases of kind `:user` and "$(LITERATURE_LABEL)" for the others; the figures and the tables that
+are written use it. `this_work = false` leaves it out, `true` or a `Publication` asks for it
+without setting it in the database.
 """
-function table(v::DatabaseView; sortby = nothing, rev::Bool = false, kwargs...)
+function table(
+    v::DatabaseView;
+    sortby = nothing,
+    rev::Bool = false,
+    this_work = :auto,
+    kwargs...,
+)
+    pub = work_publication(v.database, this_work)
+    pub === nothing && return joined_table(v; sortby, rev, kwargs...)
+    t = joined_table(v; kwargs...)
+    t = with_work(t, work_column(v.database, v.index, v.parts, pub))
+    return finish_sort(t, sortby, rev, false)
+end
+
+function joined_table(v::DatabaseView; sortby = nothing, rev::Bool = false, kwargs...)
     length(v.parts) == 1 && return table(v.parts[1]; sortby, rev, kwargs...)
     tables = [
         (v.database.members[i].name, table(p; kwargs...)) for
@@ -659,7 +715,7 @@ for f in (
     @eval $f(db::Database, args...; kwargs...) = $f(sole_dataset(db), args...; kwargs...)
 end
 
-for f in (:bibtex, :reference_summary, :find_outliers, :expanded_uncertainty)
+for f in (:find_outliers, :expanded_uncertainty)
     @eval $f(v::DatabaseView, args...; kwargs...) = $f(sole_part(v), args...; kwargs...)
 end
 
@@ -671,11 +727,6 @@ function convert_composition(
     kwargs...,
 )
     return convert_composition(sole_part(v), args...; compounds, kwargs...)
-end
-
-for f in (:export_points, :write_bibtex, :write_references)
-    @eval $f(path::AbstractString, v::DatabaseView, args...; kwargs...) =
-        $f(path, sole_part(v), args...; kwargs...)
 end
 
 # The tables of conditions and uncertainty terms can be limited to a selection.

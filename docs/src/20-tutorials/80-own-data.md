@@ -287,6 +287,68 @@ A few things the template accepts and checks:
 !!! warning "Not stored yet"
     The note column, the sample data of the `Reference` sheet (purity, supplier...) and the "where in the article" fields are read but **not stored yet**. The import says so with a warning and in `result.ignored`; nothing is lost silently.
 
+## Calling your data "This work"
+
+Next to the literature, the points of your bench should not look like one more article. Tell the database what your data are going to be published as, with a [`Publication`](@ref); only the label is needed, the rest describes the article for the references and can be completed (with the DOI, once there is one) by setting the publication again:
+
+```@example own
+set_publication!(
+    db,
+    Publication(;
+        title = "Heat capacity of liquids on a new micro DSC (example)",
+        authors = ["Alves, E."],
+        year = 2026,
+    ),
+)
+publication(db)
+```
+
+From now on [`table`](@ref) of a selection has the column `work`: "This work" for every point of a database of kind `:user` and "Literature" for the rest. It is a column of its own, `source` still says which database of the references each point comes from. Water is in both the literature and your bench, so it makes a comparison:
+
+```@example own
+water = points(
+    db;
+    component = "water",
+    pure = true,
+    property = "Heat capacity at constant pressure per volume",
+)
+sort(unique(table(water).work))
+```
+
+The figures use it without being asked. Your points are **one group** of their own, however many databases of kind `:user` they come from: a star in the highlight colour of the style, drawn on top of the literature, with the label of the publication in the legend. The literature keeps the groups that `marker_by` says (the article, by default):
+
+```@example own
+using CairoMakie
+plot_facets(water; by = :property, backend = :makie, size = (760, 420))
+```
+
+`marker_by = :work` puts all the literature together as well, which is often what a validation of a new bench needs, one group against the other; `this_work = false` in [`table`](@ref) (and in the figures) leaves the label out, and `this_work = Publication(...)` asks for it without changing the database.
+
+```@example own
+plot_facets(water; by = :property, marker_by = :work, backend = :makie, size = (760, 420))
+```
+
+The publication belongs to the databases of kind `:user`: [`set_publication!`](@ref) gives it to all of them, so that all the points make one group (`database = "my_lab"` gives it to one only), and a database that is saved keeps it in its description file, with the data.
+
+### Writing the tables and the references of a paper or of a report
+
+The same selection exports as it is shown, and the publication says how your data are referred to. `cite` is kept in the `Publication` and every export takes `cite = ...` to choose again for that file:
+
+| `cite` | The `reference` column and the references table | The `.bib` | For |
+| :-- | :-- | :-- | :-- |
+| `:label` (default) | "This work" | no entry | the paper that publishes the data: it does not cite itself |
+| `:unpublished` | the key of an `@unpublished` entry (title, authors, year and note of the publication) | that entry | an internal report, or a paper that cites your unpublished work |
+| `:published` | the key of the article of the DOI | the entry of the DOI, from the resolver and completed with the fields of the publication | once the paper is out (needs `doi`) |
+
+```julia
+set_publication!(db, Publication(; authors = ["Surname, N."], title = "Heat capacity of ...", year = 2026))
+v = points(db; property = "Mass density")
+export_points("paper_tables", v)                          # "This work", no entry in the .bib
+export_points("report_tables", v; cite = :unpublished)    # the key, and an @unpublished entry
+```
+
+A selection of several databases is written as one list: the points of each database one after the other in the same file (the header once), the articles of all of them in one `.bib` (an article that two databases hold, with the same DOI, is one entry with one key), and one row in the references table for each property of your data, whatever the references they have. `write_bibtex`, `write_references`, `reference_summary` and `bibtex` do the same for a selection of a database. The ThermoML formats are for one database: export each part of `parts(view)`.
+
 ## What a reference needs
 
 There are two levels, and they are different questions. The first is what the **package** needs to store a reference: when something here is missing the import refuses and lists the cell, and nothing is added. The second is what **ThermoML** needs to write the same data as a valid ThermoML file: the package stores the data anyway, and the report lists what fails in `thermoml_failures`, so you can fix it now or later. Both apply to the spreadsheet and to the functions (`add_reference!`, `add_experiment!`, `add_measurement!`, `add_reference_data!`).

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased]
 
+- Your data as "This work" (issue 39, first part): `Publication(; label = "This work", title, authors, year, journal, doi, note)` describes the article that your data will be published in, and `set_publication!(db, publication)` gives it to the databases of kind `:user` (`database = "name"` to one only, `nothing` to take it away; `publication(db)` returns it). It is kept in the description file of a saved database, and setting it again (with the DOI, once there is one) replaces it
+  - `table` of a selection of the database has the new column `work` (the label for the points of the databases of kind `:user`, "Literature" for the others) when the database has a publication; `this_work = false` leaves it out and `this_work = true` or a `Publication` asks for it without setting it. The column `source` keeps its meaning (the database of the reference)
+  - The figures draw all the points of the user as one group of their own, the label of the publication in the legend, with the highlight colour and marker of the style (`PlotStyle.highlight`, `highlight_marker`; a star) on top of the others, whatever `marker_by` is; `marker_by = :work` puts the literature together against it
+
+- Your data as "This work" (issue 39, second part): exports of a selection of several databases, and how the data of the user are referred to
+  - `Publication(...; cite = :label | :unpublished | :published)` (default `:label`; `:published` needs the `doi`) says how the exports refer to your data, and `cite = ...` in `export_points`, `write_bibtex`, `bibtex`, `write_references` and `reference_summary` chooses again for that call. `:label` writes "This work" and no entry in the `.bib` (for the paper that publishes the data), `:unpublished` writes the key of an `@unpublished` entry built from the fields of the publication (for reports) and `:published` the entry of the DOI from the resolver, completed with those fields. `this_work = false` ignores the publication
+  - `export_points`, `write_bibtex`, `bibtex`, `write_references` and `reference_summary` take a selection of several databases (before, only a selection of one): the points of each database are appended in the same file (the header once), the articles are one list with global keys (the same DOI is one entry), and all the points of the databases of kind `:user` are one row for each property of the references table. The ThermoML formats are refused for several databases
+  - In a LaTeX table a label ("This work") is text and not a `\cite`
+
 ## [0.1.3] - 2026-11-22
 
 - Figures (issue 43, first part): the core that does not need a plotting package. `plotdata(selection; ...)` prepares the points once (the columns of `table`, with the exact units of `unit`, `temperature_unit` and `pressure_unit`) and every figure takes it, or the selection itself with the same filters as `points`; a model is a function of the conditions in SI (`model(p, T)`, or `args = (:temperature,)`, `(:temperature, :x1)`) that returns the value in the unit of the data, or the calculated values are given as `calc`, and it runs once for the same conditions

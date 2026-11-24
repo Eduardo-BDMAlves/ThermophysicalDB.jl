@@ -103,9 +103,9 @@ function group_layers(
 )
     layers = Layer[]
     for (k, g) in enumerate(groups)
-        marker, filled = group_marker(style, k)
+        marker, filled, mine = group_look(style, g, k)
         c = if color === nothing
-            style.palette[1]
+            something(mine, style.palette[1])
         elseif color isa AbstractString
             String(color)
         else
@@ -121,7 +121,7 @@ function group_layers(
                 marker,
                 filled,
                 label = g.label,
-                size = style.markersize,
+                size = g.highlight ? style.markersize + 3 : style.markersize,
             ),
         )
     end
@@ -324,7 +324,7 @@ function figure_comparison(
         ncols = 1,
         style = o.style,
         heights = Float64[heights[1], heights[2]],
-        size = (640, 720),
+        size = (720, 600),
         sharex = true,
     )
 end
@@ -624,7 +624,11 @@ function figure_residuals(
     for (k, g) in enumerate(groups)
         values = [v for v in dev[g.rows] if isfinite(v)]
         isempty(values) && continue
-        color = o.style.palette[mod1(k, length(o.style.palette))]
+        color = if g.highlight
+            o.style.highlight
+        else
+            o.style.palette[mod1(k, length(o.style.palette))]
+        end
         if length(values) >= MIN_POINTS_VIOLIN && kind !== :box
             append!(layers, violin_layers(k, values, color))
             kind === :both && append!(layers, box_layers(k, values, 0.08, color))
@@ -632,7 +636,7 @@ function figure_residuals(
             append!(layers, box_layers(k, values, 0.25, color))
         end
         if show_points
-            marker, filled = group_marker(o.style, k)
+            marker, filled, _ = group_look(o.style, g, k)
             push!(
                 layers,
                 Layer(;

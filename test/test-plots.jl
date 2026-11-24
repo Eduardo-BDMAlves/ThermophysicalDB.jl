@@ -437,6 +437,17 @@ end
     plain = ThermophysicalDB.figure_facets(d; by = :reference)
     coloured = ThermophysicalDB.figure_facets(d; by = :reference, color = :temperature)
     @test coloured.size[1] > plain.size[1]
+    # `size` is the user's: the width and the height in pixels.
+    @test plot_comparison(d; model = truth, spec = true, size = (800, 500)).size ==
+          (800, 500)
+    @test plot_xpt(d; spec = true, size = [500.0, 400.0]).size == (500, 400)
+    @test_throws ArgumentError plot_comparison(d; model = truth, spec = true, size = 800)
+    @test_throws ArgumentError plot_comparison(
+        d;
+        model = truth,
+        spec = true,
+        size = (0, 400),
+    )
 end
 
 @testitem "the Makie extension draws every figure" setup = [PlotSamples] tags = [:unit] begin

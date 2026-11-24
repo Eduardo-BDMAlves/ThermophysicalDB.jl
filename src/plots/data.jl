@@ -229,14 +229,19 @@ end
 """
     PointGroup
 
-The label of a group of points and their positions in the data.
+The label of a group of points and their positions in the data. `highlight` marks the group of the
+data of the user ("This work", see [`set_publication!`](@ref)), which the figures draw last, in its
+own colour and marker.
 """
 struct PointGroup
     label::String
     rows::Vector{Int}
+    highlight::Bool
 end
 
-const MARKER_BY = (:reference, :method, :phase, :year_group, nothing)
+PointGroup(label::AbstractString, rows::Vector{Int}) = PointGroup(label, rows, false)
+
+const MARKER_BY = (:reference, :method, :phase, :year_group, :work, nothing)
 
 # The text that tells apart the references: the DOI, or the year when there is none.
 function reference_labels(d::PlotData)
@@ -245,13 +250,24 @@ function reference_labels(d::PlotData)
     return [isempty(doi[i]) ? string(year[i]) : string(doi[i]) for i = 1:length(d)]
 end
 
+# The points that are the user's: where the column `work` (see `table` of a `DatabaseView`) is
+# not "Literature". `nothing` when the data have no such column or no such point.
+function work_labels(d::PlotData)
+    haskey(parent(d), :work) || return nothing
+    work = column(d, :work)
+    any(!=(LITERATURE_LABEL), work) || return nothing
+    return work
+end
+
 """
     point_groups(data, by; maxgroups = 20) -> Vector{PointGroup}
 
 Group the points as `by` says: `:reference` (the DOI), `:method`, `:phase`, `:year_group` (by
-decade) or `nothing` (one group). The groups come ordered by their label; when there are more
-than `maxgroups`, the largest `maxgroups - 1` stay and the others are put together as
-`"others"`.
+decade), `:work` ("$(LITERATURE_LABEL)" and the label of the publication, see
+[`set_publication!`](@ref)) or `nothing` (one group). The groups come ordered by their label;
+when there are more than `maxgroups`, the largest `maxgroups - 1` stay and the others are put
+together as `"others"`. The points of the user are always one group of their own, whatever `by`
+is, and it comes last (it has `highlight` set).
 """
 function point_groups(d::PlotData, by; maxgroups::Integer = 20)
     by in MARKER_BY || throw(
@@ -259,19 +275,41 @@ function point_groups(d::PlotData, by; maxgroups::Integer = 20)
             "marker_by must be one of $(filter(!isnothing, collect(MARKER_BY))) or nothing, got $(repr(by))",
         ),
     )
+    by === :work &&
+        !haskey(parent(d), :work) &&
+        throw(
+            ArgumentError(
+                "marker_by = :work needs the column work: set the publication of the database with set_publication!",
+            ),
+        )
     n = length(d)
+    work = work_labels(d)
     keys_ = if by === nothing
         fill("", n)
     elseif by === :reference
         reference_labels(d)
     elseif by === :year_group
         [string(10 * (Int(y) ÷ 10), "s") for y in column(d, :year)]
+    elseif by === :work
+        String[String(v) for v in column(d, :work)]
     else
         String[isempty(v) ? "(none)" : String(v) for v in column(d, by)]
     end
+    mine = falses(n)
+    if work !== nothing
+        for i = 1:n
+            if work[i] != LITERATURE_LABEL
+                keys_[i] = String(work[i])
+                mine[i] = true
+            elseif by === nothing
+                keys_[i] = LITERATURE_LABEL
+            end
+        end
+    end
     index = Dict{String,Vector{Int}}()
+    own = Dict{String,Vector{Int}}()
     for i = 1:n
-        push!(get!(index, keys_[i], Int[]), i)
+        push!(get!(mine[i] ? own : index, keys_[i], Int[]), i)
     end
     groups = [PointGroup(k, v) for (k, v) in index]
     if length(groups) > maxgroups
@@ -283,6 +321,7 @@ function point_groups(d::PlotData, by; maxgroups::Integer = 20)
     else
         sort!(groups; by = g -> g.label)
     end
+    append!(groups, [PointGroup(k, v, true) for (k, v) in sort!(collect(own); by = first)])
     return groups
 end
 
@@ -290,6 +329,14 @@ end
 function group_marker(style::PlotStyle, k::Integer)
     n = length(style.markers)
     return (style.markers[mod1(k, n)], k <= n)
+end
+
+# How a group is drawn: its marker, whether it is filled and its colour (`nothing` when the
+# caller decides it). The data of the user have the marker and the colour of the style for them.
+function group_look(style::PlotStyle, g::PointGroup, k::Integer)
+    g.highlight && return (style.highlight_marker, true, style.highlight)
+    marker, filled = group_marker(style, k)
+    return (marker, filled, nothing)
 end
 
 # Values that are the same up to a tolerance, as a vector of the groups they make (for the

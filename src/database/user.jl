@@ -144,6 +144,8 @@ function write_member_meta(m::Member, n::Integer)
         "saved_at" => utc_timestamp(),
         "measurements" => Int(n),
     )
+    pub = m.publication
+    pub === nothing || (meta["publication"] = publication_toml(pub))
     path = joinpath(dirname(m.path), MEMBER_META)
     tmp = path * ".tmp"
     open(io -> TOML.print(io, meta), tmp, "w")
@@ -243,6 +245,75 @@ function set_priority!(db::Database, name::AbstractString, priority::Integer)
     return db
 end
 
+"""
+    set_publication!(db, publication; database = nothing) -> Database
+    set_publication!(db, nothing; database = nothing) -> Database
+
+Tell the database what your data are going to be published as: `publication` is a
+[`Publication`](@ref). From then on the points of the databases of kind `:user` are called
+`publication.label` (by default "This work") in the column `work` of [`table`](@ref), in the
+figures (one group of its own, drawn on top and highlighted) and, when the references are written,
+the article is `publication`. All the databases of the user take it, so that all their points make
+one group; `database = "name"` gives it to one only. `nothing` takes it away. A database that was
+saved keeps the publication in its description file (and a database that was not, takes it when it
+is saved); [`publication`](@ref) returns it.
+
+Setting it again, for example with the DOI once the article is out, replaces it everywhere.
+"""
+function set_publication!(
+    db::Database,
+    publication::Union{Nothing,Publication};
+    database::Union{Nothing,AbstractString} = nothing,
+)
+    targets = if database === nothing
+        own = [m for m in db.members if m.kind === :user]
+        isempty(own) && throw(
+            ArgumentError(
+                "there is no database of kind :user to hold the data of this work; create one with add_database!(db, name)",
+            ),
+        )
+        own
+    else
+        m = db.members[member_index(db, database)]
+        m.kind === :user || throw(
+            ArgumentError(
+                "only a database of kind :user holds the data of this work; \"$(m.name)\" is :$(m.kind)",
+            ),
+        )
+        [m]
+    end
+    for m in targets
+        m.publication = publication
+        if m.persistent && isfile(joinpath(dirname(m.path), MEMBER_META))
+            write_member_meta(
+                m,
+                is_open(m) ? length(m.dataset.measurements) : member_points(m),
+            )
+            audit_record!(
+                dirname(m.path),
+                "publication_changed",
+                m.name;
+                detail = publication === nothing ? "removed" : "label=$(publication.label)",
+            )
+        end
+    end
+    return db
+end
+
+"""
+    publication(db) -> Union{Nothing,Publication}
+
+The [`Publication`](@ref) that the data of the databases of kind `:user` are called, or `nothing`
+when it was not set (see [`set_publication!`](@ref)). When databases saved apart hold different
+ones, the first by priority is the one.
+"""
+function publication(db::Database)::Union{Nothing,Publication}
+    for m in db.members
+        m.kind === :user && m.publication !== nothing && return m.publication
+    end
+    return nothing
+end
+
 # The databases saved in `root`: a folder with a description and a data file. One that cannot be
 # used (another schema version, a damaged file) is skipped with a warning, never an error.
 function discover_members(root::AbstractString; taken = String[])
@@ -272,6 +343,8 @@ function discover_members(root::AbstractString; taken = String[])
                 path = data,
                 priority = Int(get(meta, "priority", DEFAULT_PRIORITY[kind])),
                 persistent = true,
+                publication = haskey(meta, "publication") ?
+                              publication_from_toml(meta["publication"]) : nothing,
             )
             member_catalog(member)    # reads the file; fails here, not in the first query
             push!(found, member)

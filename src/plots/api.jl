@@ -10,13 +10,25 @@ the axes and of the colour (text such as `"MPa"`, or a unit of a units package),
 exactly by [`table`](@ref). `style` is a [`PlotStyle`](@ref) or `:default` / `:neon`,
 `colormap` the name of a colour scheme, `unitformat` one of `:square`, `:round`, `:slash` or a
 function (see [`axis_label`](@ref)), `marker_by` what the markers tell apart (`:reference`,
-`:method`, `:phase`, `:year_group`, `nothing`), `uncertainty` (`:auto`, `:bars`, `:band`,
-`:none`), `backend` the plotting package and `spec = true` the [`FigureSpec`](@ref) without
-drawing it. The defaults are those of [`plot_defaults`](@ref).
+`:method`, `:phase`, `:year_group`, `:work`, `nothing`), `uncertainty` (`:auto`, `:bars`, `:band`,
+`:none`), `size = (width, height)` the size of the figure in pixels (each figure has its own
+default), `backend` the plotting package and `spec = true` the [`FigureSpec`](@ref) without
+drawing it. The defaults are those of [`plot_defaults`](@ref). When the database has a
+[`Publication`](@ref) ([`set_publication!`](@ref)) the points of the user are one group of their
+own, "This work" by default, in the highlight colour and marker of the style and drawn last, whatever
+`marker_by` is; `marker_by = :work` tells only them from the rest.
 """
 
-function draw(builder, args...; backend = nothing, spec::Bool = false, kwargs...)
+function draw(
+    builder,
+    args...;
+    backend = nothing,
+    spec::Bool = false,
+    size = nothing,
+    kwargs...,
+)
     figure = builder(args...; kwargs...)
+    size === nothing || (figure = resize(figure, size))
     return spec ? figure : render(figure; backend)
 end
 

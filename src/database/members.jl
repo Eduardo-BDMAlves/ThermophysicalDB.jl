@@ -57,8 +57,9 @@ end
 One database of a [`Database`](@ref): its `name`, `kind` (`:thermoml`, `:literature` or `:user`),
 the cache file it lives in (`path`, empty for one that only exists in memory), its `priority` (a
 smaller number comes first) and whether it is `persistent` (written to its file when saved; the
-databases of the user are not by default). The dataset is read from the file the first time
-[`member_dataset`](@ref) is called.
+databases of the user are not by default). The `publication` is what the points of a database of
+kind `:user` are called (see [`set_publication!`](@ref)). The dataset is read from the file the
+first time [`member_dataset`](@ref) is called.
 """
 mutable struct Member
     name::String
@@ -72,6 +73,7 @@ mutable struct Member
     # What was removed or replaced in memory since the last save, as (event, detail); the audit log
     # records it when it becomes permanent, at `save_database`.
     edits::Vector{Tuple{String,String}}
+    publication::Union{Nothing,Publication}
 end
 
 function Member(
@@ -81,6 +83,7 @@ function Member(
     dataset::Union{Nothing,Dataset} = nothing,
     priority::Integer = DEFAULT_PRIORITY[kind in MEMBER_KINDS ? kind : :user],
     persistent::Bool = kind !== :user,
+    publication::Union{Nothing,Publication} = nothing,
 )
     isempty(strip(name)) && throw(ArgumentError("a database needs a name"))
     kind in MEMBER_KINDS ||
@@ -97,6 +100,7 @@ function Member(
         nothing,
         ReentrantLock(),
         Tuple{String,String}[],
+        publication,
     )
 end
 

@@ -224,6 +224,10 @@ ternary = plotdata(
 plot_ternary(ternary; style = :default)
 ```
 
+## Your data next to the literature
+
+When the database has a [`Publication`](@ref) ([`set_publication!`](@ref)), every point of a database of kind `:user` is one group of its own in all the figures: "This work" (or the label you chose) in the legend, drawn last with the highlight colour and marker of the style, whatever `marker_by` is. `marker_by = :work` puts all the literature together as well, to compare one group with the other. The tutorial [Adding your own data](@ref tutorial_own_data) shows it with a bench and the literature.
+
 ## Your own layout and the other package
 
 In Makie the figures also fill a position of a layout of yours, with the same keywords: `plot_comparison!(fig[1, 1], d; model = kell)`.

@@ -54,8 +54,10 @@ const NEON_MARKERS = [:circle, :utriangle, :rect, :diamond, :dtriangle, :star5]
 The look of a figure: `colormap` (the name of a colour scheme, or a vector of colours of a
 gradient) for continuous colours, `diverging` for the colours of a map that is centred on zero,
 `counts` for counts, `palette` (colours) and `markers` for categories, `background` and
-`foreground` (the colour of text, axes and grid; `"none"` is a transparent background), sizes and
-`unitformat` (see [`axis_label`](@ref)). Get one with [`plot_style`](@ref).
+`foreground` (the colour of text, axes and grid; `"none"` is a transparent background), sizes,
+`highlight` and `highlight_marker` (the colour and the marker of the data of the user, "This work",
+see [`set_publication!`](@ref)) and `unitformat` (see [`axis_label`](@ref)). Get one with
+[`plot_style`](@ref).
 """
 Base.@kwdef struct PlotStyle
     name::Symbol = :default
@@ -66,6 +68,8 @@ Base.@kwdef struct PlotStyle
     markers::Vector{Symbol} = MARKERS
     background::String = "white"
     foreground::String = "black"
+    highlight::String = "#C8102E"
+    highlight_marker::Symbol = :star5
     markersize::Float64 = 8.0
     linewidth::Float64 = 2.0
     fontsize::Float64 = 13.0
@@ -93,6 +97,7 @@ function plot_style(name::Symbol = :default; kwargs...)
             markers = NEON_MARKERS,
             background = "none",
             foreground = "#9aa3c7",
+            highlight = "#ffd36b",
         )
     else
         throw(ArgumentError("style must be :default or :neon, got $(repr(name))"))
@@ -141,7 +146,7 @@ function check_default(name::Symbol, value)
     elseif name === :backend
         value === nothing || value in PLOT_BACKENDS_KNOWN
     elseif name === :marker_by
-        value === nothing || value in (:reference, :method, :phase, :year_group)
+        value === nothing || value in (:reference, :method, :phase, :year_group, :work)
     elseif name === :colormap
         value === nothing || value isa Symbol
     else
@@ -180,7 +185,7 @@ arguments it returns the current ones. `style` is `:default` or `:neon` ([`plot_
 [`axis_label`](@ref); `uncertainty` how the uncertainty of the points is shown (`:auto`, `:bars`,
 `:band` or `:none`); `backend` (`:makie` or `:plots`) the one that draws when both are loaded;
 `marker_by` what the marker of a point tells apart (`:reference`, `:method`, `:phase`,
-`:year_group` or `nothing`).
+`:year_group`, `:work` or `nothing`).
 
 The new values hold for this Julia session. With `persist = true` they are also kept with
 Preferences.jl, in the `LocalPreferences.toml` of the active environment, and are the starting

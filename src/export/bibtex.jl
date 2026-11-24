@@ -508,16 +508,21 @@ struct Bibliography
     package::Vector{BibEntry}
     report::BibtexReport
     from_archive::Bool
+    uncited::Vector{String}
 end
 
-function collect_bibliography(
+# `uncited` are the keys of the rows that are labels and not entries ("This work"): a table does
+# not `\cite` them.
+Bibliography(ids, entries, sources, package, report, from_archive) =
+    Bibliography(ids, entries, sources, package, report, from_archive, String[])
+
+# The entries of the articles of the selection, each once, from the DOI resolver completed with
+# the archive, with no key yet: `(ids, entries, archive_only, conflicts, resolved)`.
+function resolve_entries(
     view::DataView;
     online::Bool = true,
     cache::Bool = true,
     refresh::Bool = false,
-    include_source::Bool = true,
-    include_package::Bool = true,
-    package_cff::Union{Nothing,AbstractString} = nothing,
     progress::Bool = true,
     fetcher = default_fetcher,
 )
@@ -568,6 +573,17 @@ function collect_bibliography(
         end
     end
 
+    return (; ids, entries, archive_only, conflicts, resolved)
+end
+
+function collect_bibliography(
+    view::DataView;
+    include_source::Bool = true,
+    include_package::Bool = true,
+    package_cff::Union{Nothing,AbstractString} = nothing,
+    kwargs...,
+)
+    (; ids, entries, archive_only, conflicts, resolved) = resolve_entries(view; kwargs...)
     sources = include_source ? source_entries() : BibEntry[]
     package = include_package ? package_entries(package_cff) : BibEntry[]
     assign_keys!(entries, Set{String}(e.key for e in Iterators.flatten((sources, package))))
@@ -611,7 +627,7 @@ function render_bibliography(b::Bibliography)
         end
     end
     for entry in sort(b.entries; by = e -> lowercase(e.key))
-        render_entry(io, entry)
+        entry.key in b.uncited || render_entry(io, entry)
     end
     return String(take!(io))
 end

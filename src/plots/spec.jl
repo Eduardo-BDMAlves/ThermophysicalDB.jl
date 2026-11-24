@@ -89,6 +89,30 @@ Base.@kwdef struct FigureSpec
     colorbar::Union{Nothing,ColorbarSpec} = nothing
 end
 
+"""
+    resize(figure::FigureSpec, size) -> FigureSpec
+
+The same figure with another `size`, the width and the height in pixels.
+"""
+function resize(f::FigureSpec, size)
+    (size isa Tuple || size isa AbstractVector) && length(size) == 2 && all(>(0), size) ||
+        throw(
+            ArgumentError(
+                "`size` is the width and the height in pixels, such as (800, 500)",
+            ),
+        )
+    return FigureSpec(
+        f.panels,
+        f.nrows,
+        f.ncols,
+        f.style,
+        f.heights,
+        (round(Int, size[1]), round(Int, size[2])),
+        f.sharex,
+        f.colorbar,
+    )
+end
+
 function Base.show(io::IO, f::FigureSpec)
     layers = sum(p -> length(p.layers), f.panels; init = 0)
     return print(

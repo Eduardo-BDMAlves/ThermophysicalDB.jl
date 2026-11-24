@@ -224,9 +224,36 @@ function build_export_data(
     view::DataView;
     reference::Symbol = :key,
     units::Symbol = :native,
+    details::Bool = false,
+    composition::Union{Nothing,Symbol} = nothing,
+    kwargs...,
+)
+    h = export_head(view; reference, units, composition, kwargs...)
+    return assemble_export_data(
+        h.t,
+        h.reference_column,
+        h.ncomp,
+        h.x_units,
+        h.summary,
+        h.origin,
+        h.terms;
+        reference,
+        units,
+        details,
+        composition,
+    )
+end
+
+# What the writers need of one selection before they decide the columns: the table of the points,
+# the reference written in each row, the number of components, the unit of the amounts, the
+# references table, the origin notice and the uncertainty terms. `bibliography` and `collapse`
+# (the reference whose entry stands for all the points) are for the selections of several databases.
+function export_head(
+    view::DataView;
+    reference::Symbol = :key,
+    units::Symbol = :native,
     policy::Symbol = :nominal,
     report::Symbol = :source,
-    details::Bool = false,
     composition::Union{Nothing,Symbol} = nothing,
     solvent = nothing,
     molar_mass = nothing,
@@ -234,6 +261,7 @@ function build_export_data(
     density = nothing,
     fetch_molar_mass::Bool = false,
     strict::Bool = false,
+    collapse::Union{Nothing,Integer} = nothing,
     kwargs...,
 )
     reference in REFERENCE_STYLES || throw(
@@ -245,7 +273,7 @@ function build_export_data(
     ds = view.dataset
     m, ex, rf = ds.measurements, ds.experiments, ds.references
 
-    summary = reference_summary(view; policy, kwargs...)
+    summary = reference_summary(view; policy, collapse, kwargs...)
     bib = getfield(summary, :bibliography)
     t = table(
         view;
@@ -264,10 +292,10 @@ function build_export_data(
     label = fill("", length(rf))
     for (k, id) in enumerate(bib.ids)
         entry = bib.entries[k]
+        doi = collapse === nothing ? rf.doi[id] : something(field_value(entry, "doi"), "")
         label[id] =
             reference === :key ? entry.key :
-            reference === :text ? citation_text(entry) :
-            (isempty(rf.doi[id]) ? entry.key : rf.doi[id])
+            reference === :text ? citation_text(entry) : (isempty(doi) ? entry.key : doi)
     end
     n = length(view.rows)
     reference_column = Vector{String}(undef, n)
@@ -275,20 +303,48 @@ function build_export_data(
     for (i, r) in enumerate(view.rows)
         e = m.experiment[r]
         ref = ex.reference[e]
+        collapse === nothing || (ref = Int32(collapse))
         reference_column[i] = ref == NO_ID ? "" : label[ref]
         ncomp[i] = ex.ncomp[e]
     end
 
+    x_units =
+        composition === nothing ? composition_units(view) :
+        fill(SCALE_UNITS[composition], MAX_COMPONENTS)
+    return (;
+        t,
+        reference_column,
+        ncomp,
+        x_units,
+        summary,
+        origin = origin_note(view),
+        terms = point_uncertainties(ds, view, units),
+    )
+end
+
+# The columns the writers use, from the table of the points and what goes with it: the reference of
+# each row, the number of components, the unit of the amounts, the references table, the origin
+# notice and the uncertainty terms.
+function assemble_export_data(
+    t,
+    reference_column::Vector{String},
+    ncomp::Vector{UInt8},
+    x_units,
+    summary::ReferenceSummary,
+    origin::Union{Nothing,DataOrigin},
+    terms::Dict{Int,Vector{Any}};
+    reference::Symbol,
+    units::Symbol,
+    details::Bool,
+    composition::Union{Nothing,Symbol},
+)
+    n = length(reference_column)
     value_units = unique(t.unit)
     mixed = length(value_units) > 1
     value_unit =
         mixed ? "see unit" :
         (isempty(value_units) || isempty(value_units[1]) ? "-" : value_units[1])
     pressure_unit = units === :si ? "Pa" : "kPa"
-    x_units =
-        composition === nothing ? composition_units(view) :
-        fill(SCALE_UNITS[composition], MAX_COMPONENTS)
-
     # What the references table already tells (method, phase), and what is the same for the
     # whole selection (the system when there is one, the property when there is one), is not
     # repeated in every row: a blank column is left out of every format. `details` keeps it.
@@ -340,10 +396,10 @@ function build_export_data(
         t.components,
         ncomp,
         summary,
-        origin_note(view),
+        origin,
         reference,
         units,
-        point_uncertainties(ds, view, units),
+        terms,
     )
 end
 
@@ -420,7 +476,10 @@ function write_points_tex(path::AbstractString, data::ExportData)
                 j > 1 && write(io, " & ")
                 x = column[i]
                 if x isa AbstractString
-                    cite = data.reference === :key && data.written[j] === :reference
+                    cite =
+                        data.reference === :key &&
+                        data.written[j] === :reference &&
+                        !(x in getfield(data.summary, :bibliography).uncited)
                     text = latex_escape(x)
                     write(io, cite && !isempty(x) ? string("\\cite{", x, "}") : text)
                 elseif isfinite(x)
