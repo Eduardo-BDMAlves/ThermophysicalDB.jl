@@ -93,6 +93,7 @@ include("database/inputs.jl")
 include("database/repeats.jl")
 include("database/database.jl")
 include("database/export.jl")
+include("database/move.jl")
 include("compounds/linked.jl")
 include("database/duplicates.jl")
 include("query/combine.jl")
@@ -153,6 +154,8 @@ export COMPOSITION_SCALES,
     set_priority!,
     Publication,
     set_publication!,
+    move_reference!,
+    publish!,
     publication,
     CompositionConversion,
     CompoundDB,

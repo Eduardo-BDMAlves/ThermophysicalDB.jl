@@ -231,9 +231,11 @@ end
         T.Member("b"; kind = :user, dataset = TwoDatabases.mine()),
     ])
     @test_throws ArgumentError T.sample_table(two)
+    # The ThermoML formats are read only, so they are for one database.
     @test_throws ArgumentError T.export_points(
         mktempdir(),
-        T.points(two; component = "water"),
+        T.points(two; component = "water");
+        formats = (:thermoml,),
     )
     @test T.member_dataset(two, "b") isa T.Dataset
 end

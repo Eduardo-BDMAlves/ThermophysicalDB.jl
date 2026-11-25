@@ -97,6 +97,8 @@ modified_at
 set_priority!
 Publication
 set_publication!
+move_reference!
+publish!
 publication
 databases_dir
 resolve_compound

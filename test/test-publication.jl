@@ -304,3 +304,100 @@ end
         @test contains(off, "10.1234/rig")
     end
 end
+
+@testitem "a reference moves to another database and the archive is never touched" setup =
+    [TwoDatabases, OwnData, WorkData] tags = [:unit] begin
+    T = ThermophysicalDB
+    mktempdir() do dir
+        db, _ = WorkData.database(dir)
+        count_points(name) = length(T.points(db; source = name))
+        total = length(T.points(db; property = "Mass density"))
+        archive = T.member_dataset(db.members[T.member_index(db, "thermoml")])
+        before = (count_points("papers"), count_points("my_lab"))
+        # The archive is not an origin or a destination.
+        @test_throws ArgumentError T.move_reference!(
+            db,
+            "10.5555/mine-1",
+            "thermoml";
+            database = "my_lab",
+        )
+        @test_throws ArgumentError T.move_reference!(
+            db,
+            "x",
+            "papers";
+            database = "thermoml",
+        )
+        # Preview: nothing changes.
+        plan = T.move_reference!(db, "10.5555/mine-1", "papers"; database = "my_lab")
+        @test !plan.moved && plan.points == before[2] && plan.to == "papers"
+        @test (count_points("papers"), count_points("my_lab")) == before
+        # The move.
+        r = T.move_reference!(
+            db,
+            "10.5555/mine-1",
+            "papers";
+            database = "my_lab",
+            confirm = true,
+        )
+        @test r.moved
+        @test count_points("papers") == before[1] + before[2]
+        @test count_points("my_lab") == 0
+        @test length(T.points(db; property = "Mass density")) == total
+        @test T.member_dataset(db.members[T.member_index(db, "thermoml")]) === archive
+        t = T.table(T.points(db; source = "papers"))
+        @test count(==("10.5555/mine-1"), t.doi) == before[2]
+        @test_throws ArgumentError T.move_reference!(
+            db,
+            "10.5555/mine-1",
+            "papers";
+            database = "papers",
+            on_conflict = :nope,
+        )
+    end
+end
+
+@testitem "publish! turns the data of the user into the article" setup =
+    [TwoDatabases, OwnData, WorkData] tags = [:unit] begin
+    T = ThermophysicalDB
+    mktempdir() do dir
+        db, _ = WorkData.database(dir)
+        T.set_publication!(db, T.Publication(; authors = ["Alves, E."], year = 2026))
+        text = """
+        @article{x,
+          author = {Alves, Eduardo and Silva, Ana},
+          title = {A rig for water},
+          journal = {J. Chem. Eng. Data},
+          year = {2026},
+          doi = {10.1234/rig}
+        }
+        """
+        fetcher = doi -> doi == "10.1234/rig" ? text : error("not found")
+        total = length(T.points(db; property = "Mass density"))
+        plan = T.publish!(db; doi = "10.1234/rig", to = "papers", cache = false, fetcher)
+        @test !plan.published && plan.resolved && plan.fields.title == "A rig for water"
+        @test T.publication(db) !== nothing
+        @test_throws ArgumentError T.publish!(db; to = "papers")
+        r = T.publish!(
+            db;
+            doi = "10.1234/rig",
+            to = "papers",
+            cache = false,
+            fetcher,
+            confirm = true,
+        )
+        @test r.published
+        @test T.publication(db) === nothing
+        @test length(T.points(db; property = "Mass density")) == total
+        @test length(T.points(db; source = "my_lab")) == 0
+        t = T.table(T.points(db; source = "papers"))
+        @test count(==("10.1234/rig"), t.doi) == 3
+        bib = T.bibtex(
+            T.points(db; source = "papers");
+            online = false,
+            include_package = false,
+            include_source = false,
+            progress = false,
+        )
+        @test contains(bib, "10.1234/rig")
+    end
+end
