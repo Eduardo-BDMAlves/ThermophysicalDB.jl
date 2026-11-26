@@ -122,19 +122,19 @@ end
         @test T.save_database(db, "my_lab") |> isfile
         found = T.discover_members(root)
         @test length(found) == 1 && found[1].name == "my_lab"
-        @test found[1].publication == pub
+        @test only(found[1].publications) == pub
         # Changing it afterwards rewrites the description of the saved database.
         newer = T.Publication(; label = "Present study", year = 2027, doi = "10.5555/final")
         T.set_publication!(db, newer)
-        @test only(T.discover_members(root)).publication == newer
+        @test only(only(T.discover_members(root)).publications) == newer
         T.set_publication!(db, nothing)
-        @test only(T.discover_members(root)).publication === nothing
+        @test isempty(only(T.discover_members(root)).publications)
         # The literature and the archive have none.
-        @test all(m -> m.publication === nothing, filter(m -> m.kind !== :user, db.members))
+        @test all(m -> isempty(m.publications), filter(m -> m.kind !== :user, db.members))
         # Priority changes keep it.
         T.set_publication!(db, pub)
         T.set_priority!(db, "my_lab", 5)
-        @test only(T.discover_members(root)).publication == pub
+        @test only(only(T.discover_members(root)).publications) == pub
     end
 end
 

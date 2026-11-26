@@ -328,30 +328,7 @@ function move_reference!(
         drop_references = Int32[i for i = 1:length(src.references) if i != ref.id],
     )
     sub = subset_dataset(src, keep)
-    if !isempty(metadata)
-        rf = sub.references
-        fields = merge(
-            (;
-                doi = rf.doi[1],
-                title = rf.title[1],
-                journal = rf.journal[1],
-                year = Int(rf.year[1]),
-                volume = rf.volume[1],
-                pages = rf.pages[1],
-                authors = rf.authors[1],
-            ),
-            NamedTuple(metadata),
-        )
-        rf.doi[1] = normalize_doi(String(fields.doi))
-        rf.title[1] = String(fields.title)
-        rf.journal[1] = String(fields.journal)
-        rf.year[1] = Int16(fields.year)
-        rf.volume[1] = String(fields.volume)
-        rf.pages[1] = String(fields.pages)
-        rf.authors[1] = String.(fields.authors)
-        empty!(rf.index)
-        isempty(rf.doi[1]) || (rf.index[rf.doi[1]] = Int32(1))
-    end
+    apply_metadata!(sub, 1, metadata)
     target = member_dataset(dest)
     existing =
         isempty(sub.references.doi[1]) ? NO_ID :
@@ -386,6 +363,234 @@ function move_reference!(
     detail = "reference=$label experiments=$(counts.experiments) points=$(counts.points)"
     replace_dataset!(db, dest, grown, "reference_moved_in", "$detail from=$(from.name)")
     replace_dataset!(db, from, rest, "reference_moved_out", "$detail to=$(dest.name)")
+    return (; moved = true, plan...)
+end
+
+# Set the fields of the reference `k` of `sub` from `metadata` (a DOI that is given joins them).
+function apply_metadata!(sub::Dataset, k::Integer, metadata)
+    isempty(metadata) && return sub
+    rf = sub.references
+    fields = merge(
+        (;
+            doi = rf.doi[k],
+            title = rf.title[k],
+            journal = rf.journal[k],
+            year = Int(rf.year[k]),
+            volume = rf.volume[k],
+            pages = rf.pages[k],
+            authors = rf.authors[k],
+        ),
+        NamedTuple(metadata),
+    )
+    rf.doi[k] = normalize_doi(String(fields.doi))
+    rf.title[k] = String(fields.title)
+    rf.journal[k] = String(fields.journal)
+    rf.year[k] = Int16(fields.year)
+    rf.volume[k] = String(fields.volume)
+    rf.pages[k] = String(fields.pages)
+    rf.authors[k] = String.(fields.authors)
+    empty!(rf.index)
+    for (i, d) in enumerate(rf.doi)
+        isempty(d) || (rf.index[d] = Int32(i))
+    end
+    return sub
+end
+
+# The points that `what` selects in each database that can be changed: `(member, mask)` with the
+# mask over the points of the dataset of the member. `what` is the name of an experiment, a vector
+# of names, or a selection of points (`points(...)`).
+function selected_points(db::Database, what)
+    pieces = Tuple{Member,BitVector}[]
+    if what isa AbstractString || what isa AbstractVector{<:AbstractString}
+        list = what isa AbstractString ? [String(what)] : String.(what)
+        unknown = unknown_experiment_names(db, list)
+        isempty(unknown) ||
+            throw(ArgumentError("no experiment is called $(join(repr.(unknown), ", "))"))
+        wanted = Set(list)
+        for m in db.members
+            m.kind === :thermoml && continue
+            ds = member_dataset(m)
+            tags = experiment_tags(m, ds)
+            mask = BitVector([any(in(wanted), tags[e]) for e in ds.measurements.experiment])
+            any(mask) && push!(pieces, (m, mask))
+        end
+    elseif what isa DatabaseView || what isa DataView
+        parts = Tuple{Union{Nothing,Int},DataView}[]
+        if what isa DatabaseView
+            for (i, p) in zip(what.index, what.parts)
+                push!(parts, (i, p))
+            end
+        else
+            push!(parts, (nothing, what))
+        end
+        for (i, p) in parts
+            isempty(p) && continue
+            k =
+                i === nothing ?
+                findfirst(m -> member_dataset(m) === p.dataset, db.members) : Int(i)
+            k === nothing && throw(ArgumentError("the selection is not of this database"))
+            m = db.members[k]
+            m.kind === :thermoml && throw(
+                ArgumentError(
+                    "the ThermoML archive is read only: its points cannot be moved or published",
+                ),
+            )
+            ds = member_dataset(m)
+            p.dataset === ds || throw(
+                ArgumentError(
+                    "the selection is out of date: the database \"$(m.name)\" changed; select the points again",
+                ),
+            )
+            mask = falses(length(ds.measurements.experiment))
+            mask[p.rows] .= true
+            j = findfirst(x -> x[1] === m, pieces)
+            j === nothing ? push!(pieces, (m, mask)) : (pieces[j][2] .|= mask)
+        end
+    else
+        throw(
+            ArgumentError(
+                "choose the experiments with a name, a vector of names or a selection of points, got $(typeof(what))",
+            ),
+        )
+    end
+    isempty(pieces) && throw(ArgumentError("the selection has no points to move"))
+    return pieces
+end
+
+# The `Keep` that holds the points of `mask` (when `inside`) or all the others, without the
+# references and experiments that are left with no points.
+function keep_points(ds::Dataset, mask::BitVector, inside::Bool)
+    keep = cascade(ds; drop_measurements = findall(inside ? .!mask : mask))
+    ex = ds.experiments
+    kr = falses(length(ds.references))
+    for e in eachindex(keep.experiments)
+        keep.experiments[e] && (kr[ex.reference[e]] = true)
+    end
+    return Keep(kr, keep.experiments, keep.measurements)
+end
+
+# `keep` reduced to the reference `r`.
+function keep_reference(ds::Dataset, keep, r::Integer)
+    er = ds.experiments.reference
+    ke = BitVector(keep.experiments[e] && er[e] == r for e in eachindex(er))
+    km = BitVector(
+        keep.measurements[i] && ke[ds.measurements.experiment[i]] for
+        i in eachindex(keep.measurements)
+    )
+    kr = falses(length(keep.references))
+    kr[r] = true
+    return Keep(kr, ke, km)
+end
+
+"""
+    move_experiments!(db, what, to; metadata = (;), on_conflict = :error, confirm = false)
+        -> NamedTuple
+
+Move some experiments of your own databases to another database of your own, without joining the
+two: the points are copied into `to` and taken out of the origin. `what` is the name of an
+experiment ([`add_name!`](@ref)), a vector of names, or a selection of points
+(`points(db; experiment = "visc-run-1")`). When only some points of an experiment are selected,
+those are copied with the experiment and the others stay where they were. The names go with the
+experiments, so a search by name finds them in their new database. The ThermoML archive is never
+an origin or a destination.
+
+`metadata` replaces fields of the references on the way (`doi`, `title`, `journal`, `year`,
+`volume`, `pages`, `authors`); with a `doi` all the points go to one reference. When `to` already
+has a reference with that DOI, `on_conflict` is `:error` (default), `:merge` (join it) or `:skip`.
+With `confirm = false` nothing changes and the result says what would move
+(`(moved = false, from, to, references, experiments, points, partial, conflict)`).
+See [`publish!`](@ref) for the whole flow.
+"""
+function move_experiments!(
+    db::Database,
+    what,
+    to::AbstractString;
+    metadata = (;),
+    on_conflict::Symbol = :error,
+    confirm::Bool = false,
+)
+    on_conflict in MOVE_CONFLICTS || throw(
+        ArgumentError(
+            "on_conflict is one of $(join(repr.(MOVE_CONFLICTS), ", ")), got :$on_conflict",
+        ),
+    )
+    unknown = [k for k in keys(metadata) if !(k in REFERENCE_FIELDS)]
+    isempty(unknown) || throw(
+        ArgumentError(
+            "unknown field $(repr(first(unknown))) of a reference; the fields are $(join(REFERENCE_FIELDS, ", "))",
+        ),
+    )
+    dest = writable_member(db, String(to))
+    pieces = selected_points(db, what)
+    for (m, _) in pieces
+        check_move_members(db, m, dest)
+    end
+    target = member_dataset(dest)
+    grown = copy_dataset(target)
+    subs = Tuple{Dataset,String}[]
+    experiments = points = partial = 0
+    conflicts = 0
+    for (m, mask) in pieces
+        src = member_dataset(m)
+        keep = keep_points(src, mask, true)
+        experiments += count(keep.experiments)
+        points += count(keep.measurements)
+        partial += count(
+            e ->
+                keep.experiments[e] && any(
+                    i -> src.measurements.experiment[i] == e && !mask[i],
+                    eachindex(mask),
+                ),
+            eachindex(keep.experiments),
+        )
+        for r in findall(keep.references)
+            sub = subset_dataset(src, keep_reference(src, keep, r))
+            apply_metadata!(sub, 1, metadata)
+            doi = sub.references.doi[1]
+            isempty(doi) ||
+                get(target.references.index, doi, NO_ID) == NO_ID ||
+                (conflicts += 1)
+            push!(subs, (sub, m.name))
+        end
+    end
+    conflict = conflicts > 0
+    plan = (;
+        from = [m.name for (m, _) in pieces],
+        to = dest.name,
+        references = length(subs),
+        experiments,
+        points,
+        partial,
+        conflict,
+    )
+    conflict &&
+        on_conflict === :error &&
+        throw(
+            ArgumentError(
+                "\"$(dest.name)\" already has $(conflicts) of the references; " *
+                "use on_conflict = :merge to join the experiments to them or :skip to leave them",
+            ),
+        )
+    (conflict && on_conflict === :skip) && return (; moved = false, plan...)
+    confirm || return (; moved = false, plan...)
+    for (sub, origin) in subs
+        doi = sub.references.doi[1]
+        existing = isempty(doi) ? NO_ID : get(grown.references.index, doi, NO_ID)
+        append_subset!(grown, sub; into = existing, rename = origin => dest.name)
+    end
+    detail = "experiments=$experiments points=$points"
+    replace_dataset!(
+        db,
+        dest,
+        grown,
+        "experiments_moved_in",
+        "$detail from=$(join(plan.from, ","))",
+    )
+    for (m, mask) in pieces
+        src = member_dataset(m)
+        rest = subset_dataset(src, keep_points(src, mask, false))
+        replace_dataset!(db, m, rest, "experiments_moved_out", "$detail to=$(dest.name)")
+    end
     return (; moved = true, plan...)
 end
 
@@ -426,22 +631,28 @@ function published_fields(
 end
 
 """
-    publish!(db; doi = nothing, to = nothing, confirm = false, online = true, ...) -> NamedTuple
+    publish!(db, what = nothing; doi = nothing, to = nothing, confirm = false, online = true, ...)
+        -> NamedTuple
 
-Turn the data of the user, the points that [`Publication`](@ref) calls "This work", into the
-reference of the published article: every reference of the databases of kind `:user` becomes
-that article (title, authors, journal, year and pages from the DOI, by the resolver, and from the
-publication for what it lacks), is moved to the database of literature `to` (see
-[`move_reference!`](@ref); all of them join one reference, the DOI), and the publication is
-removed, so the points are literature from then on. `doi` defaults to the one of the publication,
-and `to` to the only database of literature of your own, if there is one.
+Turn the data of a work into the reference of its published article: the points go to the
+database of literature `to` (see [`move_experiments!`](@ref)), all in one reference, the DOI
+(title, authors, journal, year and pages from the DOI, by the resolver, and from the publication
+for what it lacks), and the publication is removed, so the points are literature from then on.
+The rest of your data stay where they are, and the names of the experiments are kept.
+
+`what` says which points: the name of a publication prepared with [`add_publication!`](@ref)
+(`publish!(db, "paper-A"; doi = "10.…")`), a selection of points
+(`publish!(db, points(db; experiment = r"^visc"); doi = ...)`), or nothing, for all the data of
+the databases of kind `:user` (the publication of [`set_publication!`](@ref)). `doi` defaults to
+the one of the publication, and `to` to the only database of literature of your own.
 
 With `confirm = false` (the default) nothing changes and the result lists what would move; with
 `confirm = true` it is done, in memory until [`save_database`](@ref). The ThermoML archive is
 never changed. `online`, `cache`, `refresh` and `fetcher` are those of [`bibtex`](@ref).
 """
 function publish!(
-    db::Database;
+    db::Database,
+    what = nothing;
     doi::Union{Nothing,AbstractString} = nothing,
     to::Union{Nothing,AbstractString} = nothing,
     confirm::Bool = false,
@@ -450,16 +661,31 @@ function publish!(
     refresh::Bool = false,
     fetcher = default_fetcher,
 )
-    pub = publication(db)
+    named = what isa AbstractString
+    pub = if named
+        m, k = find_publication(db, what)
+        m.publications[k]
+    else
+        publication(db)
+    end
     doi_text =
         normalize_doi(String(doi === nothing ? (pub === nothing ? "" : pub.doi) : doi))
     isempty(doi_text) && throw(
         ArgumentError(
-            "publish! needs the DOI of the article: `publish!(db; doi = \"10.…\")`",
+            "publish! needs the DOI of the article: `publish!(db, ...; doi = \"10.…\")`",
         ),
     )
-    users = [m for m in db.members if m.kind === :user]
-    isempty(users) && throw(ArgumentError("there are no data of the user to publish"))
+    selection = if named
+        isempty(pub.experiments) &&
+            throw(ArgumentError("the publication \"$(pub.name)\" has no experiments"))
+        pub.experiments
+    elseif what === nothing
+        isempty(filter(m -> m.kind === :user, db.members)) &&
+            throw(ArgumentError("there are no data of the user to publish"))
+        user_selection(db)
+    else
+        what
+    end
     destination = if to === nothing
         lit = [m for m in db.members if m.kind === :literature]
         length(lit) == 1 || throw(
@@ -476,32 +702,41 @@ function publish!(
     dest.kind === :literature ||
         throw(ArgumentError("\"$destination\" is not a database of literature"))
     fields, resolved = published_fields(pub, doi_text; online, cache, refresh, fetcher)
-    plan = NamedTuple[]
-    for m in users
-        ds = member_dataset(m)
-        for id in eachindex(ds.references.doi)
-            push!(plan, (; database = m.name, id = Int32(id), doi = ds.references.doi[id]))
-        end
-    end
-    isempty(plan) &&
-        throw(ArgumentError("the databases of the user have no reference to publish"))
-    summary =
-        (; doi = doi_text, to = destination, references = length(plan), resolved, fields)
+    plan = move_experiments!(
+        db,
+        selection,
+        destination;
+        metadata = fields,
+        on_conflict = :merge,
+        confirm,
+    )
+    summary = (;
+        doi = doi_text,
+        to = destination,
+        references = plan.references,
+        experiments = plan.experiments,
+        points = plan.points,
+        partial = plan.partial,
+        resolved,
+        fields,
+    )
     confirm || return (; published = false, summary...)
-    for m in users
-        while !isempty(member_dataset(m).references.doi)
-            ds = member_dataset(m)
-            ref = ReferenceRef(db, m, ds, Int32(1))
-            move_reference!(
-                db,
-                ref,
-                destination;
-                metadata = fields,
-                on_conflict = :merge,
-                confirm = true,
-            )
-        end
+    if named
+        remove_publication!(db, what)
+    elseif what === nothing
+        set_publication!(db, nothing)
     end
-    set_publication!(db, nothing)
     return (; published = true, summary...)
+end
+
+# All the points of the databases of kind `:user`, as a selection.
+function user_selection(db::Database)
+    index = Int[i for (i, m) in enumerate(db.members) if m.kind === :user]
+    parts = DataView[
+        DataView(
+            member_dataset(db.members[i]),
+            Int32.(eachindex(member_dataset(db.members[i]).measurements.experiment)),
+        ) for i in index
+    ]
+    return DatabaseView(db, index, parts)
 end

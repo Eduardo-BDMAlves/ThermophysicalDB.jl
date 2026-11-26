@@ -97,7 +97,17 @@ modified_at
 set_priority!
 Publication
 set_publication!
+add_publication!
+add_to_publication!
+remove_from_publication!
+remove_publication!
+publications
+add_name!
+modify_name!
+remove_name!
+experiment_names
 move_reference!
+move_experiments!
 publish!
 publication
 databases_dir

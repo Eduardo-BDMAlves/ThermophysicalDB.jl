@@ -144,8 +144,13 @@ function write_member_meta(m::Member, n::Integer)
         "saved_at" => utc_timestamp(),
         "measurements" => Int(n),
     )
-    pub = m.publication
-    pub === nothing || (meta["publication"] = publication_toml(pub))
+    for pub in m.publications
+        if isempty(pub.name)
+            meta["publication"] = publication_toml(pub)
+        else
+            get!(meta, "publications", Dict{String,Any}())[pub.name] = publication_toml(pub)
+        end
+    end
     path = joinpath(dirname(m.path), MEMBER_META)
     tmp = path * ".tmp"
     open(io -> TOML.print(io, meta), tmp, "w")
@@ -282,22 +287,31 @@ function set_publication!(
         )
         [m]
     end
+    publication !== nothing &&
+        !isempty(publication.name) &&
+        throw(
+            ArgumentError(
+                "\"$(publication.name)\" is a named publication: use add_publication!(db, publication)",
+            ),
+        )
     for m in targets
-        m.publication = publication
-        if m.persistent && isfile(joinpath(dirname(m.path), MEMBER_META))
-            write_member_meta(
-                m,
-                is_open(m) ? length(m.dataset.measurements) : member_points(m),
-            )
-            audit_record!(
-                dirname(m.path),
-                "publication_changed",
-                m.name;
-                detail = publication === nothing ? "removed" : "label=$(publication.label)",
-            )
-        end
+        filter!(p -> !isempty(p.name), m.publications)
+        publication === nothing || pushfirst!(m.publications, publication)
+        persist_publications!(
+            m,
+            publication === nothing ? "removed" : "label=$(publication.label)",
+        )
     end
     return db
+end
+
+# Write the publications of a database that was saved, with a note in its audit log.
+function persist_publications!(m::Member, detail::AbstractString)
+    if m.persistent && isfile(joinpath(dirname(m.path), MEMBER_META))
+        write_member_meta(m, is_open(m) ? length(m.dataset.measurements) : member_points(m))
+        audit_record!(dirname(m.path), "publication_changed", m.name; detail)
+    end
+    return nothing
 end
 
 """
@@ -309,7 +323,10 @@ ones, the first by priority is the one.
 """
 function publication(db::Database)::Union{Nothing,Publication}
     for m in db.members
-        m.kind === :user && m.publication !== nothing && return m.publication
+        m.kind === :user || continue
+        for p in m.publications
+            isempty(p.name) && return p
+        end
     end
     return nothing
 end
@@ -343,8 +360,14 @@ function discover_members(root::AbstractString; taken = String[])
                 path = data,
                 priority = Int(get(meta, "priority", DEFAULT_PRIORITY[kind])),
                 persistent = true,
-                publication = haskey(meta, "publication") ?
-                              publication_from_toml(meta["publication"]) : nothing,
+                publications = Publication[
+                    (haskey(meta, "publication") ?
+                     [publication_from_toml(meta["publication"])] : Publication[])...,
+                    (publication_from_toml(d) for (_, d) in sort!(
+                        collect(get(meta, "publications", Dict{String,Any}()));
+                        by = first,
+                    ))...,
+                ],
             )
             member_catalog(member)    # reads the file; fails here, not in the first query
             push!(found, member)
@@ -725,6 +748,7 @@ function commit_experiment!(
     scales::Vector{Symbol};
     purpose = "",
     number::Integer = 0,
+    name::AbstractString = "",
 )
     ds = live_dataset(ref)
     touch!(ds)
@@ -740,12 +764,17 @@ function commit_experiment!(
         purpose = intern!(ds.purposes, String(purpose)),
     )
     catalog_size(ds) == before || refresh!(ref.database, ref.member)
+    if !isempty(strip(name))
+        push_name!(ds, id, strip(name))
+    elseif ref.member.kind === :user
+        push_name!(ds, id, automatic_name(ref.database, ref.member, ds, ids))
+    end
     return ExperimentRef(ref.database, ref.member, ds, id, ref.id, length(specs))
 end
 
 """
     add_experiment!(ref; components, composition_scale = nothing, purpose = "", number = 0,
-                    compounds = nothing) -> ExperimentRef
+                    compounds = nothing, name = "") -> ExperimentRef
     add_experiment!(db; reference, database = nothing, components, ...) -> ExperimentRef
 
 Add an experiment to a reference of a database of your own: a set of points of one system, that is
@@ -754,6 +783,8 @@ name that the compound database knows exactly, or `(inchikey = ..., cas = ..., n
 [`resolve_compound`](@ref). `compounds` is a `CompoundDB` to look them up in (by default the one of
 the package). `composition_scale` is one of [`COMPOSITION_SCALES`](@ref) for all components, or one
 for each; the default is `:mole_fraction` for a mixture, and a pure compound has no composition.
+`name` names the experiment (see [`add_name!`](@ref)); in a database of kind `:user` an experiment
+without one is named `<database>_yyyy_mm_dd_HH:MM`, with `_<compound>` for one pure substance.
 `reference` of the second form is the result of [`add_reference!`](@ref) or a DOI already in the
 database.
 
@@ -772,10 +803,11 @@ function add_experiment!(
     purpose::AbstractString = "",
     number::Integer = 0,
     compounds = nothing,
+    name::AbstractString = "",
 )
     specs = check_components(components, compounds)
     scales = check_scales(composition_scale, length(specs))
-    return commit_experiment!(ref, specs, scales; purpose, number)
+    return commit_experiment!(ref, specs, scales; purpose, number, name)
 end
 
 function add_experiment!(db::Database; reference, database = nothing, kwargs...)

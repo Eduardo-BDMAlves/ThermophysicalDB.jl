@@ -101,6 +101,7 @@ function plotdata(
     pressure_unit = nothing,
     calc = nothing,
     sortby = [:doi, :temperature],
+    this_work = :auto,
     kwargs...,
 )
     source isa PlotData && return source
@@ -116,7 +117,11 @@ function plotdata(
         return PlotData(source, calc)
     end
     view = isempty(kwargs) ? source : points(source; kwargs...)
-    t = table(view; unit, temperature_unit, pressure_unit, sortby)
+    t = if view isa DatabaseView && this_work !== :auto
+        table(view; unit, temperature_unit, pressure_unit, sortby, this_work)
+    else
+        table(view; unit, temperature_unit, pressure_unit, sortby)
+    end
     return PlotData(t, calc)
 end
 
@@ -255,7 +260,7 @@ end
 function work_labels(d::PlotData)
     haskey(parent(d), :work) || return nothing
     work = column(d, :work)
-    any(!=(LITERATURE_LABEL), work) || return nothing
+    any(x -> x != LITERATURE_LABEL && x != OWN_LABEL, work) || return nothing
     return work
 end
 
@@ -298,11 +303,11 @@ function point_groups(d::PlotData, by; maxgroups::Integer = 20)
     mine = falses(n)
     if work !== nothing
         for i = 1:n
-            if work[i] != LITERATURE_LABEL
+            if work[i] != LITERATURE_LABEL && work[i] != OWN_LABEL
                 keys_[i] = String(work[i])
                 mine[i] = true
             elseif by === nothing
-                keys_[i] = LITERATURE_LABEL
+                keys_[i] = work[i]
             end
         end
     end

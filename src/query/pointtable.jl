@@ -39,14 +39,22 @@ struct PointTable{NT<:NamedTuple}
     columns::NT
     temperature_unit::String
     pressure_unit::String
+    # Points the selection left out because they were detected as duplicates (see `points`).
+    omitted::Int
     function PointTable(
         columns::NT,
         temperature_unit::AbstractString = "K",
         pressure_unit::AbstractString = "kPa",
+        omitted::Integer = 0,
     ) where {NT<:NamedTuple}
         allequal(map(length, values(columns))) ||
             throw(ArgumentError("the columns of a table must have the same length"))
-        return new{NT}(columns, String(temperature_unit), String(pressure_unit))
+        return new{NT}(
+            columns,
+            String(temperature_unit),
+            String(pressure_unit),
+            Int(omitted),
+        )
     end
 end
 
@@ -57,8 +65,32 @@ nrows(t::PointTable) = isempty(parent(t)) ? 0 : length(first(parent(t)))
 ncols(t::PointTable) = length(parent(t))
 
 # The same units for the table made of some of the rows or columns of `t`.
-with_columns(t::PointTable, columns::NamedTuple) =
-    PointTable(columns, getfield(t, :temperature_unit), getfield(t, :pressure_unit))
+with_columns(t::PointTable, columns::NamedTuple) = PointTable(
+    columns,
+    getfield(t, :temperature_unit),
+    getfield(t, :pressure_unit),
+    getfield(t, :omitted),
+)
+
+# The same table, told how many points the selection left out as duplicates.
+with_omitted(t::PointTable, n::Integer) =
+    PointTable(parent(t), getfield(t, :temperature_unit), getfield(t, :pressure_unit), n)
+
+# The line that tells that points are missing, for what is printed.
+function print_omitted(io::IO, n::Integer)
+    n > 0 || return nothing
+    println(
+        io,
+        "There are ",
+        n,
+        n == 1 ? " point" : " points",
+        " omitted: ",
+        n == 1 ? "it was" : "they were",
+        " detected as duplicates. If you want all the points, use ",
+        "`points(...; duplicate = true)`; `duplicates(view)` lists them.",
+    )
+    return nothing
+end
 
 # ----------------------------------------------------------------------------------
 # Names and sizes
@@ -417,5 +449,6 @@ function Base.show(io::IO, ::MIME"text/plain", t::PointTable; maxrows::Int = 8)
     shown = min(n, maxrows)
     println(io)
     print_points(io, t, shown, n - shown)
+    print_omitted(io, getfield(t, :omitted))
     return nothing
 end

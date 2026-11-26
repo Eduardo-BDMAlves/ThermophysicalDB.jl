@@ -353,6 +353,15 @@ function Base.show(io::IO, v::DatabaseView)
     return print(io, ")")
 end
 
+# The points a selection left out because another database holds them too, or they were entered
+# twice (each counted once).
+function omitted_points(v::DatabaseView)
+    r = v.repeats
+    r === nothing && return 0
+    gone = r.kind .== :duplicate
+    return length(unique(zip(r.other_database[gone], r.other_row[gone])))
+end
+
 # The first `maxrows` points, taking each database in order, as a table.
 function Base.show(io::IO, ::MIME"text/plain", v::DatabaseView; maxrows::Int = 12)
     println(io, "DatabaseView: ", length(v), " points")
@@ -361,23 +370,10 @@ function Base.show(io::IO, ::MIME"text/plain", v::DatabaseView; maxrows::Int = 1
     end
     if v.repeats !== nothing
         n = pair_counts(v.repeats)
-        println(
-            io,
-            "  ",
-            length(
-                unique(
-                    zip(
-                        v.repeats.other_database[v.repeats.kind .== :duplicate],
-                        v.repeats.other_row[v.repeats.kind .== :duplicate],
-                    ),
-                ),
-            ),
-            " repeated points left out (duplicates(view)); ",
-            n.conflicts,
-            " conflicts, both points kept (conflicts(view))",
-        )
+        n.conflicts > 0 &&
+            println(io, "  ", n.conflicts, " conflicts, both points kept (conflicts(view))")
     end
-    isempty(v) && return nothing
+    isempty(v) && (print_omitted(io, omitted_points(v)); return nothing)
     left = maxrows
     index, trimmed = Int[], DataView[]
     for (i, part) in zip(v.index, v.parts)
@@ -390,11 +386,24 @@ function Base.show(io::IO, ::MIME"text/plain", v::DatabaseView; maxrows::Int = 1
     println(io)
     shown = DatabaseView(v.database, index, trimmed, nothing)
     print_points(io, table(shown), length(shown), length(v) - length(shown))
+    print_omitted(io, omitted_points(v))
     return nothing
 end
 
 function select_parts(db::Database, candidates, sources, component, kwargs)
     reg = db.registry
+    experiment = get(kwargs, :experiment, nothing)
+    kwargs = (; (k => v for (k, v) in pairs(kwargs) if k !== :experiment)...)
+    named = nothing
+    if experiment !== nothing
+        named = Dict{Int,Vector{Int32}}()
+        for (m, source) in zip(candidates, sources)
+            ds = source isa DataView ? source.dataset : source
+            ids = named_experiments(db.members[m], ds, experiment)
+            isempty(ids) || (named[m] = ids)
+        end
+        isempty(named) && throw(ArgumentError("no experiment is named $(repr(experiment))"))
+    end
     match = get(kwargs, :match, :any)
     exact = get(kwargs, :exact, false)
     index, found = Int[], DataView[]
@@ -404,7 +413,9 @@ function select_parts(db::Database, candidates, sources, component, kwargs)
         ok || continue
         fraction_ok, amounts = member_fraction(reg, m, get(kwargs, :fraction, nothing))
         fraction_ok || continue
+        named !== nothing && !haskey(named, m) && continue
         own = amounts === nothing ? kwargs : (; kwargs..., fraction = amounts)
+        named === nothing || (own = (; own..., experiments = named[m]))
         try
             view =
                 comp === nothing ? points(source; own...) :
@@ -445,7 +456,8 @@ end
     points(db::Database; kwargs...) -> DatabaseView
 
 Select points in every database that can have them, with the keywords of
-[`points`](@ref) over a dataset, and `duplicate`: `false` (the default) leaves out the points
+[`points`](@ref) over a dataset, `experiment` (the name of an experiment, a `Regex` or a vector
+of them, see [`add_name!`](@ref); an `ArgumentError` when none is called that) and `duplicate`: `false` (the default) leaves out the points
 that another database with a higher priority holds too, and the points that were entered twice in a
 database of yours (the later copy is left out; it stays in the database); `true` keeps every point,
 and a [`DuplicateRules`](@ref) leaves them out with the tolerances you choose (see [`duplicates`](@ref) for
@@ -491,7 +503,7 @@ function points(
     # Nothing left: ask them all, which gives the usual message (with its suggestions).
     isempty(candidates) && (candidates = collect(eachindex(db.members)))
     sources = [member_dataset(db.members[m]) for m in candidates]
-    if length(db.members) == 1
+    if length(db.members) == 1 && !haskey(kwargs, :experiment)
         duplicate_rules(duplicate)    # a wrong value is an error whatever the number of databases
         return apply_duplicate(
             DatabaseView(db, [1], [points(sources[1]; component, kwargs...)]),
@@ -621,32 +633,125 @@ sole_dataset(db::Database) =
         ),
     )
 
-# The publication that a table is asked to call the data of the user: `:auto` is the one of the
-# database (none when it was not set), `false` or `nothing` none, `true` the one of the database or
-# a default one, and a `Publication` is that one.
-function work_publication(db::Database, this_work)
-    this_work === :auto && return publication(db)
+# What the publication takes of a selection: the publication and, for each part, which of its
+# points are the publication's.
+struct Work
+    publication::Publication
+    masks::Vector{BitVector}
+end
+
+pub_selector(p::Publication) = (p, isempty(p.name) ? nothing : p.experiments)
+
+# The publication that `this_work` says and what selects its points (`nothing`: all the data of
+# the databases of kind `:user`; names of experiments; or a selection of points). `:auto` is the
+# only publication of the database; with several the answer is an error when `strict`, and none
+# otherwise, so that a table is never refused for it.
+function resolve_work(db::Database, this_work, strict::Bool)
     (this_work === false || this_work === nothing) && return nothing
-    this_work === true && return something(publication(db), Publication())
-    this_work isa Publication && return this_work
+    everything = publications(db)
+    if this_work === :auto
+        isempty(everything) && return nothing
+        length(everything) == 1 && return pub_selector(everything[1])
+        strict || return nothing
+        throw(
+            ArgumentError(
+                "the database has several publications ($(join(repr.([p.name for p in everything]), ", "))): " *
+                "say which one is this work with `this_work = \"name\"`, or `this_work = false`",
+            ),
+        )
+    end
+    this_work === true && return pub_selector(something(publication(db), Publication()))
+    this_work isa Publication && return pub_selector(this_work)
+    if this_work isa AbstractString
+        m, k = find_publication(db, this_work)
+        return pub_selector(m.publications[k])
+    end
+    if this_work isa DatabaseView || this_work isa DataView
+        base =
+            length(everything) == 1 ? everything[1] :
+            something(publication(db), Publication())
+        return (with_experiments(base, String[]), this_work)
+    end
     throw(
         ArgumentError(
-            "this_work is :auto, true, false, nothing or a Publication, got $(repr(this_work))",
+            "this_work is :auto, true, false, nothing, the name of a publication, a Publication " *
+            "or a selection of points, got $(repr(this_work))",
         ),
     )
 end
 
-# The column `work`: what each point is, the label of the publication for the points of a
-# database of kind `:user` and "$(LITERATURE_LABEL)" for all the others.
-function work_column(db::Database, index, parts, pub::Publication)
-    return reduce(
-        vcat,
-        [
-            fill(db.members[i].kind === :user ? pub.label : LITERATURE_LABEL, length(p)) for
-            (i, p) in zip(index, parts) if !isempty(p)
-        ];
-        init = String[],
-    )
+function work_scope(v::DatabaseView, this_work; strict::Bool = false)
+    resolved = resolve_work(v.database, this_work, strict)
+    resolved === nothing && return nothing
+    pub, selector = resolved
+    masks = BitVector[]
+    for (i, p) in zip(v.index, v.parts)
+        m = v.database.members[i]
+        mask = if selector === nothing
+            m.kind === :user ? trues(length(p)) : falses(length(p))
+        elseif selector isa AbstractVector
+            names = Set(selector)
+            list = experiment_tags(m, p.dataset)
+            BitVector([
+                any(in(names), list[p.dataset.measurements.experiment[r]]) for r in p.rows
+            ])
+        else
+            chosen = selection_rows(selector, i, p)
+            BitVector([r in chosen for r in p.rows])
+        end
+        push!(masks, mask)
+    end
+    return Work(pub, masks)
+end
+
+# The rows that a selection `s` holds of the database `i`, whose points in the view are `p`.
+function selection_rows(s::DatabaseView, i::Integer, p::DataView)
+    for (j, q) in zip(s.index, s.parts)
+        j == i && q.dataset === p.dataset && return Set(q.rows)
+    end
+    return Set{Int32}()
+end
+selection_rows(s::DataView, ::Integer, p::DataView) =
+    s.dataset === p.dataset ? Set(s.rows) : Set{Int32}()
+
+# The selection with each part cut in two when only some of its points are the publication's, and
+# a flag for each part of the result that says whether it is the publication's.
+function split_work(v::DatabaseView, work::Union{Nothing,Work})
+    work === nothing && return v, fill(false, length(v.parts))
+    index, parts, flags = Int[], DataView[], Bool[]
+    for (k, p) in enumerate(v.parts)
+        mask = work.masks[k]
+        i = v.index[k]
+        if isempty(p) || !any(mask)
+            push!(index, i)
+            push!(parts, p)
+            push!(flags, false)
+        elseif all(mask)
+            push!(index, i)
+            push!(parts, p)
+            push!(flags, true)
+        else
+            push!(index, i)
+            push!(parts, DataView(p.dataset, p.rows[mask]))
+            push!(flags, true)
+            push!(index, i)
+            push!(parts, DataView(p.dataset, p.rows[.!mask]))
+            push!(flags, false)
+        end
+    end
+    return DatabaseView(v.database, index, parts, v.repeats), flags
+end
+
+# The column `work`: the label of the publication for its points, "$(OWN_LABEL)" for the other
+# points of the databases of kind `:user` and "$(LITERATURE_LABEL)" for all the rest.
+function work_column(db::Database, index, parts, work::Work)
+    labels = String[]
+    for (k, (i, p)) in enumerate(zip(index, parts))
+        isempty(p) && continue
+        other = db.members[i].kind === :user ? OWN_LABEL : LITERATURE_LABEL
+        append!(labels, [x ? work.publication.label : other for x in work.masks[k]])
+    end
+    return labels
 end
 
 function with_work(t::PointTable, labels::Vector{String})
@@ -670,17 +775,21 @@ databases of kind `:user` and "$(LITERATURE_LABEL)" for the others; the figures 
 are written use it. `this_work = false` leaves it out, `true` or a `Publication` asks for it
 without setting it in the database.
 """
-function table(
+function table(v::DatabaseView; kwargs...)
+    return with_omitted(database_table(v; kwargs...), omitted_points(v))
+end
+
+function database_table(
     v::DatabaseView;
     sortby = nothing,
     rev::Bool = false,
     this_work = :auto,
     kwargs...,
 )
-    pub = work_publication(v.database, this_work)
-    pub === nothing && return joined_table(v; sortby, rev, kwargs...)
+    work = work_scope(v, this_work)
+    work === nothing && return joined_table(v; sortby, rev, kwargs...)
     t = joined_table(v; kwargs...)
-    t = with_work(t, work_column(v.database, v.index, v.parts, pub))
+    t = with_work(t, work_column(v.database, v.index, v.parts, work))
     return finish_sort(t, sortby, rev, false)
 end
 

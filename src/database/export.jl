@@ -48,8 +48,8 @@ end
 # to be called by the name of the publication.
 function joint_selection(v::DatabaseView, this_work)
     length(v.parts) > 1 && return true
-    pub = work_publication(v.database, this_work)
-    return pub !== nothing && v.database.members[only(v.index)].kind === :user
+    work = work_scope(v, this_work; strict = true)
+    return work !== nothing && any(any, work.masks)
 end
 
 # The reference of the points of `p` that stands for all of them in the references table.
@@ -107,6 +107,7 @@ struct SelectionBibliography
     parts::Vector{Bibliography}
     collapse::Vector{Union{Nothing,Int32}}
     total::Bibliography
+    view::DatabaseView    # the selection with the points of the publication apart from the others
 end
 
 function selection_bibliography(
@@ -122,13 +123,11 @@ function selection_bibliography(
     include_package::Bool = true,
     package_cff::Union{Nothing,AbstractString} = nothing,
 )
-    pub = work_publication(v.database, this_work)
+    work = work_scope(v, this_work; strict = true)
+    pub = work === nothing ? nothing : work.publication
     mode = work_cite(pub, cite)
-    n = length(v.parts)
-    isuser = Bool[
-        pub !== nothing && v.database.members[i].kind === :user && !isempty(p) for
-        (i, p) in zip(v.index, v.parts)
-    ]
+    view, isuser = split_work(v, work)
+    n = length(view.parts)
     collapse = Vector{Union{Nothing,Int32}}(nothing, n)
     ids = Vector{Vector{Int}}(undef, n)
     entries = Vector{Vector{BibEntry}}(undef, n)
@@ -149,7 +148,7 @@ function selection_bibliography(
     end
 
     work = nothing
-    for (k, p) in enumerate(v.parts)
+    for (k, p) in enumerate(view.parts)
         if pub isa Publication && isuser[k]
             collapse[k] = first_reference(p)
             if work === nothing
@@ -187,7 +186,7 @@ function selection_bibliography(
     mode === :label && work !== nothing && push!(all_entries, work)
 
     report = BibtexReport(articles, resolved, unique(archive_only), conflicts)
-    from = any(from_archive, v.parts)
+    from = any(from_archive, view.parts)
     total = Bibliography(Int[], all_entries, sources, package, report, from, uncited)
     parts = Bibliography[
         Bibliography(
@@ -196,11 +195,11 @@ function selection_bibliography(
             sources,
             package,
             report,
-            from_archive(v.parts[k]),
+            from_archive(view.parts[k]),
             uncited,
         ) for k = 1:n
     ]
-    return SelectionBibliography(parts, collapse, total)
+    return SelectionBibliography(parts, collapse, total, view)
 end
 
 # ----------------------------------------------------------------------------------
@@ -337,7 +336,7 @@ function reference_summary(
             bibliography = sel.parts[k],
             collapse = sel.collapse[k],
             rest...,
-        ) for (k, p) in enumerate(v.parts) if !isempty(p)
+        ) for (k, p) in enumerate(sel.view.parts) if !isempty(p)
     ]
     return merge_summaries(summaries, sel.total)
 end
@@ -410,7 +409,7 @@ function joint_export_data(v::DatabaseView, sel::SelectionBibliography; kwargs..
             bibliography = sel.parts[k],
             collapse = sel.collapse[k],
             rest...,
-        ) for (k, p) in enumerate(v.parts) if !isempty(p)
+        ) for (k, p) in enumerate(sel.view.parts) if !isempty(p)
     ]
     tables = [parent(h.t) for h in heads]
     names = keys(tables[1])
@@ -504,7 +503,7 @@ function export_points(
     files = String[]
     for format in chosen
         file = joinpath(directory, name * file_extension(format))
-        write_point_file(format, file, data, v.parts[1]; sheets)
+        write_point_file(format, file, data, sel.view.parts[1]; sheets)
         push!(files, file)
     end
     references &&

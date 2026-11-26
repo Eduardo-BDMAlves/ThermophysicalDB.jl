@@ -4,13 +4,15 @@
 # The label of everything that is not the user's data in the column `work` of a table.
 const LITERATURE_LABEL = "Literature"
 const DEFAULT_WORK_LABEL = "This work"
+# What the points of the user that are not of the publication are called in the column `work`.
+const OWN_LABEL = "Own data"
 
 # How the data of the user are referred to in what is written (see `Publication`).
 const WORK_CITES = (:label, :unpublished, :published)
 
 """
     Publication(; label = "This work", title = "", authors = String[], year = 0, journal = "",
-        doi = "", note = "in preparation", cite = :label)
+        doi = "", note = "in preparation", cite = :label, name = "", experiments = String[])
 
 The article that the data of the user are going to be published in. Give it to the database with
 [`set_publication!`](@ref): from then on every point of a database of kind `:user` is called
@@ -29,8 +31,16 @@ them takes `cite = ...` to choose again:
 | `:unpublished` | the BibTeX key of the publication | an `@unpublished` entry with the fields above (for internal reports) |
 | `:published` | the key of the article | the entry of the DOI, from the resolver and completed with the fields above (needs `doi`) |
 
-`label` cannot be empty or be `"$(LITERATURE_LABEL)"` (the name of the other group). `authors` are
-written as `"Family, Given"`.
+`name` and `experiments` say which points are the publication's. Without a `name` the publication
+is the one of all the data of the user ([`set_publication!`](@ref)). With a `name` (such as
+`"paper-A"`) it is one of several that can be prepared at the same time, and its points are those
+of the experiments whose names (see [`add_name!`](@ref)) are in `experiments`
+([`add_publication!`](@ref), [`add_to_publication!`](@ref)); the other data of the user are not
+part of it. Any export or figure takes it as `this_work = "paper-A"`, or takes the selection of
+points itself (`this_work = points(db; experiment = ...)`).
+
+`label` cannot be empty or be `"$(LITERATURE_LABEL)"` or `"$(OWN_LABEL)"` (the names of the other
+groups). `authors` are written as `"Family, Given"`.
 """
 struct Publication
     label::String
@@ -41,14 +51,27 @@ struct Publication
     doi::String
     note::String
     cite::Symbol
+    name::String
+    experiments::Vector{String}
 
-    function Publication(label, title, authors, year, journal, doi, note, cite = :label)
+    function Publication(
+        label,
+        title,
+        authors,
+        year,
+        journal,
+        doi,
+        note,
+        cite = :label,
+        name = "",
+        experiments = String[],
+    )
         label = String(strip(label))
         isempty(label) &&
             throw(ArgumentError("a publication needs a label, such as \"This work\""))
-        label == LITERATURE_LABEL && throw(
+        label in (LITERATURE_LABEL, OWN_LABEL) && throw(
             ArgumentError(
-                "the label \"$LITERATURE_LABEL\" is the name of the points that are not yours; choose another",
+                "the label \"$label\" is the name of a group of points that are not of the publication; choose another",
             ),
         )
         year == 0 ||
@@ -76,6 +99,8 @@ struct Publication
             String(strip(doi)),
             String(strip(note)),
             Symbol(cite),
+            String(strip(name)),
+            String[String(strip(e)) for e in experiments if !isempty(strip(e))] |> unique,
         )
     end
 end
@@ -89,8 +114,21 @@ function Publication(;
     doi::AbstractString = "",
     note::AbstractString = "in preparation",
     cite::Symbol = :label,
+    name::AbstractString = "",
+    experiments::AbstractVector{<:AbstractString} = String[],
 )
-    return Publication(label, title, authors, year, journal, doi, note, cite)
+    return Publication(
+        label,
+        title,
+        authors,
+        year,
+        journal,
+        doi,
+        note,
+        cite,
+        name,
+        experiments,
+    )
 end
 
 Base.:(==)(a::Publication, b::Publication) =
@@ -100,6 +138,7 @@ Base.hash(p::Publication, h::UInt) =
 
 function Base.show(io::IO, p::Publication)
     print(io, "Publication(", repr(p.label))
+    isempty(p.name) || print(io, ", name = ", repr(p.name))
     isempty(p.title) || print(io, ", ", repr(p.title))
     p.year == 0 || print(io, ", ", p.year)
     return print(io, ")")
@@ -115,6 +154,8 @@ function publication_toml(p::Publication)
     isempty(p.doi) || (d["doi"] = p.doi)
     isempty(p.note) || (d["note"] = p.note)
     p.cite === :label || (d["cite"] = String(p.cite))
+    isempty(p.name) || (d["name"] = p.name)
+    isempty(p.experiments) || (d["experiments"] = p.experiments)
     return d
 end
 
@@ -128,5 +169,7 @@ function publication_from_toml(d::AbstractDict)
         doi = String(get(d, "doi", "")),
         note = String(get(d, "note", "")),
         cite = Symbol(get(d, "cite", "label")),
+        name = String(get(d, "name", "")),
+        experiments = String[String(e) for e in get(d, "experiments", String[])],
     )
 end

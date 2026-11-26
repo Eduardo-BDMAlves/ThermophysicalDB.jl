@@ -92,6 +92,8 @@ include("database/registry.jl")
 include("database/inputs.jl")
 include("database/repeats.jl")
 include("database/database.jl")
+include("database/names.jl")
+include("database/publications.jl")
 include("database/export.jl")
 include("database/move.jl")
 include("compounds/linked.jl")
@@ -154,7 +156,17 @@ export COMPOSITION_SCALES,
     set_priority!,
     Publication,
     set_publication!,
+    add_publication!,
+    add_to_publication!,
+    remove_from_publication!,
+    remove_publication!,
+    publications,
+    add_name!,
+    remove_name!,
+    modify_name!,
+    experiment_names,
     move_reference!,
+    move_experiments!,
     publish!,
     publication,
     CompositionConversion,

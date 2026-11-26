@@ -893,7 +893,7 @@ and returns a report. Both the report and the result of an import have:
   file, and the criteria that fail when they cannot (a citation that cannot be identified, a property
   or a phase that is not in the ThermoML lists, a mixture without its composition, an uncertainty
   without coverage). The package stores the data in either case; see the table of requirements in
-  the tutorial "Adding your own data";
+  the tutorial "Dealing with your own data and db";
 - `ignored`: what the file holds that this version does not store (the data of the samples, the
   notes), which is also a warning.
 

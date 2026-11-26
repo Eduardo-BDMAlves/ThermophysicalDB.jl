@@ -2,12 +2,17 @@
 CurrentModule = ThermophysicalDB
 ```
 
-# [Adding your own data](@id tutorial_own_data)
+# [Dealing with your own data and db](@id tutorial_own_data)
 
-The NIST archive is read-only: you never change it. Points from an article that is not in it, and the points you measured yourself, go into **databases of your own**, which are searched together with the archive as if they were one (see [Several databases that look like one](@ref updates)). This tutorial adds two hypothetical sets of data, in two ways:
+The NIST archive is read-only: you never change it. Points from an article that is not in it, and the points you measured yourself, go into **databases of your own**, which are searched together with the archive as if they were one (see [Several databases that look like one](@ref updates)). This tutorial follows an experimentalist from the first idea to the published article, and uses every tool of the package for that:
 
-1. **Programmatically**, building the data step by step with the objects of the package: a [`ReferenceRef`](@ref) (the article or the notebook), an [`ExperimentRef`](@ref) (one system measured) and the points.
-2. **With a spreadsheet**: the package writes an Excel template, you fill it in and the package reads it back. Two filled examples are ready to download: [`example-literature.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-literature.xlsx) and [`example-own-measurements.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-own-measurements.xlsx).
+1. **Looking for a gap** in what the literature already has, to decide what to measure.
+2. **Creating databases** of your own, and adding data to them in two ways: by code, with the objects of the package ([`ReferenceRef`](@ref), [`ExperimentRef`](@ref) and the points), and with an **Excel spreadsheet** that the package writes, you fill in and it reads back.
+3. **Editing** what you typed wrongly, and **naming** the experiments, so that months of measurements can be sorted into the articles they will become.
+4. **Tables and figures for the paper**: the references table, the points and a figure in which only your data of that article are "This work", even when the database holds more.
+5. **Publishing**: when the article is out, its points move to the literature with the right reference, and the rest of your notebook stays.
+
+Two filled spreadsheets are ready to download: [`example-literature.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-literature.xlsx) and [`example-own-measurements.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-own-measurements.xlsx). All the numbers of the tutorial are invented to show the mechanics: they come from no article and no laboratory.
 
 ```@setup own
 Main.DocsSetup.activate!()
@@ -37,6 +42,21 @@ add_database!(db, "papers"; kind = :literature, dir = root)
 add_database!(db, "my_lab"; dir = root)   # kind = :user is the default
 members(db)
 ```
+
+## Looking for a gap in the literature
+
+A measurement is worth the most where nobody has measured. Before the first sample is prepared, ask the archive what exists. The story of this tutorial is the **mass density of liquid ethanol**, ``\rho = m/V``, and the question is at which temperatures and pressures it has been measured. [`plot_xpt`](@ref) draws the plane of temperature and pressure of a selection, and `color = :count` colours each cell by the number of points in it, so the empty cells are the conditions that nobody has covered:
+
+```@example own
+using CairoMakie
+
+survey = points(db; component = "ethanol", pure = true, property = "Mass density")
+plot_xpt(survey; color = :count, backend = :makie, size = (760, 460))
+```
+
+A liquid is almost incompressible, and the density is the quantity that shows it: ``\kappa_T = \rho^{-1} (\partial\rho/\partial P)_T`` is of the order of 10⁻⁹ Pa⁻¹ for ethanol, so 50 MPa (500 bar) packs the molecules about 5 % closer. Most of the points are near atmospheric pressure, where the instruments are simple, and the high pressures, the corners with no points, are where a new bench can add something. The same survey of the *sources*, in a table, says who is there: `reference_summary(survey)` lists the articles of the selection (see [Tables for a paper: exporting points and references](@ref tutorial_export)).
+
+This tutorial's bench chooses an isotherm at 303.15 K from atmospheric pressure to 50 MPa, and one at 323.15 K. The volumetric heat capacity (see below) is measured on a second bench.
 
 ## A point from the literature, step by step
 
@@ -162,40 +182,82 @@ uncertainty_table(pure)
 
 That is 0.01 % of 298.15 K, 0.0298 K, and not 0.01 % of 25 K. An absolute uncertainty with a unit is a difference instead, so `"0.05 degC"` is 0.05 K and `"0.09 degF"` is 0.05 K. The rule is part of the uncertainty documentation: [A percentage of a temperature is taken of the absolute scale](@ref).
 
-## Your own measurements
+## Your own measurements, by code
 
-Your bench data go the same way, into the `my_lab` database. The difference is in what you know about them: you know how the sample was made and what the instrument can do, so you can state the uncertainty yourself. The volumetric heat capacity of ethanol at three temperatures, with an expanded relative uncertainty of 1 % (``k = 2``) and the uncertainty of the thermometer:
+The densimeter, a vibrating-tube instrument, measures the **period** of oscillation of a tube filled with the sample, which depends on the mass in it and so on the density. The bench data go into the `my_lab` database. The difference to the literature is in what you know about them: you know how the sample was made and what the instrument can do, so you can state the uncertainty yourself. A notebook (a reference without a DOI) holds the work, and each isotherm is an experiment of the pure ethanol:
 
 ```@example own
 notebook = add_reference!(
     db;
     database = "my_lab",
-    title = "Laboratory measurements of ethanol (example)",
+    title = "Laboratory notebook of the densimeter, 2026 (example)",
     year = 2026,
     authors = ["Alves, E."],
 )
 
-ethanol = add_experiment!(notebook; components = ["ethanol"])
+isotherm_303 = add_experiment!(notebook; components = ["ethanol"])
 
-for (T, c) in ((303.15, 1.95), (313.15, 1.97), (323.15, 1.99))
+for (P, ρ) in ((101.325, 780.9), (10_000.0, 791.6), (30_000.0, 808.9), (50_000.0, 824.5))
     add_measurement!(
-        ethanol;
-        property = "Heat capacity at constant pressure per volume",
-        unit = "J/K/cm3",
-        value = c,
-        temperature = T,
-        pressure = 101.325,
-        unc = "1 %",                                  # of the value, in the unit of the value
+        isotherm_303;
+        property = "Mass density",
+        unit = "kg/m3",
+        value = ρ,
+        temperature = 303.15,
+        pressure = P,                                       # kPa
+        unc = "0.05 %",                                     # of the value, in the unit of the value
         unc_k = 2,
-        unc_temperature = UncertaintyTerm(0.05; k = 2),   # K
-        method = "Micro DSC",
+        unc_temperature = UncertaintyTerm(0.02; k = 2),     # K
+        unc_pressure = UncertaintyTerm(50.0; k = 2),        # kPa
+        phase = "Liquid",
+        method = "Vibrating tube densimeter",
     )
 end
 
 table(points(db; source = "my_lab"))
 ```
 
-The values are hypothetical. The heat capacity of a liquid grows slowly with temperature, because more modes of motion (rotations and internal vibrations of the molecules) become available to store the energy that is added; so the three numbers going up is a quick sanity check on what you typed, and a decrease would deserve a second look.
+The values are hypothetical. The density grows with pressure, as ``\kappa_T`` says, and the growth slows down: the same step of 20 MPa adds less at 50 MPa than at 10 MPa because the liquid is already more compact. A decrease with pressure would deserve a second look at what you typed.
+
+Weeks later the second isotherm is measured. It is another experiment of the same notebook. An experiment that you add has a **name**, so it can be found again: `<database>_yyyy_mm_dd_HH:MM`, followed by `_<name of the compound>` when the system is a pure substance, unless you give one with `name`:
+
+```@example own
+isotherm_323 = add_experiment!(notebook; components = ["ethanol"], name = "dens-323")
+
+for (P, ρ) in ((101.325, 763.4), (10_000.0, 775.2), (30_000.0, 794.9), (50_000.0, 811.8))
+    add_measurement!(
+        isotherm_323;
+        property = "Mass density",
+        unit = "kg/m3",
+        value = ρ,
+        temperature = 323.15,
+        pressure = P,
+        unc = "0.05 %",
+        unc_k = 2,
+        unc_temperature = UncertaintyTerm(0.02; k = 2),
+        unc_pressure = UncertaintyTerm(50.0; k = 2),
+        phase = "Liquid",
+        method = "Vibrating tube densimeter",
+    )
+end
+
+experiment_names(points(db; source = "my_lab"))   # the names of each point's experiment
+```
+
+### Editing what you typed
+
+A mistake that is noticed later does not mean starting again. [`update_points!`](@ref) changes columns of a selection (a number, a vector, or a function of the current value): the densimeter was recalibrated with water, which says that every density is 0.04 % higher than it was written. [`remove_points!`](@ref) removes a selection, and like [`move_reference!`](@ref) and [`publish!`](@ref) it only says what would go unless `confirm = true`: the pump was unstable at one point of the 323.15 K isotherm.
+
+```@example own
+density = points(db; source = "my_lab", property = "Mass density")
+update_points!(db, density; value = v -> v * 1.0004, on_conflict = :error)
+
+unstable = points(db; source = "my_lab", temperature = (322.0, 324.0), pressure = (29_000.0, 31_000.0))
+remove_points!(db, unstable; confirm = true)
+length(points(db; source = "my_lab"))
+```
+
+The changes are in memory, and each one is written in the audit log of the database when it is saved. Whole articles go with [`remove_reference!`](@ref).
 
 ### Saving
 
@@ -205,9 +267,9 @@ Everything so far is in memory. [`save_database`](@ref) writes a database of you
 save_database(db, "my_lab")
 ```
 
-## With a spreadsheet
+## Your own measurements, with a spreadsheet
 
-Typing points one by one is fine for ten points and tedious for ten thousand. The same two steps, with an Excel file instead of code, come with the extension that loads when you load `XLSX`:
+Typing points one by one is fine for ten points and tedious for ten thousand. A second bench, a micro DSC that measures the **volumetric heat capacity** (the heat that one cubic centimetre of liquid absorbs per kelvin, ``c_p^V = \rho\, c_p``), writes its results in Excel. The same steps as above, with an Excel file instead of code, come with the extension that loads when you load `XLSX`:
 
 ```@example own
 using XLSX   # loading it activates the spreadsheet functions
@@ -225,6 +287,20 @@ The file has these sheets:
 | `Reference` | the target database, its kind (Literature or User), the DOI, the authors, the title and the compounds |
 | `EXP-1`, `EXP-2`... | one experiment each: name, property, phase, method, components, composition scale, and below it the **units** and the **uncertainty type** (absolute or relative in %) of each column |
 | `PTS-1`, `PTS-2`... | the points of the experiment: the amounts, `T`, `P`, the value and the uncertainty of each (`u(x)`, `u(T)`, `u(P)`, `u(value)`), one point per row (up to 200). Under each header, `u given as` chooses *absolute* or *relative (%)* and `k` is the coverage factor of that column |
+
+The three kinds of sheet, as the filled example [`example-own-measurements.xlsx`](https://github.com/Eduardo-BDMAlves/ThermophysicalDB.jl/raw/main/docs/src/assets/example-own-measurements.xlsx) shows them. In `Reference` the target database (`my_lab`), its kind (User), the work (here a notebook, with no DOI) and the compounds with their samples:
+
+![The sheet Reference: the target database, the work and the compounds of the example](../assets/template-reference.png)
+
+In each `EXP-n` sheet, the experiment: what was measured, the system and, calculated by the template, the coverage of its points:
+
+![The sheet EXP-1: the experiment of the example](../assets/template-experiment.png)
+
+And in `PTS-n` the points, one per row, with the unit, how the uncertainty is given (absolute or relative) and the coverage factor of each column. The temperature of this bench is in °C and the uncertainty of the value is relative, in %:
+
+![The sheet PTS-1: three points with their uncertainties](../assets/template-points.png)
+
+(The pictures are the example file drawn by LibreOffice; Excel shows the same cells.)
 
 Only the input cells (the colours are explained in the `Guide`) are for you; the rest is protected. Property, method, phase, sample source, supplier, purity analysis, purification, units and scale are menus: the values that your databases already use come first (most used first), followed by generic choices, so a new point most likely joins what is already there. Method and supplier also accept your own text. Open `template.xlsx`, fill it in and save, or start from one of the examples:
 
@@ -287,67 +363,170 @@ A few things the template accepts and checks:
 !!! warning "Not stored yet"
     The note column, the sample data of the `Reference` sheet (purity, supplier...) and the "where in the article" fields are read but **not stored yet**. The import says so with a warning and in `result.ignored`; nothing is lost silently.
 
+## Naming the experiments
+
+Months pass, and the database fills with experiments of both benches, some for the first article, some for the second, some for no article yet. What separates them is **names**. Every experiment has at least one (see above), and you can add more with [`add_name!`](@ref) to the experiments of any selection; a name that several experiments share is the name of a group, and an experiment can have several names, so a group never takes away the name of another:
+
+```@example own
+density = points(db; source = "my_lab", property = "Mass density")
+add_name!(density, "density-isotherms")
+
+heat_capacity = points(db; source = "my_lab", property = "Heat capacity at constant pressure per volume")
+add_name!(heat_capacity, "cp-micro-dsc")
+
+experiment_names(points(db; source = "my_lab"))
+```
+
+The names are a filter of [`points`](@ref) (`experiment = "name"`, a `Regex`, or a vector of names), they are kept in the database and they go with the experiment if it moves to another database:
+
+```@example own
+table(points(db; experiment = "density-isotherms"))
+```
+
+A name can be changed with [`modify_name!`](@ref): on the database, in every experiment that has it (the publications that cite it follow it, see below), or on a selection, only there. [`remove_name!`](@ref) takes one, several (a vector) or all (`true`) away from a selection. As with [`remove_points!`](@ref), nothing happens without `confirm = true`, and the result says what would change:
+
+```@example own
+modify_name!(db, "cp-micro-dsc", "cp-bench-b")                    # what would change
+modify_name!(db, "cp-micro-dsc", "cp-bench-b"; confirm = true)
+add_name!(points(db; experiment = "cp-bench-b"), "check")          # a second name
+remove_name!(points(db; experiment = "check"), "check"; confirm = true)
+experiment_names(points(db; experiment = "cp-bench-b"))
+```
+
+The same works for the experiments that come from the ThermoML archive (`add_name!` on a selection of the archive), which is how you can label "the ones I compare with": the archive itself is not changed, the names are kept in a file next to it. The name is also the way to point at points that you have not measured yet; it is given when the experiment is added:
+
+```@example own
+later = add_experiment!(
+    add_reference!(db; database = "my_lab", title = "Laboratory notebook, autumn (example)", year = 2026),
+    components = ["ethanol"],
+    name = "dens-313-extra",
+)
+add_measurement!(
+    later;
+    property = "Mass density",
+    unit = "kg/m3",
+    value = 771.8,
+    temperature = 313.15,
+    pressure = 20_000.0,
+    unc = "0.05 %",
+    unc_k = 2,
+    method = "Vibrating tube densimeter",
+)
+length(points(db; source = "my_lab"))
+```
+
+The database now holds more than any one article will use: that point at 313.15 K belongs to no article yet.
+
 ## Calling your data "This work"
 
-Next to the literature, the points of your bench should not look like one more article. Tell the database what your data are going to be published as, with a [`Publication`](@ref); only the label is needed, the rest describes the article for the references and can be completed (with the DOI, once there is one) by setting the publication again:
+Next to the literature, the points of your bench should not look like one more article, but only the points of the article you are writing. A [`Publication`](@ref) describes an article and, with `name` and `experiments`, which experiments (by name) are its data. Two articles are being written at the same time, and each takes its own:
 
 ```@example own
-set_publication!(
+add_publication!(
     db,
     Publication(;
-        title = "Heat capacity of liquids on a new micro DSC (example)",
+        name = "paper-A",
+        title = "Density of ethanol up to 50 MPa (example)",
         authors = ["Alves, E."],
         year = 2026,
+        experiments = ["density-isotherms"],
     ),
 )
-publication(db)
-```
-
-From now on [`table`](@ref) of a selection has the column `work`: "This work" for every point of a database of kind `:user` and "Literature" for the rest. It is a column of its own, `source` still says which database of the references each point comes from. Water is in both the literature and your bench, so it makes a comparison:
-
-```@example own
-water = points(
-    db;
-    component = "water",
-    pure = true,
-    property = "Heat capacity at constant pressure per volume",
+add_publication!(
+    db,
+    Publication(;
+        name = "paper-B",
+        title = "Heat capacity of ethanol by micro DSC (example)",
+        authors = ["Alves, E."],
+        year = 2026,
+        experiments = ["cp-bench-b"],
+    ),
 )
-sort(unique(table(water).work))
+publications(db)
 ```
 
-The figures use it without being asked. Your points are **one group** of their own, however many databases of kind `:user` they come from: a star in the highlight colour of the style, drawn on top of the literature, with the label of the publication in the legend. The literature keeps the groups that `marker_by` says (the article, by default):
+A publication refers to **names**, not to points: it is not changed by measuring more, by adding a name or by renaming one (a name that a publication uses cannot be lost). `this_work = "paper-A"` in [`table`](@ref), in the figures and in the exports says which points are "This work" in that output. The points of your databases that are not in it are "Own data", and the literature is "Literature":
 
 ```@example own
-using CairoMakie
-plot_facets(water; by = :property, backend = :makie, size = (760, 420))
+mine = points(db; source = "my_lab", property = "Mass density")
+t = table(mine; this_work = "paper-A")
+unique(zip(t.work, t.temperature, t.pressure))
 ```
 
-`marker_by = :work` puts all the literature together as well, which is often what a validation of a new bench needs, one group against the other; `this_work = false` in [`table`](@ref) (and in the figures) leaves the label out, and `this_work = Publication(...)` asks for it without changing the database.
+The point at 313.15 K is in the selection and in the database, and it is "Own data": it is not in paper A. A selection of points can also be given as `this_work`, when a name is more than you need.
+
+### A figure of paper A
+
+The same holds for the figures: your points of the article are one group of their own, in the highlight colour and marker of the style, drawn on top of the literature, with the label of the publication in the legend. The literature keeps the groups of `marker_by` (the article, by default):
 
 ```@example own
-plot_facets(water; by = :property, marker_by = :work, backend = :makie, size = (760, 420))
+density_all = points(db; component = "ethanol", pure = true, property = "Mass density")
+plot_isotherms(density_all; this_work = "paper-A", backend = :makie, size = (760, 460))
 ```
 
-The publication belongs to the databases of kind `:user`: [`set_publication!`](@ref) gives it to all of them, so that all the points make one group (`database = "my_lab"` gives it to one only), and a database that is saved keeps it in its description file, with the data.
+The point at 313.15 K is in the figure, because it is in the selection, but it is not a star: it is not in paper A, so it is one more point of the others (the group is named by its year, the notebook having no DOI). The plane of the first figure can be drawn again, now with the conditions that paper A added (the cells that were empty have stars):
 
-### Writing the tables and the references of a paper or of a report
+```@example own
+plot_xpt(density_all; this_work = "paper-A", backend = :makie, size = (760, 460))
+```
 
-The same selection exports as it is shown, and the publication says how your data are referred to. `cite` is kept in the `Publication` and every export takes `cite = ...` to choose again for that file:
+`marker_by = :work` puts all the literature together as well, which is often what a validation of a new bench needs, one group against the other.
+
+### The tables and the references of the paper
+
+The same selection exports as it is shown, and the publication says how your data are referred to. A paper that contains its own data does not cite itself: by default the `reference` column says "This work" and the `.bib` has no entry for it, and the references table has the articles of the *others* that are in the selection. With `cite = :unpublished` the data get the key of an `@unpublished` entry (title, authors, year and note of the publication), for a report or for a paper that cites your work in preparation, and `cite = :published` the key of the article of the DOI, once it is out. `cite` is kept in the `Publication` and every export can choose again:
 
 | `cite` | The `reference` column and the references table | The `.bib` | For |
 | :-- | :-- | :-- | :-- |
 | `:label` (default) | "This work" | no entry | the paper that publishes the data: it does not cite itself |
-| `:unpublished` | the key of an `@unpublished` entry (title, authors, year and note of the publication) | that entry | an internal report, or a paper that cites your unpublished work |
+| `:unpublished` | the key of an `@unpublished` entry | that entry | an internal report, or a paper that cites your unpublished work |
 | `:published` | the key of the article of the DOI | the entry of the DOI, from the resolver and completed with the fields of the publication | once the paper is out (needs `doi`) |
 
-```julia
-set_publication!(db, Publication(; authors = ["Surname, N."], title = "Heat capacity of ...", year = 2026))
-v = points(db; property = "Mass density")
-export_points("paper_tables", v)                          # "This work", no entry in the .bib
-export_points("report_tables", v; cite = :unpublished)    # the key, and an @unpublished entry
+```@example own
+comparison = points(db; component = "ethanol", pure = true, property = "Mass density")
+out = mktempdir()
+
+export_points(joinpath(out, "paper_A"), comparison; this_work = "paper-A", formats = (:csv, :tex))
+write_references(joinpath(out, "paper_A_refs"), comparison; this_work = "paper-A", online = false, cache = false, progress = false)
+sort(readdir(out))
 ```
 
-A selection of several databases is written as one list: the points of each database one after the other in the same file (the header once), the articles of all of them in one `.bib` (an article that two databases hold, with the same DOI, is one entry with one key), and one row in the references table for each property of your data, whatever the references they have. `write_bibtex`, `write_references`, `reference_summary` and `bibtex` do the same for a selection of a database. The ThermoML formats are for one database: export each part of `parts(view)`.
+A selection of several databases is written as one list: the points of each database one after the other in the same file (the header once), the articles of all of them in one `.bib` (an article that two databases hold, with the same DOI, is one entry with one key), and one row of the references table for each property of your data. The ThermoML formats are for one database: export each part of `parts(view)`. The file has what the selection has: the point at 313.15 K is in the first export, as "Own data", and the selection by name leaves it out:
+
+```@example own
+only_a = points(db; experiment = "density-isotherms")
+export_points(joinpath(out, "paper_A_only"), only_a; this_work = "paper-A", formats = (:csv,))
+```
+
+## When the article is published
+
+The databases never mix: your data stay in `my_lab`, the literature in its own database, and the ThermoML archive is read only. What crosses is what you decide to move, and for it the package has two functions, both of which only say what they would do until `confirm = true`:
+
+- [`move_experiments!`](@ref) moves the experiments that a name or a selection says to another database of yours, and [`move_reference!`](@ref) a whole reference. When only some points of an experiment are selected, those are copied and the others stay. The names go with the experiments.
+- [`publish!`](@ref) is the flow for the points of one article once it has a DOI: they become the reference of that article (title, authors, journal, year and pages from the DOI, completed with the publication), in a database of literature, and the publication ends. The rest of your notebook, here the 313.15 K point, the check of the instrument you did not publish and paper B, stays where it is.
+
+Paper A is out. First, what would happen, then do it:
+
+```@example own
+add_database!(db, "papers_lit"; kind = :literature, dir = root)   # the destination, a database of literature
+
+plan = publish!(db, "paper-A"; doi = "10.5555/example.2026.100", to = "papers_lit", online = false)
+(plan.published, plan.points, plan.experiments, plan.references)
+```
+
+```@example own
+publish!(db, "paper-A"; doi = "10.5555/example.2026.100", to = "papers_lit", online = false, confirm = true)
+length(points(db; source = "papers_lit")), length(points(db; source = "my_lab"))
+```
+
+The points are now literature (and the reference of the article has its DOI), found by the name they kept; paper B and the point at 313.15 K are still in `my_lab`, and the figures and tables of paper B still know what is "This work":
+
+```@example own
+points(db; experiment = "density-isotherms")
+publications(db)
+```
+
+`publish!(db; doi = ...)` with no name publishes all the data of your databases, the publication of [`set_publication!`](@ref), for the case in which everything you measured is one article. `publish!(db, selection; doi = ...)` takes any selection of points. In memory until [`save_database`](@ref), which writes the audit log of the move in both databases.
 
 ## What a reference needs
 

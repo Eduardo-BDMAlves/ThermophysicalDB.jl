@@ -321,10 +321,20 @@ end
     )
     view = T.points(db; duplicate = false)
     text = sprint(show, MIME("text/plain"), view)
-    @test occursin("1 repeated points left out", text) && occursin("1 conflicts", text)
+    @test occursin("There are 1 point omitted", text) && occursin("1 conflicts", text)
+    @test occursin("duplicate = true", text)
     @test !occursin(
-        "left out",
+        "omitted",
         sprint(show, MIME("text/plain"), T.points(db; duplicate = true)),
+    )
+    # The table of the selection says it too.
+    @test occursin(
+        "There are 1 point omitted",
+        sprint(show, MIME("text/plain"), T.table(view)),
+    )
+    @test !occursin(
+        "omitted",
+        sprint(show, MIME("text/plain"), T.table(T.points(db; duplicate = true))),
     )
     rep = T.duplicates(db)
     shown = sprint(show, MIME("text/plain"), rep)

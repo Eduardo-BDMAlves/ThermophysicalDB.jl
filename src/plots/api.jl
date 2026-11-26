@@ -16,7 +16,10 @@ default), `backend` the plotting package and `spec = true` the [`FigureSpec`](@r
 drawing it. The defaults are those of [`plot_defaults`](@ref). When the database has a
 [`Publication`](@ref) ([`set_publication!`](@ref)) the points of the user are one group of their
 own, "This work" by default, in the highlight colour and marker of the style and drawn last, whatever
-`marker_by` is; `marker_by = :work` tells only them from the rest.
+`marker_by` is; `marker_by = :work` tells only them from the rest. `this_work` says which points
+those are when there is more than one publication or only some of your points are in it: the name
+of a publication (`this_work = "paper-A"`, see [`add_publication!`](@ref)), a selection of points
+or `false`.
 """
 
 function draw(

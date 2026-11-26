@@ -253,12 +253,18 @@ function points(
     relative_uncertainty = nothing,
     unit = nothing,
     policy::Symbol = :nominal,
+    experiments = nothing,
 )
     match in (:any, :all) || throw(ArgumentError("match must be :any or :all, got :$match"))
     ds = view.dataset
     m = ds.measurements
     refs = reference_mask(ds, doi, author, source, year)
     experiment_ok = experiment_mask(ds, component, match, exact, pure, refs)
+    if experiments !== nothing
+        chosen = falses(length(experiment_ok))
+        chosen[experiments] .= true
+        experiment_ok .&= chosen
+    end
     limits = fraction_limits(ds, fraction)
     composition_ok = composition_mask(ds, limits, xkind)
     composition_ok === nothing || (experiment_ok .&= composition_ok)

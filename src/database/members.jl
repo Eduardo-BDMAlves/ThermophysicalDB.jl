@@ -73,7 +73,10 @@ mutable struct Member
     # What was removed or replaced in memory since the last save, as (event, detail); the audit log
     # records it when it becomes permanent, at `save_database`.
     edits::Vector{Tuple{String,String}}
-    publication::Union{Nothing,Publication}
+    publications::Vector{Publication}
+    # Names that the user gave to the experiments of a read-only archive, by (DOI, number of the
+    # experiment); `nothing` until they are read from the file beside the archive.
+    archive_names::Union{Nothing,Dict{Tuple{String,Int32},Vector{String}}}
 end
 
 function Member(
@@ -83,7 +86,7 @@ function Member(
     dataset::Union{Nothing,Dataset} = nothing,
     priority::Integer = DEFAULT_PRIORITY[kind in MEMBER_KINDS ? kind : :user],
     persistent::Bool = kind !== :user,
-    publication::Union{Nothing,Publication} = nothing,
+    publications::AbstractVector{Publication} = Publication[],
 )
     isempty(strip(name)) && throw(ArgumentError("a database needs a name"))
     kind in MEMBER_KINDS ||
@@ -100,7 +103,8 @@ function Member(
         nothing,
         ReentrantLock(),
         Tuple{String,String}[],
-        publication,
+        collect(Publication, publications),
+        nothing,
     )
 end
 
