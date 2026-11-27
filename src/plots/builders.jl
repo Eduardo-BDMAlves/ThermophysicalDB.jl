@@ -104,8 +104,10 @@ function group_layers(
     layers = Layer[]
     for (k, g) in enumerate(groups)
         marker, filled, mine = group_look(style, g, k)
-        c = if color === nothing
-            something(mine, style.palette[1])
+        c = if mine !== nothing
+            mine     # "This work" has the colour of the highlight: it is not lost among the colours of the values
+        elseif color === nothing
+            style.palette[1]
         elseif color isa AbstractString
             String(color)
         else
@@ -121,7 +123,7 @@ function group_layers(
                 marker,
                 filled,
                 label = g.label,
-                size = g.highlight ? style.markersize + 3 : style.markersize,
+                size = g.highlight ? style.markersize * 1.9 : style.markersize,
             ),
         )
     end
@@ -692,8 +694,14 @@ function figure_xpt(
     xunit = nothing,
     yunit = nothing,
     cunit = nothing,
+    xscale::Symbol = :linear,
+    yscale::Symbol = :linear,
     kwargs...,
 )
+    for sc in (xscale, yscale)
+        sc in (:linear, :log10) ||
+            throw(ArgumentError("a scale is :linear or :log10, got $(repr(sc))"))
+    end
     opts, filters = split_options(kwargs)
     d = prepare_data(
         data,
@@ -706,7 +714,7 @@ function figure_xpt(
     xlabel = variable_label(d, x; format = o.format)
     ylabel = variable_label(d, y; format = o.format)
     if color === :count
-        return xpt_counts(d, xs, ys, xlabel, ylabel, bins, o)
+        return xpt_counts(d, xs, ys, xlabel, ylabel, bins, o; xscale, yscale)
     end
     cs = variable_values(d, color)
     mask = highlight === nothing ? falses(length(d)) : highlight_mask(d, highlight)
@@ -747,6 +755,8 @@ function figure_xpt(
         layers,
         xlabel,
         ylabel,
+        xscale,
+        yscale,
         colorbar,
         colormap = o.style.colormap,
         colorrange = Float64.(limits),
@@ -770,37 +780,67 @@ function highlight_mask(d::PlotData, highlight)
     return BitVector([Bool(test(l)) for l in labels])
 end
 
-function xpt_counts(d, xs, ys, xlabel, ylabel, bins, o)
-    all(isfinite, xs) && all(isfinite, ys) || (
-        keep = [i for i in eachindex(xs) if isfinite(xs[i]) && isfinite(ys[i])];
-        xs = xs[keep];
-        ys = ys[keep]
-    )
-    isempty(xs) && throw(ArgumentError("there are no points to count"))
+# The map of the number of points in each cell of the plane; the points of the user (`work` of the
+# table) are drawn over it, so that the cells with no points show where they are. On a logarithmic
+# axis the cells are equal in the logarithm.
+function xpt_counts(d, xs, ys, xlabel, ylabel, bins, o; xscale = :linear, yscale = :linear)
+    xs = collect(Float64, xs)
+    ys = collect(Float64, ys)
+    usable(v, sc) = isfinite(v) && (sc === :linear || v > 0)
+    keep = [i for i in eachindex(xs) if usable(xs[i], xscale) && usable(ys[i], yscale)]
+    isempty(keep) && throw(ArgumentError("there are no points to count"))
+    work = work_labels(d)
+    mine =
+        work === nothing ? falses(length(xs)) :
+        BitVector([w != LITERATURE_LABEL && w != OWN_LABEL for w in work])
+    forward(v, sc) = sc === :log10 ? log10(v) : v
+    back(v, sc) = sc === :log10 ? 10.0^v : v
+    tx = [forward(xs[i], xscale) for i in keep]
+    ty = [forward(ys[i], yscale) for i in keep]
     nx, ny = bins
-    x0, x1 = extrema(xs)
-    y0, y1 = extrema(ys)
+    x0, x1 = extrema(tx)
+    y0, y1 = extrema(ty)
     x1 == x0 && (x1 = x0 + 1)
     y1 == y0 && (y1 = y0 + 1)
     xe = collect(range(x0, x1; length = nx + 1))
     ye = collect(range(y0, y1; length = ny + 1))
     counts = zeros(nx, ny)
-    for i in eachindex(xs)
-        ix = min(nx, 1 + floor(Int, (xs[i] - x0) / (x1 - x0) * nx))
-        iy = min(ny, 1 + floor(Int, (ys[i] - y0) / (y1 - y0) * ny))
+    for k in eachindex(tx)
+        mine[keep[k]] && continue
+        ix = min(nx, 1 + floor(Int, (tx[k] - x0) / (x1 - x0) * nx))
+        iy = min(ny, 1 + floor(Int, (ty[k] - y0) / (y1 - y0) * ny))
         counts[ix, iy] += 1
     end
+    any(>(0), counts) || throw(ArgumentError("there are no points to count"))
     z = replace(counts, 0.0 => NaN)
     limits = (1.0, maximum(counts))
     limits = limits[1] == limits[2] ? (0.0, limits[2]) : limits
-    layer = Layer(; kind = :heatmap, x = xe, y = ye, z)
+    layers = [Layer(; kind = :heatmap, x = back.(xe, xscale), y = back.(ye, yscale), z)]
+    star = [i for i in keep if mine[i]]
+    if !isempty(star)
+        push!(
+            layers,
+            Layer(;
+                kind = :scatter,
+                x = xs[star],
+                y = ys[star],
+                color = o.style.highlight,
+                marker = o.style.highlight_marker,
+                filled = true,
+                label = String(work[first(star)]),
+                size = o.style.markersize * 1.6,
+            ),
+        )
+    end
     colorbar = ColorbarSpec(raw"\mathrm{points}", o.style.counts, limits)
     panel = PanelSpec(;
-        layers = [layer],
+        layers,
         xlabel,
         ylabel,
+        xscale,
+        yscale,
         colorbar,
-        legend = false,
+        legend = !isempty(star),
         colormap = o.style.counts,
         colorrange = limits,
     )

@@ -278,6 +278,12 @@ end
     cnt = only(plot_xpt(d; color = :count, spec = true).panels)
     @test only(cnt.layers).kind === :heatmap && sum(filter(!isnan, only(cnt.layers).z)) == n
 
+    logp = only(plot_xpt(d; yscale = :log10, spec = true).panels)
+    @test logp.yscale === :log10 && logp.xscale === :linear
+    logc = only(plot_xpt(d; color = :count, yscale = :log10, spec = true).panels)
+    @test logc.yscale === :log10 && sum(filter(!isnan, only(logc.layers).z)) == n
+    @test_throws ArgumentError plot_xpt(d; yscale = :sqrt, spec = true)
+
     fac = plot_by_reference(d; spec = true)
     @test length(fac.panels) == 3 && fac.ncols == 3 && fac.nrows == 1
     @test [p.tag for p in fac.panels] == ["(a)", "(b)", "(c)"]

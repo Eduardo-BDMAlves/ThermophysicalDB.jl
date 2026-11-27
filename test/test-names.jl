@@ -108,6 +108,18 @@ end
         # The figures get the same column from `this_work`.
         d = T.plotdata(T.points(db; source = "my_lab"); this_work = "paper-A")
         @test count(==("Paper A"), T.column(d, :work)) == 2
+        # The count map of the plane draws the points of the publication over it, on any scale.
+        map = only(
+            T.plot_xpt(
+                T.points(db);
+                this_work = "paper-A",
+                color = :count,
+                yscale = :log10,
+                spec = true,
+            ).panels,
+        )
+        @test map.yscale === :log10
+        @test any(l -> l.kind === :scatter && l.label == "Paper A", map.layers)
         # A selection works the same way as the name of the publication.
         sel = T.points(db; experiment = "visc-run")
         t2 = T.table(T.points(db); this_work = sel)

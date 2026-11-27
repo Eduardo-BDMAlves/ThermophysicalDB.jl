@@ -97,11 +97,16 @@ $PLOT_COMMON
 plot_residuals(data; kwargs...) = draw(figure_residuals, data; kwargs...)
 
 """
-    plot_xpt(data; color = :value, highlight = nothing, ...)
+    plot_xpt(data; color = :value, highlight = nothing, xscale = :linear, yscale = :linear, ...)
 
 The plane of temperature and pressure of the points, coloured by the value of the property;
-`color = :count` counts the points in each cell, and `highlight` (a DOI or a list of them, a
-`Regex` or a function) draws the points of those references as stars ("This work").
+`color = :count` counts the points in each cell (the cells with no points are left empty, the
+conditions that nobody has measured), and `highlight` (a DOI or a list of them, a `Regex` or a
+function) draws the points of those references as stars ("This work"). With `color = :count` the
+points of the user that are "This work" (see `this_work`) are drawn over the map, and are not
+counted. `xscale` and `yscale` are `:linear` or `:log10`: the pressure spans decades, and a
+logarithmic `yscale = :log10` spreads the low pressures that a linear axis squeezes (the cells of
+the count are then equal in the logarithm).
 
 $PLOT_COMMON
 """

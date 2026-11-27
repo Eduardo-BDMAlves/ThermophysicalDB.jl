@@ -226,7 +226,7 @@ plot_ternary(ternary; style = :default)
 
 ## Your data next to the literature
 
-When the database has a [`Publication`](@ref) ([`set_publication!`](@ref)), every point of a database of kind `:user` is one group of its own in all the figures: "This work" (or the label you chose) in the legend, drawn last with the highlight colour and marker of the style, whatever `marker_by` is. `marker_by = :work` puts all the literature together as well, to compare one group with the other. The tutorial [Dealing with your own data and db](@ref tutorial_own_data) shows it with two benches, two articles in preparation and the literature; `this_work = "paper-A"` says which points are the ones of one article.
+When the database has a [`Publication`](@ref) ([`set_publication!`](@ref)), every point of a database of kind `:user` is one group of its own in all the figures: "This work" (or the label you chose) in the legend, drawn last with the highlight colour and marker of the style, whatever `marker_by` is. `marker_by = :work` puts all the literature together as well, to compare one group with the other. The tutorial [Normal use for a researcher](@ref tutorial_own_data) shows it with two benches, two articles in preparation and the literature; `this_work = "paper-A"` says which points are the ones of one article.
 
 ## Your own layout and the other package
 
