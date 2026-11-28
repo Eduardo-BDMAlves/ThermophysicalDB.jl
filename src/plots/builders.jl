@@ -104,10 +104,8 @@ function group_layers(
     layers = Layer[]
     for (k, g) in enumerate(groups)
         marker, filled, mine = group_look(style, g, k)
-        c = if mine !== nothing
-            mine     # "This work" has the colour of the highlight: it is not lost among the colours of the values
-        elseif color === nothing
-            style.palette[1]
+        c = if color === nothing
+            something(mine, style.palette[1])
         elseif color isa AbstractString
             String(color)
         else
@@ -696,6 +694,8 @@ function figure_xpt(
     cunit = nothing,
     xscale::Symbol = :linear,
     yscale::Symbol = :linear,
+    region = nothing,
+    region_label::AbstractString = "Region to measure",
     kwargs...,
 )
     for sc in (xscale, yscale)
@@ -714,7 +714,19 @@ function figure_xpt(
     xlabel = variable_label(d, x; format = o.format)
     ylabel = variable_label(d, y; format = o.format)
     if color === :count
-        return xpt_counts(d, xs, ys, xlabel, ylabel, bins, o; xscale, yscale)
+        return xpt_counts(
+            d,
+            xs,
+            ys,
+            xlabel,
+            ylabel,
+            bins,
+            o;
+            xscale,
+            yscale,
+            region,
+            region_label,
+        )
     end
     cs = variable_values(d, color)
     mask = highlight === nothing ? falses(length(d)) : highlight_mask(d, highlight)
@@ -741,6 +753,7 @@ function figure_xpt(
             ),
         )
     end
+    region === nothing || pushfirst!(layers, region_layer(region, xs, ys, o, region_label))
     finite = [v for v in cs if isfinite(v)]
     isempty(finite) &&
         throw(ArgumentError("the variable $(repr(color)) has no finite values"))
@@ -780,10 +793,53 @@ function highlight_mask(d::PlotData, highlight)
     return BitVector([Bool(test(l)) for l in labels])
 end
 
+# The rectangle `(xlow, xhigh, ylow, yhigh)` of the plane (in the units of the axes) that a figure
+# marks, for instance the conditions that nobody has measured: an end that is `nothing` is the
+# end of the points of the figure.
+function region_layer(region, xs, ys, o, label)
+    (region isa Tuple || region isa AbstractVector) && length(region) == 4 || throw(
+        ArgumentError(
+            "region is (xlow, xhigh, ylow, yhigh) in the units of the axes, with nothing for an open end, got $(repr(region))",
+        ),
+    )
+    fx = [v for v in xs if isfinite(v)]
+    fy = [v for v in ys if isfinite(v)]
+    (isempty(fx) || isempty(fy)) &&
+        throw(ArgumentError("there are no points for the region"))
+    x0 = something(region[1], minimum(fx))
+    x1 = something(region[2], maximum(fx))
+    y0 = something(region[3], minimum(fy))
+    y1 = something(region[4], maximum(fy))
+    (x0 < x1 && y0 < y1) || throw(
+        ArgumentError("the region is empty: $(repr(region)) in the range of the points"),
+    )
+    return Layer(;
+        kind = :polygon,
+        x = [x0, x1, x1, x0],
+        y = [y0, y0, y1, y1],
+        color = o.style.highlight,
+        alpha = 0.15,
+        width = 1.5,
+        label = String(label),
+    )
+end
+
 # The map of the number of points in each cell of the plane; the points of the user (`work` of the
 # table) are drawn over it, so that the cells with no points show where they are. On a logarithmic
 # axis the cells are equal in the logarithm.
-function xpt_counts(d, xs, ys, xlabel, ylabel, bins, o; xscale = :linear, yscale = :linear)
+function xpt_counts(
+    d,
+    xs,
+    ys,
+    xlabel,
+    ylabel,
+    bins,
+    o;
+    xscale = :linear,
+    yscale = :linear,
+    region = nothing,
+    region_label = "Region to measure",
+)
     xs = collect(Float64, xs)
     ys = collect(Float64, ys)
     usable(v, sc) = isfinite(v) && (sc === :linear || v > 0)
@@ -816,6 +872,7 @@ function xpt_counts(d, xs, ys, xlabel, ylabel, bins, o; xscale = :linear, yscale
     limits = (1.0, maximum(counts))
     limits = limits[1] == limits[2] ? (0.0, limits[2]) : limits
     layers = [Layer(; kind = :heatmap, x = back.(xe, xscale), y = back.(ye, yscale), z)]
+    region === nothing || push!(layers, region_layer(region, xs, ys, o, region_label))
     star = [i for i in keep if mine[i]]
     if !isempty(star)
         push!(
@@ -840,7 +897,7 @@ function xpt_counts(d, xs, ys, xlabel, ylabel, bins, o; xscale = :linear, yscale
         xscale,
         yscale,
         colorbar,
-        legend = !isempty(star),
+        legend = !isempty(star) || region !== nothing,
         colormap = o.style.counts,
         colorrange = limits,
     )

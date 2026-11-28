@@ -284,6 +284,25 @@ end
     @test logc.yscale === :log10 && sum(filter(!isnan, only(logc.layers).z)) == n
     @test_throws ArgumentError plot_xpt(d; yscale = :sqrt, spec = true)
 
+    reg = only(plot_xpt(d; region = (nothing, nothing, 500.0, nothing), spec = true).panels)
+    rl = only(filter(l -> l.kind === :polygon, reg.layers))
+    @test rl.label == "Region to measure" && minimum(rl.y) == 500.0 && reg.legend
+    regc = only(
+        plot_xpt(
+            d;
+            color = :count,
+            region = (nothing, nothing, 500.0, nothing),
+            spec = true,
+        ).panels,
+    )
+    @test any(l -> l.kind === :polygon, regc.layers)
+    @test_throws ArgumentError plot_xpt(d; region = (1, 2, 3), spec = true)
+    @test_throws ArgumentError plot_xpt(
+        d;
+        region = (nothing, nothing, 1e9, nothing),
+        spec = true,
+    )
+
     fac = plot_by_reference(d; spec = true)
     @test length(fac.panels) == 3 && fac.ncols == 3 && fac.nrows == 1
     @test [p.tag for p in fac.panels] == ["(a)", "(b)", "(c)"]

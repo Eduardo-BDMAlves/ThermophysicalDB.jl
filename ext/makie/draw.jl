@@ -128,6 +128,7 @@ function draw_layer!(ax, layer::T.Layer, panel::T.PanelSpec, style::T.PlotStyle)
             color = with_alpha(c, layer.alpha),
             strokecolor = c,
             strokewidth = layer.width > 0 ? layer.width : 1.0,
+            labelled...,
         )
     elseif kind === :heatmap
         Makie.heatmap!(

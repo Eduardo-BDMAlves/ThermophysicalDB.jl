@@ -104,7 +104,10 @@ The plane of temperature and pressure of the points, coloured by the value of th
 conditions that nobody has measured), and `highlight` (a DOI or a list of them, a `Regex` or a
 function) draws the points of those references as stars ("This work"). With `color = :count` the
 points of the user that are "This work" (see `this_work`) are drawn over the map, and are not
-counted. `xscale` and `yscale` are `:linear` or `:log10`: the pressure spans decades, and a
+counted. `region = (xlow, xhigh, ylow, yhigh)`, in the units of the axes and with `nothing` for an
+open end (`region = (150, nothing, 300, nothing)` for "above 150 °C and 300 bar"), shades that
+rectangle of the plane and names it `region_label` in the legend: the conditions that you chose to
+measure. `xscale` and `yscale` are `:linear` or `:log10`: the pressure spans decades, and a
 logarithmic `yscale = :log10` spreads the low pressures that a linear axis squeezes (the cells of
 the count are then equal in the logarithm).
 

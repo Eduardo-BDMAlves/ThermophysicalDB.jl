@@ -50,7 +50,7 @@ members(db)
 
 **Why.** An experiment takes weeks of preparation, and a new isotherm of a property that ten articles already cover is worth little. Before the first sample is prepared, ask the archive what exists and at which conditions.
 
-The story of this page is the **mass density** of liquid ethanol, ``\rho = m/V``, and the question is at which temperatures and pressures it was measured. [`plot_xpt`](@ref) draws the plane of temperature and pressure of a selection, and `color = :count` colours each cell by the number of points in it: the **empty cells are the conditions that nobody has covered**. The axes are in the units that a bench uses (°C and bar, any unit the package knows), the pressure is on a logarithmic scale because it spans four decades and a linear axis squeezes everything below 100 bar into the bottom line, and `bins` sets the size of the cells:
+The story of this page is the **mass density** of liquid ethanol, ``\rho = m/V``, and the question is at which temperatures and pressures it was measured. [`plot_xpt`](@ref) draws the plane of temperature and pressure of a selection: **every literature point is a marker, and the empty areas are the conditions that nobody has covered**. The axes are in the units that a bench uses (°C and bar, any unit the package knows), and the pressure is on a logarithmic scale because it spans four decades; on a linear axis everything below 100 bar is squeezed into the bottom line:
 
 ```@example own
 using CairoMakie
@@ -58,21 +58,37 @@ using CairoMakie
 survey = points(db; component = "ethanol", pure = true, property = "Mass density")
 plot_xpt(
     survey;
-    color = :count,
     xunit = "°C",
     yunit = "bar",
     yscale = :log10,
-    bins = (24, 24),
     backend = :makie,
     size = (760, 460),
 )
 ```
 
-**What to read in it.** A liquid is almost incompressible, and the density shows it: the isothermal compressibility ``\kappa_T = \rho^{-1} (\partial\rho/\partial P)_T`` of ethanol is of the order of 10⁻⁹ Pa⁻¹, so 500 bar (50 MPa) packs the molecules about 5 % closer. That is why the high pressures matter for a density (an equation of state is fitted to them) and why they are the corners that few instruments reach. The cells near atmospheric pressure are crowded because any laboratory can measure there; the empty cells at the other edges are where a new bench adds something.
+**What to read in it.** The points crowd at atmospheric pressure and at room temperature, where any laboratory can measure. Going up in temperature the literature thins out, and **above 150 °C it stops near 300 bar**; the corner of high temperature and high pressure has no point at all. That corner is the gap, and a bench that reaches it adds something. It is also a corner that is worth having: ethanol is a liquid at 200 °C only under pressure (its critical point is about 241 °C and 61 bar), and close to the critical temperature the liquid is much more compressible, ``\kappa_T = \rho^{-1} (\partial\rho/\partial P)_T`` grows without limit at the critical point, so a small error in pressure is a large error in density and an equation of state has the most to learn there.
+
+The option `region = (xlow, xhigh, ylow, yhigh)` shades a rectangle of the plane, in the units of the axes (`nothing` is an open end), so that the conditions that you chose are on the figure. Here, above 150 °C and above 300 bar. The cells coloured by the number of points (`color = :count`) say the same with a count, and are clearer when the literature has thousands of points:
+
+```@example own
+gap = (150, nothing, 300, nothing)    # T > 150 °C and p > 300 bar
+
+plot_xpt(
+    survey;
+    color = :count,
+    xunit = "°C",
+    yunit = "bar",
+    yscale = :log10,
+    bins = (24, 24),
+    region = gap,
+    backend = :makie,
+    size = (760, 460),
+)
+```
 
 The same selection also says *who* is there: `reference_summary(survey)` lists the articles (see [Tables for a paper: exporting points and references](@ref tutorial_export)). Read the articles of the cells next to the gap before you choose the conditions, because the gap may be empty for a reason.
 
-This page's bench chooses an isotherm at 30 °C from atmospheric pressure to 500 bar, and one at 50 °C. A second bench measures the volumetric heat capacity (see below).
+This page's bench measures inside the shaded region: an isotherm at 160 °C and another at 200 °C, each from 350 to 650 bar. A second bench measures the volumetric heat capacity (see below).
 
 ## Articles that the archive lacks, step by step
 
@@ -215,19 +231,19 @@ notebook = add_reference!(
     authors = ["Alves, E."],
 )
 
-isotherm_303 = add_experiment!(notebook; components = ["ethanol"])
+isotherm_433 = add_experiment!(notebook; components = ["ethanol"])
 ```
 
-The points follow. The temperature is `"30 °C"` and the pressure is in bar, as the display of the instrument says; the package converts them to kelvin and kilopascal, which is what the archive stores, so that your points sit next to the literature without any step in between. The uncertainties, which are differences, only change scale (0.02 °C is 0.02 K, and the 0.5 bar of the pressure transducer is 50 kPa), so they are given in the stored unit, with the coverage factor ``k = 2`` that the manufacturer uses; `unc = "0.05 %"` is a relative uncertainty of the value:
+The points follow. The temperature is `"160 °C"` and the pressure is in bar, as the display of the instrument says; the package converts them to kelvin and kilopascal, which is what the archive stores, so that your points sit next to the literature without any step in between. The uncertainties, which are differences, only change scale (0.02 °C is 0.02 K, and the 0.5 bar of the pressure transducer is 50 kPa), so they are given in the stored unit, with the coverage factor ``k = 2`` that the manufacturer uses; `unc = "0.05 %"` is a relative uncertainty of the value:
 
 ```@example own
-for (P, ρ) in (("1.01325 bar", 780.9), ("100 bar", 791.6), ("300 bar", 808.9), ("500 bar", 824.5))
+for (P, ρ) in (("350 bar", 683.0), ("450 bar", 696.0), ("550 bar", 707.5), ("650 bar", 717.5))
     add_measurement!(
-        isotherm_303;
+        isotherm_433;
         property = "Mass density",
         unit = "kg/m3",
         value = ρ,
-        temperature = "30 °C",
+        temperature = "160 °C",
         pressure = P,
         unc = "0.05 %",                                  # of the value
         unc_k = 2,
@@ -241,22 +257,22 @@ end
 table(points(db; source = "my_lab"))
 ```
 
-Look at the table: the temperature is 303.15 K and the pressure is 101.325 kPa, whatever the units of the input (the table itself can show another unit, see the figures below). The values are hypothetical. The density grows with pressure, as ``\kappa_T`` says, and the growth slows down: the same step of 200 bar adds less at high pressure than at low, because the liquid is already more compact. A decrease with pressure would be a reason to look at what you typed.
+Look at the table: the temperature is 433.15 K and the pressure is 35 000 kPa, whatever the units of the input (the table itself can show another unit, see the figures below). The values are hypothetical. The density grows with pressure, as ``\kappa_T`` says, and the growth slows down: the same step of 100 bar adds less at high pressure than at low, because the liquid is already more compact. A decrease with pressure would be a reason to look at what you typed.
 
 ### Weeks later: the second isotherm, with another name
 
 The second isotherm is another experiment of the same notebook, measured weeks after the first. **Every experiment you add has a name**, so you can find it again among the hundreds that will accumulate: `<database>_yyyy_mm_dd_HH:MM`, followed by `_<name of the compound>` when the system is a pure substance, unless you give one with `name`. The first experiment above has the automatic one, and this one has the name given:
 
 ```@example own
-isotherm_323 = add_experiment!(notebook; components = ["ethanol"], name = "dens-323")
+isotherm_473 = add_experiment!(notebook; components = ["ethanol"], name = "dens-473")
 
-for (P, ρ) in (("1.01325 bar", 763.4), ("100 bar", 775.2), ("300 bar", 794.9), ("500 bar", 811.8))
+for (P, ρ) in (("350 bar", 636.0), ("450 bar", 652.0), ("550 bar", 666.0), ("650 bar", 678.5))
     add_measurement!(
-        isotherm_323;
+        isotherm_473;
         property = "Mass density",
         unit = "kg/m3",
         value = ρ,
-        temperature = "50 °C",
+        temperature = "200 °C",
         pressure = P,
         unc = "0.05 %",
         unc_k = 2,
@@ -272,7 +288,7 @@ experiment_names(points(db; source = "my_lab"))   # the names of the experiment 
 
 ### Editing what you typed
 
-**Why.** A mistake that is noticed later does not mean starting again, and a correction that is applied by hand to forty points is a new source of mistakes. [`update_points!`](@ref) changes columns of a selection with a number, a vector or a function of the current value, and [`remove_points!`](@ref) removes a selection. Two things happened in the laboratory: the densimeter was recalibrated with water, which says that every density is 0.04 % higher than it was written; and the pump was unstable at one point of the 50 °C isotherm. Like [`move_reference!`](@ref) and [`publish!`](@ref), `remove_points!` only says what would go unless `confirm = true`, because a point that is removed cannot be found again except in the audit log:
+**Why.** A mistake that is noticed later does not mean starting again, and a correction that is applied by hand to forty points is a new source of mistakes. [`update_points!`](@ref) changes columns of a selection with a number, a vector or a function of the current value, and [`remove_points!`](@ref) removes a selection. Two things happened in the laboratory: the densimeter was recalibrated with water, which says that every density is 0.04 % higher than it was written; and the pump was unstable at one point of the 200 °C isotherm (450 bar). Like [`move_reference!`](@ref) and [`publish!`](@ref), `remove_points!` only says what would go unless `confirm = true`, because a point that is removed cannot be found again except in the audit log:
 
 ```@example own
 density = points(db; source = "my_lab", property = "Mass density")
@@ -280,7 +296,7 @@ update_points!(db, density; value = v -> v * 1.0004, on_conflict = :error)
 ```
 
 ```@example own
-unstable = points(db; source = "my_lab", temperature = (322.0, 324.0), pressure = (29_000.0, 31_000.0))
+unstable = points(db; source = "my_lab", temperature = (472.0, 474.0), pressure = (44_000.0, 46_000.0))
 remove_points!(db, unstable; confirm = true)
 length(points(db; source = "my_lab"))
 ```
@@ -436,21 +452,21 @@ The same tools work for the experiments of the ThermoML archive: `add_name!` on 
 
 ### Data that no article uses yet
 
-Measurement goes on. This point at 40 °C, with a pressure of 200 bar, belongs to no article yet: it has its own name, and the publications of the next sections do not mention it. It is the reason for the care with names: the database now holds more than any one article will use.
+Measurement goes on. This point at 180 °C, with a pressure of 500 bar (inside the region as well), belongs to no article yet: it has its own name, and the publications of the next sections do not mention it. It is the reason for the care with names: the database now holds more than any one article will use.
 
 ```@example own
 later = add_experiment!(
     add_reference!(db; database = "my_lab", title = "Laboratory notebook, autumn (example)", year = 2026),
     components = ["ethanol"],
-    name = "dens-313-extra",
+    name = "dens-453-extra",
 )
 add_measurement!(
     later;
     property = "Mass density",
     unit = "kg/m3",
-    value = 771.8,
-    temperature = "40 °C",
-    pressure = "200 bar",
+    value = 681.0,
+    temperature = "180 °C",
+    pressure = "500 bar",
     unc = "0.05 %",
     unc_k = 2,
     method = "Vibrating tube densimeter",
@@ -471,7 +487,7 @@ add_publication!(
     db,
     Publication(;
         name = "paper-A",
-        title = "Density of ethanol up to 500 bar (example)",
+        title = "Density of ethanol at high temperature and pressure (example)",
         authors = ["Alves, E."],
         year = 2026,
         experiments = ["density-isotherms"],
@@ -502,11 +518,11 @@ t = table(mine; this_work = "paper-A")
 unique(zip(t.work, t.temperature, t.pressure))
 ```
 
-The point at 40 °C (313.15 K) is in the selection and in the database, and it is "Own data": it is not in paper A. A selection of points can also be given as `this_work`, when a name is more than you need.
+The point at 180 °C (453.15 K) is in the selection and in the database, and it is "Own data": it is not in paper A. A selection of points can also be given as `this_work`, when a name is more than you need.
 
 ### In a figure
 
-**Why a figure first.** The first figure of the paper is the one that says where the new data are, and it is where the labels matter. The points of the publication are one group of their own, drawn on top in the highlight colour, with the label of the publication in the legend; with `marker_by = :work` the literature is one group too, instead of one marker for each article (twenty articles are a legend that nobody reads). The figure is the plane of the survey again, now with the conditions of paper A, in °C and bar, the pressure on a logarithmic scale, and with smaller markers for the literature (`plot_style(markersize = 5.0)`), so that the stars are not lost:
+**Why a figure first.** The first figure of the paper is the one that says where the new data are, and it is where the labels matter. The points of the publication are one group of their own, drawn on top, larger than the others, with the label of the publication in the legend; with `marker_by = :work` the literature is one group too, instead of one marker for each article (twenty articles are a legend that nobody reads). The figure is the plane of the survey again, now with the conditions of paper A inside the region that was chosen, in °C and bar with the pressure on a logarithmic scale. The marker of "This work" is a hexagon (`highlight_marker`), and the colour of every marker is the density, so the new points are read against the literature next to them:
 
 ```@example own
 density_all = points(db; component = "ethanol", pure = true, property = "Mass density")
@@ -514,16 +530,17 @@ plot_xpt(
     density_all;
     this_work = "paper-A",
     marker_by = :work,
-    style = plot_style(markersize = 5.0),
+    style = plot_style(highlight_marker = :hexagon),
     xunit = "°C",
     yunit = "bar",
     yscale = :log10,
+    region = gap,
     backend = :makie,
     size = (760, 460),
 )
 ```
 
-The point at 40 °C is in the database but not in paper A, so it is not a star: the legend lists it as "Own data", apart from the literature and from "This work". The values themselves are better seen with the literature around the conditions of the bench. The filter `temperature = (285.0, 340.0)` (kelvin) keeps the neighbourhood; the density in g/cm³ and the pressure in bar, which is on a logarithmic axis, are other units than the first figure's, to show that every figure converts to the unit that you ask for (`xunit`, `yunit`, `cunit`):
+The point at 180 °C is in the database but not in paper A, so it is not highlighted: the legend lists it as "Own data", apart from the literature and from "This work". The values themselves are better seen with the literature around the conditions of the bench. The filter `temperature = (380.0, 480.0)` (kelvin) keeps the neighbourhood; the density in g/cm³ and the pressure in bar, which is on a logarithmic axis, are other units than the first figure's, to show that every figure converts to the unit that you ask for (`xunit`, `yunit`, `cunit`):
 
 ```@example own
 nearby = points(
@@ -531,13 +548,13 @@ nearby = points(
     component = "ethanol",
     pure = true,
     property = "Mass density",
-    temperature = (285.0, 340.0),
+    temperature = (380.0, 480.0),
 )
 plot_isotherms(
     nearby;
     this_work = "paper-A",
     marker_by = :work,
-    style = plot_style(markersize = 5.0),
+    style = plot_style(highlight_marker = :hexagon),
     xunit = "bar",
     xscale = :log10,
     yunit = "g/cm3",
@@ -546,7 +563,7 @@ plot_isotherms(
 )
 ```
 
-Each colour is one temperature (in kelvin, the unit of the data, since `cunit` was not given). If your isotherm follows the trend of the literature the stars lie on the line of the points around them; if it does not, either the instrument or the article is wrong, and the figure is the quickest way to see it.
+Each colour is one temperature (in kelvin, the unit of the data, since `cunit` was not given). If your isotherm follows the trend of the literature the new points lie on the line of the points around them; if it does not, either the instrument or the article is wrong, and the figure is the quickest way to see it.
 
 ### The tables and the references of the paper
 
@@ -567,7 +584,7 @@ write_references(joinpath(out, "paper_A_refs"), comparison; this_work = "paper-A
 sort(readdir(out))
 ```
 
-A selection of several databases is written as one list: the points of each database one after the other in the same file (the header once), the articles of all of them in one `.bib` (an article that two databases hold, with the same DOI, is one entry with one key), and one row of the references table for each property of your data. The ThermoML formats are for one database: export each part of `parts(view)`. The file has what the selection has: the point at 40 °C is in the first export, as "Own data", and the selection by name leaves it out:
+A selection of several databases is written as one list: the points of each database one after the other in the same file (the header once), the articles of all of them in one `.bib` (an article that two databases hold, with the same DOI, is one entry with one key), and one row of the references table for each property of your data. The ThermoML formats are for one database: export each part of `parts(view)`. The file has what the selection has: the point at 180 °C is in the first export, as "Own data", and the selection by name leaves it out:
 
 ```@example own
 only_a = points(db; experiment = "density-isotherms")
@@ -579,7 +596,7 @@ export_points(joinpath(out, "paper_A_only"), only_a; this_work = "paper-A", form
 **Why a flow of its own.** For months the points were yours, in `my_lab`. Once the article has a DOI they are literature: someone else can cite them, and the figures of the next work should draw them like any other article, with its reference. The databases never mix (your data stay in `my_lab`, the literature in its own database, and the archive is read only), so the move of the data is something that you decide, with two functions that only say what they would do until `confirm = true`:
 
 - [`move_experiments!`](@ref) moves the experiments that a name or a selection says to another database of yours, and [`move_reference!`](@ref) a whole reference. When only some points of an experiment are selected, those are copied and the others stay. The names go with the experiments.
-- [`publish!`](@ref) is the flow for the points of one article once it has a DOI: they become the reference of that article (title, authors, journal, year and pages from the DOI, completed with the publication), in a database of literature, and the publication ends. The rest of your notebook, here the 40 °C point, the heat-capacity bench and paper B, stays where it is.
+- [`publish!`](@ref) is the flow for the points of one article once it has a DOI: they become the reference of that article (title, authors, journal, year and pages from the DOI, completed with the publication), in a database of literature, and the publication ends. The rest of your notebook, here the 180 °C point, the heat-capacity bench and paper B, stays where it is.
 
 Paper A is out. The destination is a database of literature for your published data (a new one, since `papers` holds typed articles; use any you have):
 
@@ -601,7 +618,7 @@ publish!(db, "paper-A"; doi = "10.5555/example.2026.100", to = "papers_lit", onl
 length(points(db; source = "papers_lit")), length(points(db; source = "my_lab"))
 ```
 
-The points are now literature, with the reference of the article (its DOI), and are found by the name they kept; paper B and the point at 40 °C are still in `my_lab`, and the figures and tables of paper B still know what is "This work":
+The points are now literature, with the reference of the article (its DOI), and are found by the name they kept; paper B and the point at 180 °C are still in `my_lab`, and the figures and tables of paper B still know what is "This work":
 
 ```@example own
 points(db; experiment = "density-isotherms")
